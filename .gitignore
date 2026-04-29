@@ -1,0 +1,74 @@
+# --- Dependencies ---
+node_modules/
+.pnp
+.pnp.js
+
+# --- Build output ---
+out/
+dist/
+dist-ssr/
+build/
+release/
+*.local
+
+# --- Vite / electron-vite caches ---
+.vite/
+.vite-cache/
+.cache/
+.turbo/
+.parcel-cache/
+
+# --- TypeScript build info ---
+*.tsbuildinfo
+.tscache/
+
+# --- Logs ---
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- Environment ---
+.env
+.env.*
+!.env.example
+
+# --- Editor / OS ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+
+# --- Test / coverage ---
+coverage/
+.nyc_output/
+*.lcov
+
+# --- Electron / native ---
+*.tsbuildinfo
+*.node
+
+# --- Local app data (SQLite / userData copies) ---
+*.sqlite
+*.sqlite-journal
+*.db
+userData/
+
+# --- Claude Code local session memory ---
+.remember/
+.claude/
+
+# --- Misc ---
+*.pid
+*.seed
+*.pid.lock

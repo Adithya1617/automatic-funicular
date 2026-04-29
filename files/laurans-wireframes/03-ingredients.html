@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3. Ingredients · Laurans wireframe</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { margin: 0; padding: 32px 20px; font-family: var(--font-sans); background: #f8f7f2; color: var(--color-text-primary); }
+  .wf-wrap { max-width: 720px; margin: 0 auto; }
+  .wf-head { margin-bottom: 24px; }
+  .wf-head a { color: var(--color-text-info); text-decoration: none; font-size: 12px; display: inline-block; margin-bottom: 12px; }
+  .wf-head h1 { font-size: 22px; font-weight: 500; margin: 0 0 4px; }
+  .wf-head p { font-size: 13px; color: var(--color-text-secondary); margin: 0; }
+
+  .shell { display: grid; grid-template-columns: 138px 1fr; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; background: var(--color-background-primary); min-height: 700px; }
+  .sb { background: var(--color-background-secondary); border-right: 0.5px solid var(--color-border-tertiary); padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .brand { display: flex; align-items: center; gap: 8px; padding: 4px 6px 14px; }
+  .bm { width: 22px; height: 22px; border-radius: 6px; background: var(--color-text-primary); color: var(--color-background-primary); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; }
+  .bn { font-size: 13px; font-weight: 500; }
+  .nl { font-size: 10px; color: var(--color-text-tertiary); padding: 10px 6px 4px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .ni { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px; font-size: 12px; color: var(--color-text-secondary); cursor: pointer; min-height: 32px; }
+  .ni.act { background: var(--color-background-primary); color: var(--color-text-primary); border: 0.5px solid var(--color-border-tertiary); font-weight: 500; }
+  .ni svg { width: 13px; height: 13px; flex-shrink: 0; }
+  .bdg { margin-left: auto; background: var(--color-background-danger); color: var(--color-text-danger); font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 500; }
+  .main { padding: 16px 18px; }
+  .tb { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 0.5px solid var(--color-border-tertiary); margin-bottom: 14px; }
+  .tb h1 { font-size: 17px; font-weight: 500; margin: 0; }
+  .tb-r { display: flex; align-items: center; gap: 6px; }
+  .btn-prim { padding: 7px 12px; background: var(--color-text-primary); color: var(--color-background-primary); border: 0; border-radius: 6px; font-size: 11px; font-weight: 500; min-height: 30px; cursor: pointer; }
+  .btn-sec { padding: 7px 12px; border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); border-radius: 6px; font-size: 11px; font-weight: 500; min-height: 30px; cursor: pointer; }
+
+  .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .search { flex: 1; display: flex; align-items: center; gap: 6px; padding: 7px 10px; border: 0.5px solid var(--color-border-tertiary); border-radius: 6px; background: var(--color-background-primary); min-height: 32px; }
+  .search svg { width: 13px; height: 13px; color: var(--color-text-tertiary); }
+  .search input { border: 0; background: transparent; font-size: 12px; outline: none; flex: 1; }
+  .ctrl { display: flex; align-items: center; gap: 5px; padding: 7px 10px; border: 0.5px solid var(--color-border-tertiary); border-radius: 6px; font-size: 11px; background: var(--color-background-primary); min-height: 32px; }
+  .ctrl svg { width: 11px; height: 11px; }
+
+  .tbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .tbl th { text-align: left; font-size: 10px; color: var(--color-text-tertiary); padding: 8px 10px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; border-bottom: 0.5px solid var(--color-border-tertiary); background: var(--color-background-secondary); }
+  .tbl td { padding: 10px; font-size: 12px; border-bottom: 0.5px solid var(--color-border-tertiary); vertical-align: middle; }
+  .tbl tr.sel td { background: var(--color-background-info); }
+  .tbl tr.sel td:first-child { box-shadow: inset 3px 0 0 var(--color-text-info); }
+  .ing-name { font-weight: 500; color: var(--color-text-primary); }
+  .ing-sub { font-size: 10px; color: var(--color-text-tertiary); }
+  .stock-cell { display: flex; flex-direction: column; gap: 4px; }
+  .stock-bar { height: 4px; background: var(--color-background-secondary); border-radius: 2px; overflow: hidden; }
+  .stock-fill { height: 100%; }
+  .stock-fill.ok { background: var(--color-text-success); }
+  .stock-fill.warn { background: var(--color-text-warning); }
+  .stock-fill.dng { background: var(--color-text-danger); }
+  .pill { display: inline-block; font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 500; }
+  .pill.raw { background: #F1EFE8; color: #444441; }
+  .pill.prep { background: #EEEDFE; color: #3C3489; }
+
+  .ledger-panel { margin-top: 12px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); }
+  .ledger-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .ledger-title { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
+  .ledger-stats { display: flex; gap: 16px; font-size: 11px; color: var(--color-text-secondary); }
+  .ledger-stats span b { color: var(--color-text-primary); font-weight: 500; }
+  .ledger-tabs { display: flex; gap: 16px; padding: 0 14px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .ltab { padding: 8px 0; font-size: 11px; color: var(--color-text-secondary); border-bottom: 1.5px solid transparent; cursor: pointer; }
+  .ltab.act { color: var(--color-text-primary); border-bottom-color: var(--color-text-primary); font-weight: 500; }
+  .ledger-body { padding: 4px 14px 12px; }
+  .lrow { display: grid; grid-template-columns: 80px 70px 1fr 80px 80px; gap: 8px; padding: 8px 0; font-size: 11px; align-items: center; border-bottom: 0.5px dashed var(--color-border-tertiary); }
+  .lrow:last-child { border-bottom: 0; }
+  .ldate { color: var(--color-text-tertiary); }
+  .lreason { font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 500; display: inline-block; text-align: center; }
+  .lr-purchase { background: #E1F5EE; color: #0F6E56; }
+  .lr-sale { background: #E6F1FB; color: #0C447C; }
+  .lr-wastage { background: #FCEBEB; color: #A32D2D; }
+  .lr-prod { background: #EEEDFE; color: #3C3489; }
+  .lr-adj { background: #F1EFE8; color: #444441; }
+  .lqty.pos { color: var(--color-text-success); font-weight: 500; text-align: right; }
+  .lqty.neg { color: var(--color-text-danger); font-weight: 500; text-align: right; }
+  .lref { color: var(--color-text-secondary); font-size: 10px; text-align: right; }
+</style>
+</head>
+<body>
+<div class="wf-wrap">
+<div class="wf-head">
+<a href="index.html">&larr; All wireframes</a>
+<h1>3. Ingredients</h1>
+<p>List with stock-level bars · click a row to expand the movement ledger panel below.</p>
+</div>
+
+<div class="shell">
+  <aside class="sb">
+    <div class="brand"><div class="bm">L</div><div class="bn">Laurans</div></div>
+    <div class="nl">Operations</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>Dashboard</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h10v12H3z"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>Live orders<span class="bdg">3</span></div>
+    <div class="ni act"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 5l6-3 6 3v6l-6 3-6-3z"/><path d="M2 5l6 3 6-3M8 8v6"/></svg>Ingredients</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h8a2 2 0 012 2v10H5a2 2 0 01-2-2z"/><path d="M3 12a2 2 0 012-2h8"/></svg>Menu</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h8l2 2v10H3z"/><path d="M5 6h6M5 9h6M5 12h4"/></svg>Invoices</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h10v11H3z"/><path d="M6 7l1.5 1.5L11 5"/></svg>Stock take</div>
+    <div class="nl">System</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg>CSV import</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M3 13l1.5-1.5M11.5 4.5L13 3"/></svg>Settings</div>
+  </aside>
+
+  <main class="main">
+    <div class="tb">
+      <h1>Ingredients</h1>
+      <div class="tb-r"><button class="btn-sec">Adjust stock</button><button class="btn-prim">+ New ingredient</button></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="search"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5"/><path d="M11 11l3 3"/></svg><input placeholder="Search 47 ingredients…"/></div>
+      <div class="ctrl">All categories <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6l4 4 4-4"/></svg></div>
+      <div class="ctrl">Type: all <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6l4 4 4-4"/></svg></div>
+    </div>
+
+    <div style="border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); overflow: hidden;">
+      <table class="tbl">
+        <colgroup><col style="width: 32%"/><col style="width: 14%"/><col style="width: 28%"/><col style="width: 14%"/><col style="width: 12%"/></colgroup>
+        <thead><tr><th>Name</th><th>Type</th><th>Stock</th><th style="text-align: right;">Avg cost</th><th>Last move</th></tr></thead>
+        <tbody>
+          <tr class="sel"><td><div class="ing-name">Paneer</div><div class="ing-sub">Dairy</div></td><td><span class="pill raw">raw</span></td><td><div class="stock-cell"><div style="display: flex; justify-content: space-between; font-size: 11px;"><span style="color: var(--color-text-danger); font-weight: 500;">2.4 kg</span><span style="color: var(--color-text-tertiary);">low: 5 kg</span></div><div class="stock-bar"><div class="stock-fill dng" style="width: 24%"></div></div></div></td><td style="text-align: right;">₹420/kg</td><td style="color: var(--color-text-tertiary);">2h ago</td></tr>
+          <tr><td><div class="ing-name">Basmati rice</div><div class="ing-sub">Grains</div></td><td><span class="pill raw">raw</span></td><td><div class="stock-cell"><div style="display: flex; justify-content: space-between; font-size: 11px;"><span style="color: var(--color-text-danger); font-weight: 500;">8 kg</span><span style="color: var(--color-text-tertiary);">low: 15 kg</span></div><div class="stock-bar"><div class="stock-fill dng" style="width: 32%"></div></div></div></td><td style="text-align: right;">₹98/kg</td><td style="color: var(--color-text-tertiary);">3h ago</td></tr>
+          <tr><td><div class="ing-name">Biryani masala</div><div class="ing-sub">Spice blend</div></td><td><span class="pill prep">prepared</span></td><td><div class="stock-cell"><div style="display: flex; justify-content: space-between; font-size: 11px;"><span style="color: var(--color-text-warning); font-weight: 500;">340 g</span><span style="color: var(--color-text-tertiary);">low: 500 g</span></div><div class="stock-bar"><div class="stock-fill warn" style="width: 45%"></div></div></div></td><td style="text-align: right;">₹860/kg</td><td style="color: var(--color-text-tertiary);">yesterday</td></tr>
+          <tr><td><div class="ing-name">Onions</div><div class="ing-sub">Vegetables</div></td><td><span class="pill raw">raw</span></td><td><div class="stock-cell"><div style="display: flex; justify-content: space-between; font-size: 11px;"><span style="color: var(--color-text-primary); font-weight: 500;">12 kg</span><span style="color: var(--color-text-tertiary);">low: 8 kg</span></div><div class="stock-bar"><div class="stock-fill ok" style="width: 65%"></div></div></div></td><td style="text-align: right;">₹38/kg</td><td style="color: var(--color-text-tertiary);">today</td></tr>
+          <tr><td><div class="ing-name">Chicken</div><div class="ing-sub">Meat</div></td><td><span class="pill raw">raw</span></td><td><div class="stock-cell"><div style="display: flex; justify-content: space-between; font-size: 11px;"><span style="color: var(--color-text-primary); font-weight: 500;">6.5 kg</span><span style="color: var(--color-text-tertiary);">low: 4 kg</span></div><div class="stock-bar"><div class="stock-fill ok" style="width: 78%"></div></div></div></td><td style="text-align: right;">₹240/kg</td><td style="color: var(--color-text-tertiary);">today</td></tr>
+          <tr><td><div class="ing-name">Garam masala</div><div class="ing-sub">Spices</div></td><td><span class="pill prep">prepared</span></td><td><div class="stock-cell"><div style="display: flex; justify-content: space-between; font-size: 11px;"><span style="color: var(--color-text-primary); font-weight: 500;">820 g</span><span style="color: var(--color-text-tertiary);">low: 300 g</span></div><div class="stock-bar"><div class="stock-fill ok" style="width: 88%"></div></div></div></td><td style="text-align: right;">₹1,240/kg</td><td style="color: var(--color-text-tertiary);">3d ago</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="ledger-panel">
+      <div class="ledger-head">
+        <div class="ledger-title"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 8l3 3 5-6"/></svg>Paneer · stock movements</div>
+        <div class="ledger-stats"><span>Stock <b>2.4 kg</b></span><span>Avg cost <b>₹420</b></span><span>Value <b>₹1,008</b></span></div>
+      </div>
+      <div class="ledger-tabs"><div class="ltab act">Movements</div><div class="ltab">Recipes using this</div><div class="ltab">Suppliers</div><div class="ltab">Edit</div></div>
+      <div class="ledger-body">
+        <div class="lrow"><span class="ldate">29 Apr 14:22</span><span class="lreason lr-sale">sale</span><span style="color: var(--color-text-secondary);">Order #SW-8390 · Paneer biryani ×2</span><span class="lqty neg">−0.3 kg</span><span class="lref">₹420</span></div>
+        <div class="lrow"><span class="ldate">29 Apr 12:08</span><span class="lreason lr-sale">sale</span><span style="color: var(--color-text-secondary);">Order #ZM-3187 · Paneer butter masala</span><span class="lqty neg">−0.2 kg</span><span class="lref">₹420</span></div>
+        <div class="lrow"><span class="ldate">28 Apr 18:45</span><span class="lreason lr-wastage">wastage</span><span style="color: var(--color-text-secondary);">Spoilage — left out overnight</span><span class="lqty neg">−0.5 kg</span><span class="lref">₹420</span></div>
+        <div class="lrow"><span class="ldate">28 Apr 09:30</span><span class="lreason lr-purchase">purchase</span><span style="color: var(--color-text-secondary);">Invoice DF-2412 · DairyFresh</span><span class="lqty pos">+5.0 kg</span><span class="lref">₹420</span></div>
+        <div class="lrow"><span class="ldate">27 Apr 16:14</span><span class="lreason lr-adj">adjustment</span><span style="color: var(--color-text-secondary);">Stock take · book 0.4 vs counted 0.2</span><span class="lqty neg">−0.2 kg</span><span class="lref">—</span></div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+</body>
+</html>

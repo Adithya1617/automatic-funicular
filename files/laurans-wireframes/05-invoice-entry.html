@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5. Invoice entry · Laurans wireframe</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { margin: 0; padding: 32px 20px; font-family: var(--font-sans); background: #f8f7f2; color: var(--color-text-primary); }
+  .wf-wrap { max-width: 720px; margin: 0 auto; }
+  .wf-head { margin-bottom: 24px; }
+  .wf-head a { color: var(--color-text-info); text-decoration: none; font-size: 12px; display: inline-block; margin-bottom: 12px; }
+  .wf-head h1 { font-size: 22px; font-weight: 500; margin: 0 0 4px; }
+  .wf-head p { font-size: 13px; color: var(--color-text-secondary); margin: 0; }
+
+  .shell { display: grid; grid-template-columns: 138px 1fr; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; background: var(--color-background-primary); min-height: 720px; }
+  .sb { background: var(--color-background-secondary); border-right: 0.5px solid var(--color-border-tertiary); padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .brand { display: flex; align-items: center; gap: 8px; padding: 4px 6px 14px; }
+  .bm { width: 22px; height: 22px; border-radius: 6px; background: var(--color-text-primary); color: var(--color-background-primary); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; }
+  .bn { font-size: 13px; font-weight: 500; }
+  .nl { font-size: 10px; color: var(--color-text-tertiary); padding: 10px 6px 4px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .ni { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px; font-size: 12px; color: var(--color-text-secondary); cursor: pointer; min-height: 32px; }
+  .ni.act { background: var(--color-background-primary); color: var(--color-text-primary); border: 0.5px solid var(--color-border-tertiary); font-weight: 500; }
+  .ni svg { width: 13px; height: 13px; flex-shrink: 0; }
+  .bdg { margin-left: auto; background: var(--color-background-danger); color: var(--color-text-danger); font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 500; }
+  .main { padding: 16px 18px; }
+  .crumb { font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 6px; }
+  .tb { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 0.5px solid var(--color-border-tertiary); margin-bottom: 14px; }
+  .tb h1 { font-size: 17px; font-weight: 500; margin: 0; display: flex; align-items: center; gap: 8px; }
+  .tag-draft { font-size: 10px; padding: 2px 8px; border-radius: 4px; background: var(--color-background-warning); color: var(--color-text-warning); font-weight: 500; }
+  .tb-r { display: flex; align-items: center; gap: 6px; }
+  .btn-prim { padding: 7px 12px; background: var(--color-text-primary); color: var(--color-background-primary); border: 0; border-radius: 6px; font-size: 11px; font-weight: 500; min-height: 30px; cursor: pointer; }
+  .btn-sec { padding: 7px 12px; border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); border-radius: 6px; font-size: 11px; font-weight: 500; min-height: 30px; cursor: pointer; }
+
+  .head-grid { display: grid; grid-template-columns: 1fr 1fr 180px; gap: 10px; margin-bottom: 14px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 11px; color: var(--color-text-secondary); }
+  .field input, .field select { font-size: 12px; padding: 7px 9px; border: 0.5px solid var(--color-border-tertiary); border-radius: 6px; background: var(--color-background-primary); min-height: 32px; outline: none; }
+  .pdf-up { border: 0.5px dashed var(--color-border-secondary); border-radius: 6px; padding: 10px; font-size: 11px; color: var(--color-text-secondary); background: var(--color-background-secondary); display: flex; align-items: center; gap: 8px; min-height: 32px; }
+  .pdf-up svg { width: 14px; height: 14px; color: var(--color-text-info); }
+  .pdf-up b { color: var(--color-text-primary); font-weight: 500; }
+
+  .form-row-inline { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+
+  .lines-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .lines-title { font-size: 12px; font-weight: 500; }
+  .lines-actions { display: flex; gap: 6px; }
+  .pill-btn { padding: 5px 10px; font-size: 11px; border: 0.5px solid var(--color-border-tertiary); border-radius: 4px; background: var(--color-background-primary); cursor: pointer; min-height: 28px; }
+
+  .ltbl { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); overflow: visible; background: var(--color-background-primary); }
+  .lhead { display: grid; grid-template-columns: 1.6fr 0.7fr 0.6fr 0.8fr 0.9fr 26px; gap: 6px; padding: 8px 10px; background: var(--color-background-secondary); font-size: 10px; color: var(--color-text-tertiary); font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .lr { display: grid; grid-template-columns: 1.6fr 0.7fr 0.6fr 0.8fr 0.9fr 26px; gap: 6px; padding: 8px 10px; align-items: center; border-bottom: 0.5px solid var(--color-border-tertiary); position: relative; font-size: 11px; }
+  .lr:last-of-type { border-bottom: 0; }
+  .lr .desc { display: flex; flex-direction: column; gap: 2px; }
+  .desc-main { font-size: 12px; }
+  .desc-map { font-size: 10px; color: var(--color-text-success); display: flex; align-items: center; gap: 4px; }
+  .desc-map svg { width: 10px; height: 10px; }
+  .desc-warn { font-size: 10px; color: var(--color-text-warning); display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  .desc-warn svg { width: 10px; height: 10px; }
+  .lr input, .lr select { font-size: 11px; padding: 5px 7px; border: 0.5px solid var(--color-border-tertiary); border-radius: 4px; background: var(--color-background-primary); width: 100%; box-sizing: border-box; outline: none; min-height: 28px; }
+  .lr-del { color: var(--color-text-tertiary); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .lr-del svg { width: 12px; height: 12px; }
+  .lr.editing { background: var(--color-background-info); }
+
+  .auto-popup { position: relative; }
+  .auto-list { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--color-background-primary); border: 0.5px solid var(--color-border-secondary); border-radius: 6px; box-shadow: 0 0 0 0; z-index: 5; max-width: 320px; }
+  .auto-head { padding: 6px 10px; font-size: 10px; color: var(--color-text-tertiary); letter-spacing: 0.04em; text-transform: uppercase; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .auto-item { padding: 7px 10px; font-size: 11px; cursor: pointer; border-bottom: 0.5px dashed var(--color-border-tertiary); }
+  .auto-item:last-child { border-bottom: 0; }
+  .auto-item.hi { background: var(--color-background-info); }
+  .auto-item .ai-row { display: flex; justify-content: space-between; align-items: center; }
+  .auto-item .ai-name { font-weight: 500; font-size: 11px; }
+  .auto-item .ai-meta { font-size: 10px; color: var(--color-text-tertiary); margin-top: 2px; }
+  .auto-foot { padding: 7px 10px; font-size: 11px; color: var(--color-text-info); cursor: pointer; }
+
+  .add-row { padding: 10px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-text-info); border-top: 0.5px dashed var(--color-border-tertiary); cursor: pointer; }
+  .add-row svg { width: 12px; height: 12px; }
+
+  .totals { margin-top: 14px; display: flex; justify-content: flex-end; }
+  .tot-card { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 10px 14px; min-width: 220px; }
+  .tot-row { display: flex; justify-content: space-between; font-size: 12px; padding: 4px 0; }
+  .tot-row.grand { font-size: 14px; font-weight: 500; padding-top: 6px; border-top: 0.5px solid var(--color-border-tertiary); margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="wf-wrap">
+<div class="wf-head">
+<a href="index.html">&larr; All wireframes</a>
+<h1>5. Invoice entry</h1>
+<p>Manual entry with smart per-supplier memory · auto-suggests past mappings · unmapped rows flagged before commit.</p>
+</div>
+
+
+<h2 class="sr-only">Invoice entry wireframe with supplier and PDF upload header, line item table showing smart autocomplete dropdown for one row pulling past purchases from DairyFresh, an unmapped item flagged amber, and total breakdown.</h2>
+
+<div class="shell">
+  <aside class="sb">
+    <div class="brand">
+      <div class="bm">L</div>
+      <div class="bn">Laurans</div>
+    </div>
+    <div class="nl">Operations</div>
+    <div class="ni">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+      Dashboard
+    </div>
+    <div class="ni">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h10v12H3z"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
+      Live orders<span class="bdg">3</span>
+    </div>
+    <div class="ni">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 5l6-3 6 3v6l-6 3-6-3z"/><path d="M2 5l6 3 6-3M8 8v6"/></svg>
+      Ingredients
+    </div>
+    <div class="ni">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h8a2 2 0 012 2v10H5a2 2 0 01-2-2z"/><path d="M3 12a2 2 0 012-2h8"/></svg>
+      Menu
+    </div>
+    <div class="ni act">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h8l2 2v10H3z"/><path d="M5 6h6M5 9h6M5 12h4"/></svg>
+      Invoices
+    </div>
+    <div class="ni">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h10v11H3z"/><path d="M6 7l1.5 1.5L11 5"/></svg>
+      Stock take
+    </div>
+    <div class="nl">System</div>
+    <div class="ni">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg>
+      CSV import
+    </div>
+    <div class="ni">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M3 13l1.5-1.5M11.5 4.5L13 3"/></svg>
+      Settings
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="crumb">Invoices / <span style="color: var(--color-text-primary);">New invoice</span></div>
+    <div class="tb">
+      <h1>New invoice <span class="tag-draft">DRAFT</span></h1>
+      <div class="tb-r">
+        <button class="btn-sec">Bulk paste</button>
+        <button class="btn-sec">Save draft</button>
+        <button class="btn-prim">Map &amp; commit</button>
+      </div>
+    </div>
+
+    <div class="head-grid">
+      <div class="field"><label>Supplier</label><select><option>DairyFresh Pvt Ltd</option></select></div>
+      <div class="field"><label>Invoice number</label><input value="DF-2412"/></div>
+      <div class="field"><label>Date</label><input value="28/04/2026"/></div>
+    </div>
+    <div class="form-row-inline">
+      <div class="field"><label>Notes (optional)</label><input placeholder="Internal note for this invoice"/></div>
+      <div class="field"><label>Invoice PDF</label>
+        <div class="pdf-up">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6l3 3v9H4z"/><path d="M10 2v3h3"/></svg>
+          <span><b>DF-2412.pdf</b> · 248 KB · uploaded</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="lines-head">
+      <span class="lines-title">Line items</span>
+      <span style="font-size: 11px; color: var(--color-text-tertiary);">Past 30 mappings remembered for this supplier</span>
+    </div>
+
+    <div class="ltbl">
+      <div class="lhead">
+        <span>Description</span><span>Qty</span><span>Unit</span><span>Unit cost</span><span style="text-align: right;">Total</span><span></span>
+      </div>
+
+      <div class="lr">
+        <div class="desc">
+          <span class="desc-main">DAIRYFRESH PANEER 1KG BLOCK</span>
+          <span class="desc-map">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8l3 3 7-7"/></svg>
+            mapped → Paneer
+          </span>
+        </div>
+        <input value="5"/>
+        <select><option>kg</option></select>
+        <input value="420"/>
+        <span style="text-align: right; font-weight: 500;">₹2,100</span>
+        <span class="lr-del"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg></span>
+      </div>
+
+      <div class="lr editing">
+        <div class="desc auto-popup">
+          <span class="desc-main">DAIRY YOG│</span>
+          <div class="auto-list">
+            <div class="auto-head">From DairyFresh history</div>
+            <div class="auto-item hi">
+              <div class="ai-row"><span class="ai-name">DAIRYFRESH YOGURT 500ML CUP → Yogurt</span></div>
+              <div class="ai-meta">last: 8 cups @ ₹45 · 14 Apr · weighted avg ₹46/cup</div>
+            </div>
+            <div class="auto-item">
+              <div class="ai-row"><span class="ai-name">DAIRY YOGURT BUCKET 5KG → Yogurt</span></div>
+              <div class="ai-meta">last: 2 buckets @ ₹380 · 22 Mar</div>
+            </div>
+            <div class="auto-foot">+ Map to a different ingredient</div>
+          </div>
+        </div>
+        <input value="6"/>
+        <select><option>each</option></select>
+        <input value="45"/>
+        <span style="text-align: right; font-weight: 500;">₹270</span>
+        <span class="lr-del"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg></span>
+      </div>
+
+      <div class="lr">
+        <div class="desc">
+          <span class="desc-main">DAIRYFRESH BUTTER UNSALTED 500G</span>
+          <span class="desc-map">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8l3 3 7-7"/></svg>
+            mapped → Butter
+          </span>
+        </div>
+        <input value="4"/>
+        <select><option>each</option></select>
+        <input value="290"/>
+        <span style="text-align: right; font-weight: 500;">₹1,160</span>
+        <span class="lr-del"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg></span>
+      </div>
+
+      <div class="lr">
+        <div class="desc">
+          <span class="desc-main">FARM CREAM HEAVY 1L PACK</span>
+          <span class="desc-warn">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2l6 11H2z"/><path d="M8 6v3M8 11v0.5"/></svg>
+            needs mapping → click to assign
+          </span>
+        </div>
+        <input value="2"/>
+        <select><option>L</option></select>
+        <input value="180"/>
+        <span style="text-align: right; font-weight: 500;">₹360</span>
+        <span class="lr-del"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg></span>
+      </div>
+
+      <div class="add-row">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v6M5 8h6"/></svg>
+        Add line item
+      </div>
+    </div>
+
+    <div class="totals">
+      <div class="tot-card">
+        <div class="tot-row"><span>Subtotal (4 items)</span><span>₹3,890</span></div>
+        <div class="tot-row" style="color: var(--color-text-tertiary);"><span>GST (tracked total only)</span><span>included</span></div>
+        <div class="tot-row grand"><span>Invoice total</span><span>₹3,890</span></div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+</body>
+</html>

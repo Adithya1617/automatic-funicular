@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laurans wireframes · index</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { margin: 0; padding: 48px 24px; font-family: var(--font-sans); background: #f8f7f2; color: var(--color-text-primary); }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  header { margin-bottom: 32px; padding-bottom: 20px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .brand { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+  .brand .mark { width: 28px; height: 28px; border-radius: 8px; background: var(--color-text-primary); color: var(--color-background-primary); display: flex; align-items: center; justify-content: center; font-weight: 500; font-size: 14px; }
+  .brand .name { font-size: 14px; font-weight: 500; }
+  h1 { font-size: 26px; font-weight: 500; margin: 0 0 6px; }
+  .lede { font-size: 14px; color: var(--color-text-secondary); margin: 0; line-height: 1.5; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 32px; }
+  .card { display: block; padding: 16px 18px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); text-decoration: none; color: inherit; transition: border-color 0.1s; }
+  .card:hover { border-color: var(--color-border-secondary); }
+  .num { font-size: 11px; color: var(--color-text-tertiary); font-family: var(--font-mono); }
+  .title { font-size: 15px; font-weight: 500; margin: 4px 0 6px; }
+  .desc { font-size: 12px; color: var(--color-text-secondary); line-height: 1.45; margin: 0; }
+  .group-label { font-size: 11px; color: var(--color-text-tertiary); letter-spacing: 0.06em; text-transform: uppercase; margin: 24px 0 10px; font-weight: 500; }
+  .group-label:first-of-type { margin-top: 0; }
+  .footer { font-size: 12px; color: var(--color-text-tertiary); padding-top: 24px; border-top: 0.5px solid var(--color-border-tertiary); line-height: 1.6; }
+  .footer a { color: var(--color-text-info); text-decoration: none; }
+  .footer code { font-family: var(--font-mono); background: var(--color-background-secondary); padding: 1px 5px; border-radius: 3px; font-size: 11px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><div class="mark">L</div><div class="name">Laurans</div></div>
+    <h1>UI wireframes</h1>
+    <p class="lede">Eight mid-fidelity screens for the Laurans Food Court inventory management system. Click any card to open the rendered wireframe. The implementation spec lives in <a href="WIREFRAMES.md" style="color: var(--color-text-info);">WIREFRAMES.md</a>.</p>
+  </header>
+
+  <div class="group-label">Operations</div>
+  <div class="grid">
+    <a class="card" href="01-dashboard.html"><div class="num">01</div><div class="title">Dashboard</div><p class="desc">Landing screen with KPI tiles, low-stock list, top dishes, revenue by channel, reorder suggestions.</p></a>
+    <a class="card" href="02-live-orders.html"><div class="num">02</div><div class="title">Live orders</div><p class="desc">Real-time feed with status filters, source badges, sound + toast on arrival, mark-delivered actions.</p></a>
+    <a class="card" href="03-ingredients.html"><div class="num">03</div><div class="title">Ingredients</div><p class="desc">Table with stock-level bars · expandable movement ledger panel showing every purchase, sale, wastage.</p></a>
+    <a class="card" href="04-menu-editor.html"><div class="num">04</div><div class="title">Menu item editor</div><p class="desc">Recipe builder with drag handles, live food-cost calc, BoM-aware availability with bottleneck highlight.</p></a>
+    <a class="card" href="05-invoice-entry.html"><div class="num">05</div><div class="title">Invoice entry</div><p class="desc">Manual entry with smart per-supplier autocomplete · unmapped rows flagged amber before commit.</p></a>
+    <a class="card" href="06-stock-take.html"><div class="num">06</div><div class="title">Stock take</div><p class="desc">3-step counting flow · order polling paused while in progress · live diff vs book quantity.</p></a>
+    <a class="card" href="07-manual-order.html"><div class="num">07</div><div class="title">Manual order entry</div><p class="desc">Tap-to-add menu picker · channel selector lets you fire mock-Swiggy or mock-POS test orders.</p></a>
+  </div>
+
+  <div class="group-label">System</div>
+  <div class="grid">
+    <a class="card" href="08-csv-importer.html"><div class="num">08</div><div class="title">CSV importer</div><p class="desc">4-entity tabs · mandatory dry-run · per-row diff with errors and warnings · idempotent on retry.</p></a>
+  </div>
+
+  <div class="footer">
+    <strong>To use these with Claude Code:</strong> drop this whole folder into your repo at <code>docs/wireframes/</code>, then in your build prompts reference the spec file (<code>docs/wireframes/WIREFRAMES.md</code>) and the relevant HTML wireframe by section. Read <code>README.md</code> for the full handoff workflow.
+  </div>
+</div>
+</body>
+</html>

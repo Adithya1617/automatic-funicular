@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>8. CSV importer · Laurans wireframe</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { margin: 0; padding: 32px 20px; font-family: var(--font-sans); background: #f8f7f2; color: var(--color-text-primary); }
+  .wf-wrap { max-width: 720px; margin: 0 auto; }
+  .wf-head { margin-bottom: 24px; }
+  .wf-head a { color: var(--color-text-info); text-decoration: none; font-size: 12px; display: inline-block; margin-bottom: 12px; }
+  .wf-head h1 { font-size: 22px; font-weight: 500; margin: 0 0 4px; }
+  .wf-head p { font-size: 13px; color: var(--color-text-secondary); margin: 0; }
+
+  .shell { display: grid; grid-template-columns: 138px 1fr; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; background: var(--color-background-primary); min-height: 720px; }
+  .sb { background: var(--color-background-secondary); border-right: 0.5px solid var(--color-border-tertiary); padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .brand { display: flex; align-items: center; gap: 8px; padding: 4px 6px 14px; }
+  .bm { width: 22px; height: 22px; border-radius: 6px; background: var(--color-text-primary); color: var(--color-background-primary); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; }
+  .bn { font-size: 13px; font-weight: 500; }
+  .nl { font-size: 10px; color: var(--color-text-tertiary); padding: 10px 6px 4px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .ni { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px; font-size: 12px; color: var(--color-text-secondary); cursor: pointer; min-height: 32px; }
+  .ni.act { background: var(--color-background-primary); color: var(--color-text-primary); border: 0.5px solid var(--color-border-tertiary); font-weight: 500; }
+  .ni svg { width: 13px; height: 13px; flex-shrink: 0; }
+  .bdg { margin-left: auto; background: var(--color-background-danger); color: var(--color-text-danger); font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 500; }
+  .main { padding: 16px 18px; }
+  .crumb { font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 6px; }
+  .tb { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 0.5px solid var(--color-border-tertiary); margin-bottom: 14px; }
+  .tb h1 { font-size: 17px; font-weight: 500; margin: 0; }
+  .tb-r { display: flex; align-items: center; gap: 6px; }
+  .btn-prim { padding: 8px 14px; background: var(--color-text-success); color: var(--color-background-primary); border: 0; border-radius: 6px; font-size: 12px; font-weight: 500; min-height: 36px; cursor: pointer; }
+  .btn-sec { padding: 7px 12px; border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); border-radius: 6px; font-size: 11px; font-weight: 500; min-height: 30px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-sec svg { width: 12px; height: 12px; }
+
+  .ent-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+  .ent { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; min-height: 64px; }
+  .ent.act { border: 1.5px solid var(--color-text-info); background: var(--color-background-info); }
+  .ent-name { font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+  .ent.act .ent-name { color: var(--color-text-info); }
+  .ent-name svg { width: 12px; height: 12px; }
+  .ent-meta { font-size: 10px; color: var(--color-text-tertiary); }
+  .ent.act .ent-meta { color: var(--color-text-info); }
+
+  .upload-zone { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 14px 16px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); margin-bottom: 14px; }
+  .upload-info { display: flex; align-items: center; gap: 12px; }
+  .upload-icon { width: 36px; height: 36px; border-radius: 8px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .upload-icon svg { width: 16px; height: 16px; color: var(--color-text-info); }
+  .upload-meta-l1 { font-size: 12px; font-weight: 500; }
+  .upload-meta-l2 { font-size: 11px; color: var(--color-text-tertiary); margin-top: 2px; }
+
+  .summary-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+  .sum-tile { padding: 10px 12px; border-radius: var(--border-radius-md); border: 0.5px solid; }
+  .sum-tile.add { background: var(--color-background-success); border-color: var(--color-border-success); }
+  .sum-tile.upd { background: var(--color-background-info); border-color: var(--color-border-info); }
+  .sum-tile.warn { background: var(--color-background-warning); border-color: var(--color-border-warning); }
+  .sum-tile.err { background: var(--color-background-danger); border-color: var(--color-border-danger); }
+  .sum-l { font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 500; }
+  .sum-tile.add .sum-l { color: var(--color-text-success); }
+  .sum-tile.upd .sum-l { color: var(--color-text-info); }
+  .sum-tile.warn .sum-l { color: var(--color-text-warning); }
+  .sum-tile.err .sum-l { color: var(--color-text-danger); }
+  .sum-v { font-size: 22px; font-weight: 500; line-height: 1.1; margin-top: 4px; }
+  .sum-tile.add .sum-v { color: var(--color-text-success); }
+  .sum-tile.upd .sum-v { color: var(--color-text-info); }
+  .sum-tile.warn .sum-v { color: var(--color-text-warning); }
+  .sum-tile.err .sum-v { color: var(--color-text-danger); }
+
+  .dr-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .dr-title { font-size: 12px; font-weight: 500; }
+  .dr-filters { display: flex; gap: 4px; }
+  .chip { padding: 5px 10px; border: 0.5px solid var(--color-border-tertiary); border-radius: 12px; font-size: 10px; background: var(--color-background-primary); cursor: pointer; min-height: 24px; }
+  .chip.act { background: var(--color-text-primary); color: var(--color-background-primary); border-color: var(--color-text-primary); }
+
+  .dtbl { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); overflow: hidden; }
+  .dhead { display: grid; grid-template-columns: 32px 70px 1.4fr 1fr 1.6fr; gap: 8px; padding: 8px 12px; background: var(--color-background-secondary); font-size: 10px; color: var(--color-text-tertiary); font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .drow { display: grid; grid-template-columns: 32px 70px 1.4fr 1fr 1.6fr; gap: 8px; padding: 9px 12px; align-items: center; border-bottom: 0.5px solid var(--color-border-tertiary); font-size: 11px; }
+  .drow:last-child { border-bottom: 0; }
+  .drow.err-row { background: var(--color-background-danger); }
+  .drow.warn-row { background: var(--color-background-warning); }
+  .ds-icon { display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 4px; }
+  .ds-icon svg { width: 11px; height: 11px; }
+  .ds-icon.add { background: var(--color-background-success); color: var(--color-text-success); }
+  .ds-icon.upd { background: var(--color-background-info); color: var(--color-text-info); }
+  .ds-icon.warn { background: var(--color-background-warning); color: var(--color-text-warning); }
+  .ds-icon.err { background: var(--color-background-danger); color: var(--color-text-danger); }
+  .dline { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-tertiary); }
+  .dname { font-weight: 500; font-size: 12px; }
+  .dnsub { font-size: 10px; color: var(--color-text-tertiary); margin-top: 1px; }
+  .daction { font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 500; display: inline-block; }
+  .daction.add { background: var(--color-background-success); color: var(--color-text-success); }
+  .daction.upd { background: var(--color-background-info); color: var(--color-text-info); }
+  .daction.skip { background: var(--color-background-secondary); color: var(--color-text-secondary); }
+  .dmsg { font-size: 11px; color: var(--color-text-secondary); }
+  .dmsg.err { color: var(--color-text-danger); font-weight: 500; }
+  .dmsg.warn { color: var(--color-text-warning); }
+
+  .footer-info { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; margin-top: 12px; border-top: 0.5px solid var(--color-border-tertiary); font-size: 11px; color: var(--color-text-tertiary); }
+</style>
+</head>
+<body>
+<div class="wf-wrap">
+<div class="wf-head">
+<a href="index.html">&larr; All wireframes</a>
+<h1>8. CSV importer</h1>
+<p>Bulk-load reference data with mandatory dry-run · per-row diff with errors and warnings · idempotent on retry.</p>
+</div>
+
+<div class="shell">
+  <aside class="sb">
+    <div class="brand"><div class="bm">L</div><div class="bn">Laurans</div></div>
+    <div class="nl">Operations</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>Dashboard</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h10v12H3z"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>Live orders<span class="bdg">3</span></div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 5l6-3 6 3v6l-6 3-6-3z"/><path d="M2 5l6 3 6-3M8 8v6"/></svg>Ingredients</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h8a2 2 0 012 2v10H5a2 2 0 01-2-2z"/><path d="M3 12a2 2 0 012-2h8"/></svg>Menu</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h8l2 2v10H3z"/><path d="M5 6h6M5 9h6M5 12h4"/></svg>Invoices</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h10v11H3z"/><path d="M6 7l1.5 1.5L11 5"/></svg>Stock take</div>
+    <div class="nl">System</div>
+    <div class="ni act"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg>CSV import</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M3 13l1.5-1.5M11.5 4.5L13 3"/></svg>Settings</div>
+  </aside>
+
+  <main class="main">
+    <div class="crumb">CSV import / <span style="color: var(--color-text-primary);">Ingredients · dry run</span></div>
+    <div class="tb">
+      <h1>CSV import</h1>
+      <div class="tb-r">
+        <button class="btn-sec"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg>Download template</button>
+        <button class="btn-prim">Commit 14 changes</button>
+      </div>
+    </div>
+
+    <div class="ent-tabs">
+      <div class="ent act"><div class="ent-name"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 5l6-3 6 3v6l-6 3-6-3z"/></svg>Ingredients</div><div class="ent-meta">47 in DB · 18 in CSV</div></div>
+      <div class="ent"><div class="ent-name"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="6" r="2.5"/><path d="M3 14a5 5 0 0110 0"/></svg>Suppliers</div><div class="ent-meta">8 in DB · 0 staged</div></div>
+      <div class="ent"><div class="ent-name"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h8a2 2 0 012 2v10H5a2 2 0 01-2-2z"/></svg>Menu items</div><div class="ent-meta">25 in DB · 0 staged</div></div>
+      <div class="ent"><div class="ent-name"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h10M3 8h10M3 12h6"/></svg>Recipes</div><div class="ent-meta">25 in DB · 0 staged</div></div>
+    </div>
+
+    <div class="upload-zone">
+      <div class="upload-info">
+        <div class="upload-icon"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6l3 3v9H4z"/><path d="M10 2v3h3M6 9h4M6 11h4"/></svg></div>
+        <div><div class="upload-meta-l1">ingredients_q2_2026.csv</div><div class="upload-meta-l2">18 rows · 1.2 KB · uploaded 11:42 · idempotent on retry</div></div>
+      </div>
+      <button class="btn-sec"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 5h10M6 5V3h4v2M5 5l1 9h4l1-9"/></svg>Replace file</button>
+    </div>
+
+    <div class="summary-row">
+      <div class="sum-tile add"><div class="sum-l">Will create</div><div class="sum-v">9</div></div>
+      <div class="sum-tile upd"><div class="sum-l">Will update</div><div class="sum-v">5</div></div>
+      <div class="sum-tile warn"><div class="sum-l">Warnings</div><div class="sum-v">2</div></div>
+      <div class="sum-tile err"><div class="sum-l">Errors</div><div class="sum-v">2</div></div>
+    </div>
+
+    <div class="dr-head">
+      <span class="dr-title">Per-row preview · 18 rows</span>
+      <div class="dr-filters">
+        <span class="chip act">All</span><span class="chip">Errors</span><span class="chip">Warnings</span><span class="chip">Adds</span><span class="chip">Updates</span>
+      </div>
+    </div>
+
+    <div class="dtbl">
+      <div class="dhead"><span></span><span>Line</span><span>Name / SKU</span><span>Action</span><span>Detail</span></div>
+      <div class="drow"><div class="ds-icon add"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v10M3 8h10"/></svg></div><span class="dline">L2</span><div><div class="dname">Cardamom (green)</div><div class="dnsub">Spices · base unit g</div></div><span><span class="daction add">create</span></span><span class="dmsg">New ingredient · low_stock 200 g · cost ₹3,200/kg</span></div>
+      <div class="drow"><div class="ds-icon upd"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h10M9 4l4 4-4 4"/></svg></div><span class="dline">L3</span><div><div class="dname">Basmati rice</div><div class="dnsub">matched by name</div></div><span><span class="daction upd">update</span></span><span class="dmsg">low_stock 15 → <b style="color: var(--color-text-primary);">20</b> kg · category unchanged</span></div>
+      <div class="drow"><div class="ds-icon upd"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h10M9 4l4 4-4 4"/></svg></div><span class="dline">L4</span><div><div class="dname">Paneer</div><div class="dnsub">matched by name</div></div><span><span class="daction upd">update</span></span><span class="dmsg">low_stock 5 → <b style="color: var(--color-text-primary);">8</b> kg</span></div>
+      <div class="drow warn-row"><div class="ds-icon warn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3l6 11H2z"/><path d="M8 7v3M8 12v0.5"/></svg></div><span class="dline">L5</span><div><div class="dname">Onion</div><div class="dnsub">no exact match</div></div><span><span class="daction add">create</span></span><span class="dmsg warn">Fuzzy match found: "Onions" (existing). Create anyway? · click to merge</span></div>
+      <div class="drow err-row"><div class="ds-icon err"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="6"/><path d="M5 5l6 6M11 5l-6 6"/></svg></div><span class="dline">L6</span><div><div class="dname">Saffron</div><div class="dnsub">column "base_unit" missing</div></div><span><span class="daction skip">skip</span></span><span class="dmsg err">Required field "base_unit" is empty — must be g, ml, or each</span></div>
+      <div class="drow"><div class="ds-icon add"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v10M3 8h10"/></svg></div><span class="dline">L7</span><div><div class="dname">Cumin seeds</div><div class="dnsub">Spices · base unit g</div></div><span><span class="daction add">create</span></span><span class="dmsg">New ingredient · low_stock 150 g</span></div>
+      <div class="drow err-row"><div class="ds-icon err"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="6"/><path d="M5 5l6 6M11 5l-6 6"/></svg></div><span class="dline">L9</span><div><div class="dname">Cooking oil</div><div class="dnsub">conflicting unit</div></div><span><span class="daction skip">skip</span></span><span class="dmsg err">base_unit "litre" doesn't match existing record (ml) — choose one</span></div>
+      <div class="drow"><div class="ds-icon upd"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8h10M9 4l4 4-4 4"/></svg></div><span class="dline">L10</span><div><div class="dname">Yogurt</div><div class="dnsub">matched by name</div></div><span><span class="daction upd">update</span></span><span class="dmsg">category Beverages → <b style="color: var(--color-text-primary);">Dairy</b></span></div>
+    </div>
+
+    <div class="footer-info">
+      <span>Re-running this file produces the same outcome · safe to retry after fixing errors</span>
+      <span>Showing 8 of 18 rows · scroll for the rest</span>
+    </div>
+  </main>
+</div>
+</div>
+</body>
+</html>

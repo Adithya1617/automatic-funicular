@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4. Menu editor · Laurans wireframe</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  body { margin: 0; padding: 32px 20px; font-family: var(--font-sans); background: #f8f7f2; color: var(--color-text-primary); }
+  .wf-wrap { max-width: 720px; margin: 0 auto; }
+  .wf-head { margin-bottom: 24px; }
+  .wf-head a { color: var(--color-text-info); text-decoration: none; font-size: 12px; display: inline-block; margin-bottom: 12px; }
+  .wf-head h1 { font-size: 22px; font-weight: 500; margin: 0 0 4px; }
+  .wf-head p { font-size: 13px; color: var(--color-text-secondary); margin: 0; }
+
+  .shell { display: grid; grid-template-columns: 138px 1fr; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); overflow: hidden; background: var(--color-background-primary); min-height: 720px; }
+  .sb { background: var(--color-background-secondary); border-right: 0.5px solid var(--color-border-tertiary); padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .brand { display: flex; align-items: center; gap: 8px; padding: 4px 6px 14px; }
+  .bm { width: 22px; height: 22px; border-radius: 6px; background: var(--color-text-primary); color: var(--color-background-primary); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; }
+  .bn { font-size: 13px; font-weight: 500; }
+  .nl { font-size: 10px; color: var(--color-text-tertiary); padding: 10px 6px 4px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .ni { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px; font-size: 12px; color: var(--color-text-secondary); cursor: pointer; min-height: 32px; }
+  .ni.act { background: var(--color-background-primary); color: var(--color-text-primary); border: 0.5px solid var(--color-border-tertiary); font-weight: 500; }
+  .ni svg { width: 13px; height: 13px; flex-shrink: 0; }
+  .bdg { margin-left: auto; background: var(--color-background-danger); color: var(--color-text-danger); font-size: 10px; padding: 1px 6px; border-radius: 8px; font-weight: 500; }
+  .main { padding: 16px 18px; }
+  .crumb { font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 6px; }
+  .crumb a { color: var(--color-text-info); }
+  .tb { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 0.5px solid var(--color-border-tertiary); margin-bottom: 14px; }
+  .tb h1 { font-size: 17px; font-weight: 500; margin: 0; display: flex; align-items: center; gap: 8px; }
+  .ver-tag { font-size: 10px; padding: 2px 8px; border-radius: 4px; background: var(--color-background-info); color: var(--color-text-info); font-weight: 500; }
+  .tb-r { display: flex; align-items: center; gap: 6px; }
+  .btn-prim { padding: 7px 12px; background: var(--color-text-primary); color: var(--color-background-primary); border: 0; border-radius: 6px; font-size: 11px; font-weight: 500; min-height: 30px; cursor: pointer; }
+  .btn-sec { padding: 7px 12px; border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-primary); border-radius: 6px; font-size: 11px; font-weight: 500; min-height: 30px; cursor: pointer; }
+
+  .grid-main { display: grid; grid-template-columns: 1fr 170px; gap: 14px; }
+  .col-form { min-width: 0; }
+  .col-side { min-width: 0; }
+  .section { margin-bottom: 16px; }
+  .sec-title { font-size: 12px; font-weight: 500; color: var(--color-text-primary); margin: 0 0 8px; display: flex; align-items: center; gap: 6px; }
+  .sec-sub { font-size: 11px; color: var(--color-text-tertiary); font-weight: 400; }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 11px; color: var(--color-text-secondary); }
+  .field input, .field select { font-size: 12px; padding: 7px 9px; border: 0.5px solid var(--color-border-tertiary); border-radius: 6px; background: var(--color-background-primary); min-height: 32px; outline: none; }
+
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; border: 0.5px solid var(--color-border-tertiary); border-radius: 6px; background: var(--color-background-primary); }
+  .toggle { width: 28px; height: 16px; background: var(--color-text-success); border-radius: 8px; position: relative; }
+  .toggle::after { content: ''; position: absolute; right: 2px; top: 2px; width: 12px; height: 12px; background: white; border-radius: 50%; }
+
+  .recipe-tbl { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); overflow: hidden; }
+  .recipe-head { display: grid; grid-template-columns: 18px 1fr 80px 60px 1fr 26px; gap: 8px; padding: 8px 10px; background: var(--color-background-secondary); font-size: 10px; color: var(--color-text-tertiary); font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .rrow { display: grid; grid-template-columns: 18px 1fr 80px 60px 1fr 26px; gap: 8px; padding: 8px 10px; align-items: center; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .rrow:last-of-type { border-bottom: 0; }
+  .rdrag { color: var(--color-text-tertiary); cursor: grab; display: flex; align-items: center; justify-content: center; }
+  .rdrag svg { width: 10px; height: 10px; }
+  .ring { font-size: 12px; }
+  .ring-tag { display: inline-block; font-size: 9px; padding: 1px 5px; border-radius: 3px; margin-left: 4px; vertical-align: middle; }
+  .ring-tag.prep { background: #EEEDFE; color: #3C3489; }
+  .rinp { font-size: 12px; padding: 5px 7px; border: 0.5px solid var(--color-border-tertiary); border-radius: 4px; width: 100%; box-sizing: border-box; outline: none; min-height: 28px; }
+  .rsel { font-size: 11px; padding: 5px 7px; border: 0.5px solid var(--color-border-tertiary); border-radius: 4px; background: var(--color-background-primary); width: 100%; box-sizing: border-box; min-height: 28px; }
+  .rdel { color: var(--color-text-tertiary); cursor: pointer; }
+  .rdel svg { width: 12px; height: 12px; }
+  .rnotes { font-size: 11px; color: var(--color-text-secondary); }
+  .add-row { padding: 10px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-text-info); border-top: 0.5px dashed var(--color-border-tertiary); cursor: pointer; }
+  .add-row svg { width: 12px; height: 12px; }
+
+  .summary { background: var(--color-background-secondary); border-radius: var(--border-radius-lg); padding: 12px 14px; }
+  .sum-block { padding-bottom: 10px; margin-bottom: 10px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .sum-block:last-child { padding-bottom: 0; margin-bottom: 0; border-bottom: 0; }
+  .sum-l { font-size: 10px; color: var(--color-text-secondary); margin-bottom: 3px; letter-spacing: 0.02em; }
+  .sum-v { font-size: 16px; font-weight: 500; }
+  .sum-sub { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+  .pct-bar { width: 100%; height: 6px; background: var(--color-background-primary); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+  .pct-fill { height: 100%; background: var(--color-text-success); }
+  .avail-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; background: var(--color-background-success); color: var(--color-text-success); border-radius: 4px; font-size: 11px; font-weight: 500; }
+  .avail-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-text-success); }
+</style>
+</head>
+<body>
+<div class="wf-wrap">
+<div class="wf-head">
+<a href="index.html">&larr; All wireframes</a>
+<h1>4. Menu item editor</h1>
+<p>Recipe builder with drag handles · live food-cost calc · availability driven by BoM walk through prepared sub-recipes.</p>
+</div>
+
+<div class="shell">
+  <aside class="sb">
+    <div class="brand"><div class="bm">L</div><div class="bn">Laurans</div></div>
+    <div class="nl">Operations</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>Dashboard</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h10v12H3z"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>Live orders<span class="bdg">3</span></div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 5l6-3 6 3v6l-6 3-6-3z"/><path d="M2 5l6 3 6-3M8 8v6"/></svg>Ingredients</div>
+    <div class="ni act"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h8a2 2 0 012 2v10H5a2 2 0 01-2-2z"/><path d="M3 12a2 2 0 012-2h8"/></svg>Menu</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h8l2 2v10H3z"/><path d="M5 6h6M5 9h6M5 12h4"/></svg>Invoices</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3h10v11H3z"/><path d="M6 7l1.5 1.5L11 5"/></svg>Stock take</div>
+    <div class="nl">System</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2v8M5 7l3 3 3-3M3 13h10"/></svg>CSV import</div>
+    <div class="ni"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5L13 13M3 13l1.5-1.5M11.5 4.5L13 3"/></svg>Settings</div>
+  </aside>
+
+  <main class="main">
+    <div class="crumb">Menu / Biryani / <span style="color: var(--color-text-primary);">Paneer biryani</span></div>
+    <div class="tb">
+      <h1>Paneer biryani <span class="ver-tag">v3 draft</span></h1>
+      <div class="tb-r"><button class="btn-sec">Show diff</button><button class="btn-sec">Cancel</button><button class="btn-prim">Save version</button></div>
+    </div>
+
+    <div class="grid-main">
+      <div class="col-form">
+        <div class="section">
+          <div class="sec-title">Basics</div>
+          <div class="form-row"><div class="field"><label>Name</label><input value="Paneer biryani"/></div><div class="field"><label>Category</label><select><option>Biryani</option></select></div></div>
+          <div class="form-row"><div class="field"><label>Selling price (₹)</label><input value="320"/></div><div class="field"><label>Variant group</label><select><option>Biryani — paneer / chicken / mutton / veg</option></select></div></div>
+          <div class="form-row"><div class="field"><label>Display order</label><input value="2"/></div><div class="field"><label>&nbsp;</label><div class="toggle-row"><span style="font-size: 12px;">Active on menu</span><div class="toggle"></div></div></div></div>
+        </div>
+
+        <div class="section">
+          <div class="sec-title">Recipe <span class="sec-sub">· per 1 serving · BoM depth 2</span></div>
+          <div class="recipe-tbl">
+            <div class="recipe-head"><span></span><span>Ingredient</span><span>Qty</span><span>Unit</span><span>Notes</span><span></span></div>
+            <div class="rrow"><span class="rdrag"><svg viewBox="0 0 8 12" fill="currentColor"><circle cx="2" cy="2" r="1"/><circle cx="6" cy="2" r="1"/><circle cx="2" cy="6" r="1"/><circle cx="6" cy="6" r="1"/><circle cx="2" cy="10" r="1"/><circle cx="6" cy="10" r="1"/></svg></span><span class="ring">Basmati rice</span><input class="rinp" value="180"/><select class="rsel"><option>g</option></select><span class="rnotes">Soaked 30 min</span><span class="rdel"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg></span></div>
+            <div class="rrow"><span class="rdrag"><svg viewBox="0 0 8 12" fill="currentColor"><circle cx="2" cy="2" r="1"/><circle cx="6" cy="2" r="1"/><circle cx="2" cy="6" r="1"/><circle cx="6" cy="6" r="1"/><circle cx="2" cy="10" r="1"/><circle cx="6" cy="10" r="1"/></svg></span><span class="ring">Paneer</span><input class="rinp" value="120"/><select class="rsel"><option>g</option></select><span class="rnotes">Cubed</span><span class="rdel"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg></span></div>
+            <div class="rrow"><span class="rdrag"><svg viewBox="0 0 8 12" fill="currentColor"><circle cx="2" cy="2" r="1"/><circle cx="6" cy="2" r="1"/><circle cx="2" cy="6" r="1"/><circle cx="6" cy="6" r="1"/><circle cx="2" cy="10" r="1"/><circle cx="6" cy="10" r="1"/></svg></span><span class="ring">Biryani masala<span class="ring-tag prep">prep</span></span><input class="rinp" value="8"/><select class="rsel"><option>g</option></select><span class="rnotes">House blend</span><span class="rdel"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg></span></div>
+            <div class="rrow"><span class="rdrag"><svg viewBox="0 0 8 12" fill="currentColor"><circle cx="2" cy="2" r="1"/><circle cx="6" cy="2" r="1"/><circle cx="2" cy="6" r="1"/><circle cx="6" cy="6" r="1"/><circle cx="2" cy="10" r="1"/><circle cx="6" cy="10" r="1"/></svg></span><span class="ring">Onions</span><input class="rinp" value="60"/><select class="rsel"><option>g</option></select><span class="rnotes">Birista</span><span class="rdel"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg></span></div>
+            <div class="rrow"><span class="rdrag"><svg viewBox="0 0 8 12" fill="currentColor"><circle cx="2" cy="2" r="1"/><circle cx="6" cy="2" r="1"/><circle cx="2" cy="6" r="1"/><circle cx="6" cy="6" r="1"/><circle cx="2" cy="10" r="1"/><circle cx="6" cy="10" r="1"/></svg></span><span class="ring">Yogurt</span><input class="rinp" value="40"/><select class="rsel"><option>ml</option></select><span class="rnotes">For marinade</span><span class="rdel"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg></span></div>
+            <div class="rrow"><span class="rdrag"><svg viewBox="0 0 8 12" fill="currentColor"><circle cx="2" cy="2" r="1"/><circle cx="6" cy="2" r="1"/><circle cx="2" cy="6" r="1"/><circle cx="6" cy="6" r="1"/><circle cx="2" cy="10" r="1"/><circle cx="6" cy="10" r="1"/></svg></span><span class="ring">Ghee</span><input class="rinp" value="15"/><select class="rsel"><option>ml</option></select><span class="rnotes"></span><span class="rdel"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"/></svg></span></div>
+            <div class="add-row"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v6M5 8h6"/></svg>Add ingredient</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-side">
+        <div class="summary">
+          <div class="sum-block"><div class="sum-l">Theoretical food cost</div><div class="sum-v" style="color: var(--color-text-success);">28.4%</div><div class="pct-bar"><div class="pct-fill" style="width: 28%;"></div></div><div class="sum-sub">₹91 of ₹320</div></div>
+          <div class="sum-block"><div class="sum-l">Recipe cost</div><div class="sum-v">₹91.20</div><div class="sum-sub">6 ingredients</div></div>
+          <div class="sum-block"><div class="sum-l">Availability</div><div class="avail-pill"><span class="dot"></span>13 servings</div><div class="sum-sub" style="margin-top: 6px;">Limited by paneer (2.4 kg)</div></div>
+          <div class="sum-block"><div class="sum-l">Version</div><div style="font-size: 12px; font-weight: 500;">Editing v3 (draft)</div><div class="sum-sub">v2 active since 12 Apr</div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+</body>
+</html>

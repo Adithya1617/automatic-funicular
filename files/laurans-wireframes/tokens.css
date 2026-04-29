@@ -1,0 +1,42 @@
+/* Laurans wireframes — shared design tokens
+ * These mirror the tokens used in the original visualizations.
+ * Override or extend in your real Tailwind/shadcn theme.
+ */
+
+:root {
+  /* Text */
+  --color-text-primary: #2C2C2A;
+  --color-text-secondary: #5F5E5A;
+  --color-text-tertiary: #888780;
+  --color-text-info: #185FA5;
+  --color-text-success: #3B6D11;
+  --color-text-warning: #854F0B;
+  --color-text-danger: #A32D2D;
+
+  /* Backgrounds */
+  --color-background-primary: #FFFFFF;
+  --color-background-secondary: #F5F4EE;
+  --color-background-tertiary: #EFEDE5;
+  --color-background-info: #E6F1FB;
+  --color-background-success: #EAF3DE;
+  --color-background-warning: #FAEEDA;
+  --color-background-danger: #FCEBEB;
+
+  /* Borders */
+  --color-border-tertiary: rgba(0, 0, 0, 0.10);
+  --color-border-secondary: rgba(0, 0, 0, 0.20);
+  --color-border-primary: rgba(0, 0, 0, 0.30);
+  --color-border-info: #B5D4F4;
+  --color-border-success: #C0DD97;
+  --color-border-warning: #FAC775;
+  --color-border-danger: #F7C1C1;
+
+  /* Radii */
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-radius-xl: 16px;
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+}

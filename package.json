@@ -1,0 +1,38 @@
+{
+  "name": "laurans",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Laurans Food Court — Restaurant Inventory Management (Electron desktop app)",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "env -u ELECTRON_RUN_AS_NODE electron-vite dev",
+    "build": "env -u ELECTRON_RUN_AS_NODE electron-vite build",
+    "preview": "env -u ELECTRON_RUN_AS_NODE electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json"
+  },
+  "dependencies": {
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.460.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "tailwind-merge": "^2.5.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.14",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}
