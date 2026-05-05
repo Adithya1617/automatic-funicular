@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import type { Ingredient } from '@shared/schemas/ingredient';
 import { Button } from '@renderer/components/ui/button';
 import {
   Dialog,
@@ -27,7 +28,17 @@ import {
 } from '@shared/constants/enums';
 import { useCreateIngredient } from '@renderer/hooks/ipc/useIngredients';
 
-type Props = { open: boolean; onOpenChange: (open: boolean) => void };
+type Props = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initial?: {
+    name?: string;
+    category?: string;
+    baseUnit?: BaseUnit;
+    type?: IngredientType;
+  };
+  onCreated?: (ingredient: Ingredient) => void;
+};
 
 type FormValues = {
   name: string;
@@ -38,19 +49,33 @@ type FormValues = {
   densityGPerMl: string; // textual, blank means null
 };
 
-export function NewIngredientDialog({ open, onOpenChange }: Props) {
+export function NewIngredientDialog({ open, onOpenChange, initial, onCreated }: Props) {
   const create = useCreateIngredient();
   const [serverError, setServerError] = useState<string | null>(null);
   const { register, handleSubmit, reset, watch, setValue, formState } = useForm<FormValues>({
     defaultValues: {
-      name: '',
-      category: '',
-      type: 'raw',
-      baseUnit: 'g',
+      name: initial?.name ?? '',
+      category: initial?.category ?? '',
+      type: initial?.type ?? 'raw',
+      baseUnit: initial?.baseUnit ?? 'g',
       lowStockThreshold: 0,
       densityGPerMl: '',
     },
   });
+
+  useEffect(() => {
+    if (open) {
+      reset({
+        name: initial?.name ?? '',
+        category: initial?.category ?? '',
+        type: initial?.type ?? 'raw',
+        baseUnit: initial?.baseUnit ?? 'g',
+        lowStockThreshold: 0,
+        densityGPerMl: '',
+      });
+      setServerError(null);
+    }
+  }, [open, initial?.name, initial?.category, initial?.baseUnit, initial?.type, reset]);
 
   const baseUnit = watch('baseUnit');
   const type = watch('type');
@@ -59,7 +84,7 @@ export function NewIngredientDialog({ open, onOpenChange }: Props) {
     setServerError(null);
     try {
       const densityNum = values.densityGPerMl.trim() === '' ? null : Number(values.densityGPerMl);
-      await create.mutateAsync({
+      const created = await create.mutateAsync({
         name: values.name.trim(),
         category: values.category.trim(),
         type: values.type,
@@ -67,6 +92,7 @@ export function NewIngredientDialog({ open, onOpenChange }: Props) {
         lowStockThreshold: Number(values.lowStockThreshold) || 0,
         densityGPerMl: densityNum != null && Number.isFinite(densityNum) && densityNum > 0 ? densityNum : null,
       });
+      if (onCreated) onCreated(created);
       reset();
       onOpenChange(false);
     } catch (err) {
