@@ -3,6 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus } from 'lucide-react';
 import type { LineDraft } from '@shared/schemas/invoice';
 import type { ParseResult } from '@shared/schemas/invoiceParser';
+import type { IngredientSuggestion } from '@shared/invoiceTemplates/types';
+import type { Ingredient } from '@shared/schemas/ingredient';
+import { getTemplateById } from '@shared/invoiceTemplates';
 import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@renderer/components/ui/table';
@@ -12,6 +15,7 @@ import {
   useCommitInvoice,
   useCreateInvoiceDraft,
   useInvoice,
+  useParseInvoice,
   useReplaceInvoiceLines,
   useUpdateInvoice,
 } from '@renderer/hooks/ipc/useInvoices';
@@ -19,6 +23,8 @@ import { InvoiceHeaderForm, type InvoiceHeaderValues } from '@renderer/features/
 import { PdfAttachZone } from '@renderer/features/invoices/PdfAttachZone';
 import { InvoiceLineRow, type LineDraftRow } from '@renderer/features/invoices/InvoiceLineRow';
 import { InvoiceTotalsCard } from '@renderer/features/invoices/InvoiceTotalsCard';
+import { SupplierEditorDialog } from '@renderer/features/suppliers/SupplierEditorDialog';
+import { NewIngredientDialog } from '@renderer/features/ingredients/NewIngredientDialog';
 
 let lineKeyCounter = 0;
 const nextLineKey = () => `l-${++lineKeyCounter}`;
@@ -74,10 +80,23 @@ export function InvoiceEditorPage() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [parseInfo, setParseInfo] = useState<string | null>(null);
   const [duplicateInvoiceId, setDuplicateInvoiceId] = useState<string | null>(null);
+  const [lastDroppedBytes, setLastDroppedBytes] = useState<Uint8Array | null>(null);
+  const [unknownSupplier, setUnknownSupplier] = useState<{ gstin: string; templateId: string } | null>(null);
+  const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
+  const [createIngredientFor, setCreateIngredientFor] = useState<{
+    rowIndex: number;
+    initial: { name: string; baseUnit: 'g' | 'ml' | 'each'; category: string };
+  } | null>(null);
+  const [perRowSuggestions, setPerRowSuggestions] = useState<Record<string, IngredientSuggestion>>({});
 
-  function handleParsed(result: ParseResult) {
+  const parseInvoice = useParseInvoice();
+
+  function handleParsed(result: ParseResult, bytes?: Uint8Array) {
     setDuplicateInvoiceId(null);
     setParseInfo(null);
+    if (bytes) setLastDroppedBytes(bytes);
+    setUnknownSupplier(null);
+
     if (!result.ok) {
       if (result.reason === 'duplicate') {
         setDuplicateInvoiceId(result.existingInvoiceId ?? null);
@@ -90,6 +109,7 @@ export function InvoiceEditorPage() {
       setParseInfo('Could not extract data from this PDF.');
       return;
     }
+
     // Pre-fill header.
     setHeader({
       supplierId: result.header.supplierId ?? '',
@@ -97,19 +117,49 @@ export function InvoiceEditorPage() {
       invoiceDateInput: dateToInputValue(result.header.invoiceDate),
       notes: '',
     });
-    // Pre-fill rows.
-    setRows(
+
+    // Compute per-row suggestions from the matched template.
+    const tpl = getTemplateById(result.templateId);
+    const rowKeys = result.lines.map(() => nextLineKey());
+    const suggestionsByKey: Record<string, IngredientSuggestion> = {};
+    const newRows: LineDraftRow[] =
       result.lines.length === 0
         ? [emptyLine()]
-        : result.lines.map((l) => ({
-            key: nextLineKey(),
-            rawDescription: l.rawDescription,
-            ingredientId: l.ingredientId,
-            quantity: l.quantity,
-            unit: l.unit,
-            unitCost: l.unitCost,
-          })),
-    );
+        : result.lines.map((l, i) => {
+            const key = rowKeys[i]!;
+            if (tpl) {
+              suggestionsByKey[key] = tpl.suggestIngredient({
+                rawDescription: l.rawDescription,
+                quantity: l.quantity,
+                unit: (l.unit === 'g' || l.unit === 'ml' || l.unit === 'each' ? l.unit : '') as
+                  | ''
+                  | 'g'
+                  | 'ml'
+                  | 'each',
+                unitCost: l.unitCost,
+                categoryHint: l.categoryHint,
+              });
+            }
+            return {
+              key,
+              rawDescription: l.rawDescription,
+              ingredientId: l.ingredientId,
+              quantity: l.quantity,
+              unit: l.unit,
+              unitCost: l.unitCost,
+            };
+          });
+    setRows(newRows);
+    setPerRowSuggestions(suggestionsByKey);
+
+    // Detect unknown_supplier issue from the parser.
+    const unknownIssue = result.issues.find(
+      (i) => i.kind === 'unknown_supplier',
+    ) as { kind: 'unknown_supplier'; gstin: string | null } | undefined;
+    if (unknownIssue && unknownIssue.gstin) {
+      setUnknownSupplier({ gstin: unknownIssue.gstin, templateId: result.templateId });
+    }
+
     // Build a one-line summary of issues.
     const skipped = result.issues
       .filter((i) => i.kind === 'skipped_charge')
@@ -119,6 +169,27 @@ export function InvoiceEditorPage() {
     if (unmapped > 0) parts.push(`${unmapped} line${unmapped === 1 ? '' : 's'} need an ingredient mapping`);
     if (skipped > 0) parts.push(`₹${skipped.toFixed(2)} in fees not added to stock`);
     if (parts.length > 0) setParseInfo(parts.join(' · '));
+  }
+
+  async function reParseLastBytes() {
+    if (!lastDroppedBytes) return;
+    try {
+      const result = await parseInvoice.mutateAsync(lastDroppedBytes);
+      handleParsed(result);
+    } catch (err) {
+      setParseInfo(err instanceof Error ? err.message : 'Could not re-parse PDF');
+    }
+  }
+
+  function handleIngredientCreated(rowIndex: number, ingredient: Ingredient) {
+    setCreateIngredientFor(null);
+    setRows((prev) =>
+      prev.map((r, i) =>
+        i === rowIndex
+          ? { ...r, ingredientId: ingredient.id, unit: r.unit || ingredient.baseUnit }
+          : r,
+      ),
+    );
   }
 
   useEffect(() => {
@@ -307,8 +378,44 @@ export function InvoiceEditorPage() {
               invoiceId={existing?.id ?? null}
               filePath={existing?.filePath ?? null}
               disabled={isCommitted}
-              onParsed={handleParsed}
+              onParsed={(result, bytes) => handleParsed(result, bytes)}
             />
+            {unknownSupplier ? (
+              <div className="mt-2 rounded-md border border-border-tertiary bg-background-secondary px-3 py-2 text-[12px] text-text-secondary">
+                <div className="mb-1 font-medium text-text-primary">
+                  This PDF is from a supplier we don't recognise yet.
+                </div>
+                <div className="mb-2">
+                  Detected GSTIN: <span className="font-mono">{unknownSupplier.gstin}</span>
+                  {(() => {
+                    const tpl = getTemplateById(unknownSupplier.templateId);
+                    return tpl ? (
+                      <>
+                        {' · '}Suggested name: <span className="font-medium">{tpl.defaultSupplierName}</span>
+                      </>
+                    ) : null;
+                  })()}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setSupplierDialogOpen(true)}
+                  >
+                    Create supplier and re-parse
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setUnknownSupplier(null)}
+                  >
+                    Dismiss
+                  </Button>
+                </div>
+              </div>
+            ) : null}
             {parseInfo ? (
               <div className="mt-2 rounded-md border border-border-tertiary bg-background-secondary px-3 py-2 text-[12px] text-text-secondary">
                 {parseInfo}
@@ -347,6 +454,7 @@ export function InvoiceEditorPage() {
                   draft={row}
                   ingredients={ingredients}
                   supplierId={header.supplierId || null}
+                  suggestion={perRowSuggestions[row.key] ?? null}
                   disabled={isCommitted}
                   onChange={(next) =>
                     setRows((prev) => prev.map((r, i) => (i === idx ? next : r)))
@@ -355,6 +463,12 @@ export function InvoiceEditorPage() {
                     setRows((prev) =>
                       prev.length === 1 ? [emptyLine()] : prev.filter((_, i) => i !== idx),
                     )
+                  }
+                  onCreateNew={(s) =>
+                    setCreateIngredientFor({
+                      rowIndex: idx,
+                      initial: { name: s.name, baseUnit: s.baseUnit, category: s.category },
+                    })
                   }
                 />
               ))}
@@ -381,6 +495,45 @@ export function InvoiceEditorPage() {
           {serverError}
         </div>
       ) : null}
+
+      <SupplierEditorDialog
+        open={supplierDialogOpen}
+        onOpenChange={(o) => {
+          setSupplierDialogOpen(o);
+          if (!o) {
+            // Dialog closed. If the user actually created/saved, the mutation success
+            // would have already invalidated the suppliers query. Re-parse from the
+            // last dropped bytes so the editor picks up the new supplier id.
+            // Note: react-query's onSuccess fires before the dialog closes (the dialog
+            // closes in onSuccess of the mutation), so we trigger re-parse on close.
+            if (unknownSupplier) {
+              void reParseLastBytes();
+            }
+          }
+        }}
+        supplier={null}
+        initialName={unknownSupplier ? (getTemplateById(unknownSupplier.templateId)?.defaultSupplierName ?? '') : ''}
+        initialGstin={unknownSupplier?.gstin ?? ''}
+      />
+
+      <NewIngredientDialog
+        open={createIngredientFor !== null}
+        onOpenChange={(o) => {
+          if (!o) setCreateIngredientFor(null);
+        }}
+        initial={
+          createIngredientFor
+            ? {
+                name: createIngredientFor.initial.name,
+                baseUnit: createIngredientFor.initial.baseUnit,
+                category: createIngredientFor.initial.category,
+              }
+            : undefined
+        }
+        onCreated={(ing) => {
+          if (createIngredientFor) handleIngredientCreated(createIngredientFor.rowIndex, ing);
+        }}
+      />
     </div>
   );
 }
