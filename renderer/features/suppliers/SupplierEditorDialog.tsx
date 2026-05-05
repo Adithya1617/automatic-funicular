@@ -18,6 +18,9 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   supplier: Supplier | null;
+  /** Pre-fill values for create mode. Ignored when `supplier` is non-null (edit). */
+  initialName?: string;
+  initialGstin?: string;
 };
 
 type FormValues = {
@@ -27,7 +30,7 @@ type FormValues = {
   notes: string;
 };
 
-export function SupplierEditorDialog({ open, onOpenChange, supplier }: Props) {
+export function SupplierEditorDialog({ open, onOpenChange, supplier, initialName, initialGstin }: Props) {
   const create = useCreateSupplier();
   const update = useUpdateSupplier();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -35,9 +38,9 @@ export function SupplierEditorDialog({ open, onOpenChange, supplier }: Props) {
 
   const { register, handleSubmit, reset, formState } = useForm<FormValues>({
     defaultValues: {
-      name: supplier?.name ?? '',
+      name: supplier?.name ?? initialName ?? '',
       contactInfo: supplier?.contactInfo ?? '',
-      gstin: supplier?.gstin ?? '',
+      gstin: supplier?.gstin ?? initialGstin ?? '',
       notes: supplier?.notes ?? '',
     },
   });
@@ -45,14 +48,14 @@ export function SupplierEditorDialog({ open, onOpenChange, supplier }: Props) {
   useEffect(() => {
     if (open) {
       reset({
-        name: supplier?.name ?? '',
+        name: supplier?.name ?? initialName ?? '',
         contactInfo: supplier?.contactInfo ?? '',
-        gstin: supplier?.gstin ?? '',
+        gstin: supplier?.gstin ?? initialGstin ?? '',
         notes: supplier?.notes ?? '',
       });
       setServerError(null);
     }
-  }, [open, supplier, reset]);
+  }, [open, supplier, initialName, initialGstin, reset]);
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
