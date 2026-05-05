@@ -84,7 +84,7 @@ export function InvoiceEditorPage() {
   const [unknownSupplier, setUnknownSupplier] = useState<{ gstin: string; templateId: string } | null>(null);
   const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
   const [createIngredientFor, setCreateIngredientFor] = useState<{
-    rowIndex: number;
+    rowKey: string;
     initial: { name: string; baseUnit: 'g' | 'ml' | 'each'; category: string };
   } | null>(null);
   const [perRowSuggestions, setPerRowSuggestions] = useState<Record<string, IngredientSuggestion>>({});
@@ -181,11 +181,11 @@ export function InvoiceEditorPage() {
     }
   }
 
-  function handleIngredientCreated(rowIndex: number, ingredient: Ingredient) {
+  function handleIngredientCreated(rowKey: string, ingredient: Ingredient) {
     setCreateIngredientFor(null);
     setRows((prev) =>
-      prev.map((r, i) =>
-        i === rowIndex
+      prev.map((r) =>
+        r.key === rowKey
           ? { ...r, ingredientId: ingredient.id, unit: r.unit || ingredient.baseUnit }
           : r,
       ),
@@ -466,7 +466,7 @@ export function InvoiceEditorPage() {
                   }
                   onCreateNew={(s) =>
                     setCreateIngredientFor({
-                      rowIndex: idx,
+                      rowKey: row.key,
                       initial: { name: s.name, baseUnit: s.baseUnit, category: s.category },
                     })
                   }
@@ -498,22 +498,13 @@ export function InvoiceEditorPage() {
 
       <SupplierEditorDialog
         open={supplierDialogOpen}
-        onOpenChange={(o) => {
-          setSupplierDialogOpen(o);
-          if (!o) {
-            // Dialog closed. If the user actually created/saved, the mutation success
-            // would have already invalidated the suppliers query. Re-parse from the
-            // last dropped bytes so the editor picks up the new supplier id.
-            // Note: react-query's onSuccess fires before the dialog closes (the dialog
-            // closes in onSuccess of the mutation), so we trigger re-parse on close.
-            if (unknownSupplier) {
-              void reParseLastBytes();
-            }
-          }
-        }}
+        onOpenChange={setSupplierDialogOpen}
         supplier={null}
         initialName={unknownSupplier ? (getTemplateById(unknownSupplier.templateId)?.defaultSupplierName ?? '') : ''}
         initialGstin={unknownSupplier?.gstin ?? ''}
+        onCreated={() => {
+          void reParseLastBytes();
+        }}
       />
 
       <NewIngredientDialog
@@ -531,7 +522,7 @@ export function InvoiceEditorPage() {
             : undefined
         }
         onCreated={(ing) => {
-          if (createIngredientFor) handleIngredientCreated(createIngredientFor.rowIndex, ing);
+          if (createIngredientFor) handleIngredientCreated(createIngredientFor.rowKey, ing);
         }}
       />
     </div>

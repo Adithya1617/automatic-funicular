@@ -21,6 +21,8 @@ type Props = {
   /** Pre-fill values for create mode. Ignored when `supplier` is non-null (edit). */
   initialName?: string;
   initialGstin?: string;
+  /** Called after a new supplier is successfully created. Not called on updates. */
+  onCreated?: (supplier: Supplier) => void;
 };
 
 type FormValues = {
@@ -30,7 +32,7 @@ type FormValues = {
   notes: string;
 };
 
-export function SupplierEditorDialog({ open, onOpenChange, supplier, initialName, initialGstin }: Props) {
+export function SupplierEditorDialog({ open, onOpenChange, supplier, initialName, initialGstin, onCreated }: Props) {
   const create = useCreateSupplier();
   const update = useUpdateSupplier();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -69,12 +71,13 @@ export function SupplierEditorDialog({ open, onOpenChange, supplier, initialName
           notes: values.notes.trim() || null,
         });
       } else {
-        await create.mutateAsync({
+        const created = await create.mutateAsync({
           name: values.name.trim(),
           contactInfo: values.contactInfo.trim() || null,
           gstin: values.gstin.trim() || null,
           notes: values.notes.trim() || null,
         });
+        if (onCreated) onCreated(created);
       }
       reset();
       onOpenChange(false);
