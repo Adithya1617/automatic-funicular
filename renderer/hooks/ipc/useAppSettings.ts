@@ -1,0 +1,53 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type {
+  AppSettingsSnapshot,
+  ChooseDirectoryInput,
+  SetBackupFolderInput,
+  SetBackupTimeInput,
+  SetFirstRunInput,
+} from '@shared/schemas/appSettings';
+import { unwrap } from '@renderer/lib/ipc';
+
+const KEY = ['appSettings'] as const;
+
+export function useAppSettings() {
+  return useQuery({
+    queryKey: KEY,
+    queryFn: () => unwrap(window.laurans.appSettings.snapshot({})),
+  });
+}
+
+function useMut<TIn>(
+  fn: (input: TIn) => Promise<AppSettingsSnapshot>,
+) {
+  const qc = useQueryClient();
+  return useMutation<AppSettingsSnapshot, Error, TIn>({
+    mutationFn: fn,
+    onSuccess: (next) => qc.setQueryData(KEY, next),
+  });
+}
+
+export function useSetBackupFolder() {
+  return useMut<SetBackupFolderInput>((input) =>
+    unwrap(window.laurans.appSettings.setBackupFolder(input)),
+  );
+}
+
+export function useSetBackupTime() {
+  return useMut<SetBackupTimeInput>((input) =>
+    unwrap(window.laurans.appSettings.setBackupTime(input)),
+  );
+}
+
+export function useSetFirstRunCompleted() {
+  return useMut<SetFirstRunInput>((input) =>
+    unwrap(window.laurans.appSettings.setFirstRunCompleted(input)),
+  );
+}
+
+export function useChooseDirectory() {
+  return useMutation({
+    mutationFn: (input: ChooseDirectoryInput) =>
+      unwrap(window.laurans.appSettings.chooseDirectory(input)),
+  });
+}
