@@ -1,0 +1,41 @@
+import { registerAppSettingsHandlers } from './handlers/appSettings';
+import { registerAvailabilityHandlers } from './handlers/availability';
+import { registerBackupHandlers } from './handlers/backup';
+import { registerCsvImportHandlers } from './handlers/csvImport';
+import { registerDashboardHandlers } from './handlers/dashboard';
+import { registerIngredientHandlers } from './handlers/ingredient';
+import { registerInventoryHandlers } from './handlers/inventory';
+import { registerInvoiceHandlers } from './handlers/invoice';
+import { registerMenuItemHandlers } from './handlers/menuItem';
+import { registerOrderHandlers } from './handlers/order';
+import { registerOrderingChannelHandlers } from './handlers/orderingChannel';
+import { registerProductionHandlers } from './handlers/production';
+import { registerReconciliationHandlers } from './handlers/reconciliation';
+import { registerRecipeHandlers } from './handlers/recipe';
+import { registerReportHandlers } from './handlers/report';
+import { registerStockMovementHandlers } from './handlers/stockMovement';
+import { registerStockTakeHandlers } from './handlers/stockTake';
+import { registerSupplierHandlers } from './handlers/supplier';
+import { registerSupplierItemMappingHandlers } from './handlers/supplierItemMapping';
+
+export function registerIpcHandlers(): void {
+  registerIngredientHandlers();
+  registerSupplierHandlers();
+  registerStockMovementHandlers();
+  registerInventoryHandlers();
+  registerRecipeHandlers();
+  registerProductionHandlers();
+  registerMenuItemHandlers();
+  registerAvailabilityHandlers();
+  registerOrderHandlers();
+  registerOrderingChannelHandlers();
+  registerInvoiceHandlers();
+  registerSupplierItemMappingHandlers();
+  registerStockTakeHandlers();
+  registerDashboardHandlers();
+  registerReportHandlers();
+  registerCsvImportHandlers();
+  registerAppSettingsHandlers();
+  registerBackupHandlers();
+  registerReconciliationHandlers();
+}
