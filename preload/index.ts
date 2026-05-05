@@ -73,6 +73,10 @@ import type {
   UpdateInvoiceInput,
 } from '@shared/schemas/invoice';
 import type {
+  ParseInvoiceInput,
+  ParseResult,
+} from '@shared/schemas/invoiceParser';
+import type {
   SuggestSupplierItemInput,
   SupplierItemMapping,
 } from '@shared/schemas/supplierItemMapping';
@@ -212,6 +216,7 @@ const api = {
     replaceLines: invoke<ReplaceInvoiceLinesInput, InvoiceWithLines>(IPC.invoice.replaceLines),
     commit: invoke<CommitInvoiceInput, InvoiceWithLines>(IPC.invoice.commit),
     attachPdf: invoke<AttachPdfInput, Invoice>(IPC.invoice.attachPdf),
+    parse: invoke<ParseInvoiceInput, ParseResult>(IPC.invoice.parse),
   },
   supplierItemMapping: {
     suggest: invoke<SuggestSupplierItemInput, SupplierItemMapping[]>(

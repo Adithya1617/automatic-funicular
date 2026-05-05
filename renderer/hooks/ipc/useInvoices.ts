@@ -7,6 +7,7 @@ import type {
   ReplaceInvoiceLinesInput,
   UpdateInvoiceInput,
 } from '@shared/schemas/invoice';
+import type { ParseResult } from '@shared/schemas/invoiceParser';
 import { unwrap } from '@renderer/lib/ipc';
 
 const invoicesKey = (filter: ListInvoicesInput | undefined = undefined) =>
@@ -70,4 +71,11 @@ export function useAttachInvoicePdf() {
   return useInvoiceMutation((input: AttachPdfInput) =>
     unwrap(window.laurans.invoice.attachPdf(input)),
   );
+}
+
+export function useParseInvoice() {
+  return useMutation<ParseResult, Error, Uint8Array>({
+    mutationFn: (bytes) =>
+      unwrap(window.laurans.invoice.parse({ bytes: bytes as Uint8Array<ArrayBuffer> })),
+  });
 }

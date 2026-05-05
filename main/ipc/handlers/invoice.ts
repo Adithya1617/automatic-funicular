@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import { getDb } from '../../db/client';
 import { InvoiceService } from '../../services/InvoiceService';
+import { InvoiceParserService } from '../../services/InvoiceParserService';
 import { DEFAULT_TENANT_ID } from '@shared/constants/system';
 import { IPC } from '@shared/schemas/ipc';
 import {
@@ -12,6 +13,7 @@ import {
   replaceInvoiceLinesInputSchema,
   updateInvoiceInputSchema,
 } from '@shared/schemas/invoice';
+import { parseInvoiceInputSchema } from '@shared/schemas/invoiceParser';
 import { makeHandler } from './wrap';
 
 export function registerInvoiceHandlers(): void {
@@ -61,6 +63,13 @@ export function registerInvoiceHandlers(): void {
     IPC.invoice.attachPdf,
     makeHandler(attachPdfInputSchema, (input) =>
       InvoiceService.attachPdf(getDb().db, DEFAULT_TENANT_ID, input),
+    ),
+  );
+
+  ipcMain.handle(
+    IPC.invoice.parse,
+    makeHandler(parseInvoiceInputSchema, (input) =>
+      InvoiceParserService.parse(getDb().db, DEFAULT_TENANT_ID, input),
     ),
   );
 }
