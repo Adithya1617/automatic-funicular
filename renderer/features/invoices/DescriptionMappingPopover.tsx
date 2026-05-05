@@ -1,5 +1,6 @@
 import type { Ingredient } from '@shared/schemas/ingredient';
 import type { SupplierItemMapping } from '@shared/schemas/supplierItemMapping';
+import type { IngredientSuggestion } from '@shared/invoiceTemplates/types';
 import {
   Popover,
   PopoverAnchor,
@@ -12,7 +13,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@renderer/components/ui/select';
+import { Button } from '@renderer/components/ui/button';
 import { useSupplierItemSuggestions } from '@renderer/hooks/ipc/useSupplierItemMapping';
+import { rankIngredientMatches } from '@shared/invoiceTemplates/match';
 import { formatINR } from '@shared/utils/currency';
 import { formatDateDMY } from '@shared/utils/date';
 
@@ -31,8 +34,11 @@ type Props = {
   partial: string;
   ingredients: Ingredient[];
   selectedIngredientId: string | null;
+  /** Suggested name+unit+category derived from the parsed line. Null when no template suggestion is available. */
+  suggestion: IngredientSuggestion | null;
   onApplySuggestion: (suggestion: AppliedSuggestion) => void;
   onPickIngredient: (ingredientId: string) => void;
+  onCreateNew: (suggestion: IngredientSuggestion) => void;
 };
 
 export function DescriptionMappingPopover({
@@ -43,14 +49,20 @@ export function DescriptionMappingPopover({
   partial,
   ingredients,
   selectedIngredientId,
+  suggestion,
   onApplySuggestion,
   onPickIngredient,
+  onCreateNew,
 }: Props) {
   const { data: suggestions = [] } = useSupplierItemSuggestions(
     supplierId ? { supplierId, partial, limit: 8 } : null,
   );
-
   const ingredientById = new Map(ingredients.map((i) => [i.id, i]));
+
+  // Fuzzy-match candidates from the suggestion (when no past mapping rules the row).
+  const fuzzyCandidates = suggestion
+    ? rankIngredientMatches(suggestion.name, ingredients)
+    : [];
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
@@ -65,7 +77,7 @@ export function DescriptionMappingPopover({
           </div>
         ) : suggestions.length === 0 ? (
           <div className="px-2 py-2 text-[11px] text-text-tertiary">
-            No mappings yet for this supplier. Pick an ingredient below to map this line.
+            No mappings yet for this supplier.
           </div>
         ) : (
           <>
@@ -104,9 +116,46 @@ export function DescriptionMappingPopover({
             </div>
           </>
         )}
+
+        {fuzzyCandidates.length > 0 ? (
+          <div className="mt-1 border-t border-border-tertiary px-2 pt-2">
+            <div className="text-[10px] uppercase tracking-wider text-text-tertiary">
+              Looks like
+            </div>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {fuzzyCandidates.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => onPickIngredient(c.id)}
+                  className="rounded-md border border-border-tertiary bg-background-secondary px-2 py-1 text-[11px] text-text-primary hover:bg-background-tertiary"
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {suggestion ? (
+          <div className="mt-1 border-t border-border-tertiary px-2 pt-2">
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              className="w-full"
+              onClick={() => onCreateNew(suggestion)}
+            >
+              + Create new ingredient: {suggestion.name || '(name this)'}
+              {suggestion.baseUnit ? ` (${suggestion.baseUnit}` : ''}
+              {suggestion.category ? `, ${suggestion.category})` : suggestion.baseUnit ? ')' : ''}
+            </Button>
+          </div>
+        ) : null}
+
         <div className="mt-1 border-t border-border-tertiary px-2 pt-2">
           <div className="text-[10px] uppercase tracking-wider text-text-tertiary">
-            Map to ingredient
+            Map to existing ingredient
           </div>
           <div className="mt-1">
             <Select
