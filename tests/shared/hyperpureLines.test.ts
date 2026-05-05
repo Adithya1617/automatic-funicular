@@ -47,4 +47,16 @@ describe('Hyperpure line parsing', () => {
       expect(+line!.unitCost.toFixed(4)).toBeCloseTo(unitCost, 4);
     }
   });
+
+  it('attaches the active category header as categoryHint on each line', async () => {
+    const text = await extractPdfText(new Uint8Array(readFileSync(SAMPLE)));
+    const result = HyperpureTemplate.parse(text);
+    const byDesc = (s: string) => result.lines.find((l) => l.rawDescription.includes(s));
+
+    expect(byDesc('Mushroom Slices')?.categoryHint).toBe('Canned & Imported Items');
+    expect(byDesc('Lite Paneer')?.categoryHint).toBe('Dairy');
+    expect(byDesc('Beans Haricot')?.categoryHint).toBe('Fruits & Vegetables');
+    expect(byDesc('Black Pepper Whole')?.categoryHint).toBe('Masala, Salt & Sugar');
+    expect(byDesc('Aromatic Mix')?.categoryHint).toBe('Sauces & Seasoning');
+  });
 });

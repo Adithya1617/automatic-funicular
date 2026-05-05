@@ -11,6 +11,7 @@ export type ParsedLine = {
   quantity: number; // already in base unit when packSize is known; else inv qty as-is
   unit: '' | 'g' | 'ml' | 'each';
   unitCost: number; // post-tax, post-discount, per (base) unit
+  categoryHint: string; // '' when no header is active for this line
 };
 
 export type ParseIssue =

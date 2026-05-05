@@ -125,6 +125,7 @@ function parseLines(text: PdfTextOutput): { lines: ParsedLine[]; issues: ParseIs
   // and we may see the table continue through page 2 before "Other Charges" appears.
   let inTable = false;
   let stopped = false;
+  let activeCategory = '';
   for (const page of text.pages) {
     if (stopped) break;
     const rows = groupItemsIntoRows(page.items);
@@ -147,7 +148,13 @@ function parseLines(text: PdfTextOutput): { lines: ParsedLine[]; issues: ParseIs
         stopped = true;
         break;
       }
-      if (isCategoryHeader(rt)) continue;
+      if (isCategoryHeader(rt)) {
+        // Find the matching header in CATEGORY_HEADERS and remember it; use the
+        // canonical form, not whatever fragment appeared on the page.
+        const matched = CATEGORY_HEADERS.find((h) => rt === h || rt.startsWith(h));
+        activeCategory = matched ?? rt;
+        continue;
+      }
 
       const parsed = parseLineRow(rt);
       if (!parsed) continue; // skip continuation/wrapped lines we can't reconstruct
@@ -160,6 +167,7 @@ function parseLines(text: PdfTextOutput): { lines: ParsedLine[]; issues: ParseIs
           quantity: parsed.invQty,
           unit: '',
           unitCost: parsed.total / parsed.invQty,
+          categoryHint: activeCategory,
         });
         continue;
       }
@@ -170,6 +178,7 @@ function parseLines(text: PdfTextOutput): { lines: ParsedLine[]; issues: ParseIs
         quantity: totalQtyBase,
         unit: pack.unit,
         unitCost: parsed.total / totalQtyBase,
+        categoryHint: activeCategory,
       });
     }
   }
