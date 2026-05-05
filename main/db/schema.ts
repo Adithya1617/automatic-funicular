@@ -59,12 +59,14 @@ export const suppliers = sqliteTable(
     tenantId: integer('tenant_id').notNull(),
     name: text('name').notNull(),
     contactInfo: text('contact_info'),
+    gstin: text('gstin'),
     notes: text('notes'),
     isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     ...audit,
   },
   (t) => ({
     tenantNameIdx: index('idx_suppliers_tenant_name').on(t.tenantId, t.name),
+    tenantGstinIdx: index('idx_suppliers_tenant_gstin').on(t.tenantId, t.gstin),
   }),
 );
 

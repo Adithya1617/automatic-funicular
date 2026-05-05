@@ -38,6 +38,14 @@ export const supplierRepository = {
       .get();
   },
 
+  findByGstin(db: AppDb, tenantId: number, gstin: string): SupplierRow | undefined {
+    return db
+      .select()
+      .from(suppliers)
+      .where(and(eq(suppliers.tenantId, tenantId), eq(suppliers.gstin, gstin)))
+      .get();
+  },
+
   insert(db: AppDb, row: SupplierInsert): SupplierRow {
     return db.insert(suppliers).values(row).returning().get();
   },

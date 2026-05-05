@@ -6,6 +6,7 @@ export const supplierSchema = z.object({
   tenantId: z.number().int(),
   name: z.string().min(1).max(120),
   contactInfo: z.string().nullable(),
+  gstin: z.string().nullable(),
   notes: z.string().nullable(),
   isActive: z.boolean(),
   createdAt: z.number().int(),
@@ -18,6 +19,7 @@ export type Supplier = z.infer<typeof supplierSchema>;
 export const createSupplierInputSchema = z.object({
   name: z.string().min(1).max(120),
   contactInfo: z.string().max(500).nullable().default(null),
+  gstin: z.string().max(15).nullable().default(null),
   notes: z.string().max(2000).nullable().default(null),
 });
 export type CreateSupplierInput = z.infer<typeof createSupplierInputSchema>;
@@ -26,6 +28,7 @@ export const updateSupplierInputSchema = z.object({
   id: idSchema,
   name: z.string().min(1).max(120).optional(),
   contactInfo: z.string().max(500).nullable().optional(),
+  gstin: z.string().max(15).nullable().optional(),
   notes: z.string().max(2000).nullable().optional(),
   isActive: z.boolean().optional(),
 });

@@ -37,6 +37,25 @@ export const invoiceRepository = {
       .get();
   },
 
+  findByNumber(
+    db: AppDb,
+    tenantId: number,
+    supplierId: string,
+    invoiceNumber: string,
+  ): InvoiceRow | undefined {
+    return db
+      .select()
+      .from(invoices)
+      .where(
+        and(
+          eq(invoices.tenantId, tenantId),
+          eq(invoices.supplierId, supplierId),
+          eq(invoices.invoiceNumber, invoiceNumber),
+        ),
+      )
+      .get();
+  },
+
   insert(db: AppDb, row: InvoiceInsert): InvoiceRow {
     return db.insert(invoices).values(row).returning().get();
   },

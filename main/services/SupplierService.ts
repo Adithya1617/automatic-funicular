@@ -46,6 +46,7 @@ export const SupplierService = {
       tenantId,
       name: input.name,
       contactInfo: input.contactInfo,
+      gstin: input.gstin?.trim() || null,
       notes: input.notes,
       isActive: true,
       createdAt: now,
@@ -77,6 +78,7 @@ export const SupplierService = {
     const patch: Record<string, unknown> = { updatedAt: Date.now(), updatedBy: actorId };
     if (input.name !== undefined) patch['name'] = input.name;
     if (input.contactInfo !== undefined) patch['contactInfo'] = input.contactInfo;
+    if (input.gstin !== undefined) patch['gstin'] = input.gstin?.trim() || null;
     if (input.notes !== undefined) patch['notes'] = input.notes;
     if (input.isActive !== undefined) patch['isActive'] = input.isActive;
 

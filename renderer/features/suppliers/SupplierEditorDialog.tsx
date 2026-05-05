@@ -23,6 +23,7 @@ type Props = {
 type FormValues = {
   name: string;
   contactInfo: string;
+  gstin: string;
   notes: string;
 };
 
@@ -36,6 +37,7 @@ export function SupplierEditorDialog({ open, onOpenChange, supplier }: Props) {
     defaultValues: {
       name: supplier?.name ?? '',
       contactInfo: supplier?.contactInfo ?? '',
+      gstin: supplier?.gstin ?? '',
       notes: supplier?.notes ?? '',
     },
   });
@@ -45,6 +47,7 @@ export function SupplierEditorDialog({ open, onOpenChange, supplier }: Props) {
       reset({
         name: supplier?.name ?? '',
         contactInfo: supplier?.contactInfo ?? '',
+        gstin: supplier?.gstin ?? '',
         notes: supplier?.notes ?? '',
       });
       setServerError(null);
@@ -59,12 +62,14 @@ export function SupplierEditorDialog({ open, onOpenChange, supplier }: Props) {
           id: supplier.id,
           name: values.name.trim(),
           contactInfo: values.contactInfo.trim() || null,
+          gstin: values.gstin.trim() || null,
           notes: values.notes.trim() || null,
         });
       } else {
         await create.mutateAsync({
           name: values.name.trim(),
           contactInfo: values.contactInfo.trim() || null,
+          gstin: values.gstin.trim() || null,
           notes: values.notes.trim() || null,
         });
       }
@@ -90,6 +95,14 @@ export function SupplierEditorDialog({ open, onOpenChange, supplier }: Props) {
           <div className="grid gap-1">
             <Label htmlFor="sup-contact">Contact info</Label>
             <Input id="sup-contact" placeholder="Phone, email, address…" {...register('contactInfo', { maxLength: 500 })} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label htmlFor="sup-gstin">GSTIN</Label>
+            <Input
+              id="sup-gstin"
+              placeholder="36AAACZ8867B1Z1"
+              {...register('gstin', { maxLength: 15 })}
+            />
           </div>
           <div className="grid gap-1">
             <Label htmlFor="sup-notes">Notes</Label>
