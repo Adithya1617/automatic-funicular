@@ -87,6 +87,7 @@ export function InvoiceLineRow({
                 onChange({ ...draft, rawDescription: e.target.value })
               }
               onFocus={() => setPopoverOpen(true)}
+              onClick={() => setPopoverOpen(true)}
               disabled={disabled}
               maxLength={500}
             />
@@ -98,7 +99,14 @@ export function InvoiceLineRow({
               mapped → <span className="font-medium">{child.name}</span>
             </span>
           ) : (
-            <span className="text-text-warning">needs mapping → click to assign</span>
+            <button
+              type="button"
+              onClick={() => setPopoverOpen(true)}
+              disabled={disabled}
+              className="text-text-warning underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              needs mapping → click to assign
+            </button>
           )}
         </div>
       </TableCell>
