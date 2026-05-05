@@ -25,8 +25,16 @@ export type TemplateParseResult = {
   issues: ParseIssue[];
 };
 
+export type IngredientSuggestion = {
+  name: string;
+  baseUnit: 'g' | 'ml' | 'each';
+  category: string;
+};
+
 export interface InvoiceTemplate {
   id: string;
+  defaultSupplierName: string;
   detect(text: PdfTextOutput): boolean;
   parse(text: PdfTextOutput): TemplateParseResult;
+  suggestIngredient(line: ParsedLine): IngredientSuggestion;
 }

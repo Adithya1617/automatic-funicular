@@ -4,6 +4,7 @@ import type {
   ParsedLine,
   ParseIssue,
   TemplateParseResult,
+  IngredientSuggestion,
 } from './types';
 import type { PdfTextOutput } from '../utils/pdfText';
 import { extractPackSize } from './packSize';
@@ -201,8 +202,51 @@ function collectCharges(rows: Row[], startIdx: number, issues: ParseIssue[]): vo
   }
 }
 
+function titleCase(s: string): string {
+  return s
+    .toLowerCase()
+    .split('')
+    .map((char, i, arr) => {
+      // Capitalize letter at position 0, or after whitespace, but NOT after opening parens
+      if (i === 0) return char.toUpperCase();
+      const prev = arr[i - 1]!;
+      if (/\s/.test(prev) && /[a-z]/.test(char)) return char.toUpperCase();
+      return char;
+    })
+    .join('');
+}
+
+function suggestIngredient(line: ParsedLine): IngredientSuggestion {
+  // Step 1: strip everything from the first comma onwards.
+  const commaIdx = line.rawDescription.indexOf(',');
+  let working = (commaIdx >= 0 ? line.rawDescription.slice(0, commaIdx) : line.rawDescription).trim();
+
+  // Step 2: drop brand prefix when " - " (space-hyphen-space) is present.
+  const dashIdx = working.indexOf(' - ');
+  if (dashIdx >= 0) {
+    working = working.slice(dashIdx + 3).trim();
+  }
+
+  // Step 3: drop a trailing parenthesised qualifier if its inner text is < 30 chars.
+  const parenMatch = /\(([^)]*)\)\s*$/.exec(working);
+  if (parenMatch && parenMatch[1]!.length < 30) {
+    working = working.slice(0, parenMatch.index).trim();
+  }
+
+  // Step 4: collapse whitespace and title-case.
+  working = working.replace(/\s+/g, ' ').trim();
+  const name = working.length > 0 ? titleCase(working) : '';
+
+  // Base unit fallback: parsed lines whose pack-size couldn't be detected come through
+  // with unit="". Default such cases to 'each' — the user can change it in the dialog.
+  const baseUnit: 'g' | 'ml' | 'each' = line.unit === '' ? 'each' : line.unit;
+
+  return { name, baseUnit, category: line.categoryHint };
+}
+
 export const HyperpureTemplate: InvoiceTemplate = {
   id: 'hyperpure',
+  defaultSupplierName: 'Zomato Hyperpure',
   detect(text: PdfTextOutput): boolean {
     if (text.pages.length === 0) return false;
     const joined = text.pages[0]!.items.map((i) => i.str).join(' ');
@@ -216,4 +260,5 @@ export const HyperpureTemplate: InvoiceTemplate = {
     const { lines, issues } = parseLines(text);
     return { header, lines, issues };
   },
+  suggestIngredient,
 };
