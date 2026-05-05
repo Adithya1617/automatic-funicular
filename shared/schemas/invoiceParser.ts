@@ -17,6 +17,7 @@ export const parsedLineSchema = z.object({
   quantity: z.number(),
   unit: z.string(),
   unitCost: z.number(),
+  categoryHint: z.string(),
 });
 
 export const parseIssueSchema = z.discriminatedUnion('kind', [

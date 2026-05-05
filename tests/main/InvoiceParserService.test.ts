@@ -88,4 +88,26 @@ describe('InvoiceParserService.parse', () => {
     const other = out.lines.find((l) => !l.rawDescription.includes('Lite Paneer'));
     expect(other?.ingredientId).toBeNull();
   });
+
+  it('propagates categoryHint from the template through to renderer-facing lines', async () => {
+    vi.spyOn(supplierRepository, 'findByGstin').mockReturnValue({
+      id: 'sup-hyperpure',
+      tenantId: DEFAULT_TENANT_ID,
+      name: 'Zomato Hyperpure',
+      gstin: '36AAACZ8867B1Z1',
+      isActive: true,
+    } as never);
+    vi.spyOn(invoiceRepository, 'findByNumber').mockReturnValue(null as never);
+    vi.spyOn(supplierItemMappingRepository, 'findByDescription').mockReturnValue(null as never);
+
+    const buf = new Uint8Array(readFileSync(SAMPLE));
+    const out = await InvoiceParserService.parse(fakeDb, DEFAULT_TENANT_ID, { bytes: buf });
+
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    const paneer = out.lines.find((l) => l.rawDescription.includes('Lite Paneer'));
+    expect(paneer?.categoryHint).toBe('Dairy');
+    const carrot = out.lines.find((l) => l.rawDescription.includes('Carrots (Big)'));
+    expect(carrot?.categoryHint).toBe('Fruits & Vegetables');
+  });
 });

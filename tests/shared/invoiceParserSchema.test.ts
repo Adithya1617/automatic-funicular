@@ -12,11 +12,24 @@ describe('parseResultSchema', () => {
         invoiceDate: 1714291200000,
       },
       lines: [
-        { rawDescription: 'Paneer, 1 Kg', ingredientId: 'ing-1', quantity: 1000, unit: 'g', unitCost: 0.291 },
+        { rawDescription: 'Paneer, 1 Kg', ingredientId: 'ing-1', quantity: 1000, unit: 'g', unitCost: 0.291, categoryHint: 'Dairy' },
       ],
       issues: [{ kind: 'skipped_charge', label: 'Delivery Charge', total: 234.82 }],
     };
     expect(parseResultSchema.parse(input)).toEqual(input);
+  });
+
+  it('rejects a line missing categoryHint', () => {
+    const input = {
+      ok: true,
+      templateId: 'hyperpure',
+      header: { supplierId: null, invoiceNumber: 'X', invoiceDate: 0 },
+      lines: [
+        { rawDescription: 'X', ingredientId: null, quantity: 1, unit: 'g', unitCost: 1 },
+      ],
+      issues: [],
+    };
+    expect(() => parseResultSchema.parse(input)).toThrow();
   });
 
   it('accepts a duplicate failure with existingInvoiceId', () => {
