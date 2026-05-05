@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { extractPdfText } from '../../shared/utils/pdfText';
-import { detectTemplate } from '../../shared/invoiceTemplates';
+import { detectTemplate, getTemplateById } from '../../shared/invoiceTemplates';
 
 const SAMPLE = join(__dirname, '..', '__fixtures__', 'invoices', 'hyperpure-sample.pdf');
 
@@ -22,5 +22,17 @@ describe('detectTemplate', () => {
       pages: [{ items: [{ str: 'Some Random Invoice', x: 0, y: 0, width: 0 }] }],
     };
     expect(detectTemplate(fake)).toBeNull();
+  });
+});
+
+describe('getTemplateById', () => {
+  it('returns the hyperpure template by id', () => {
+    const tpl = getTemplateById('hyperpure');
+    expect(tpl?.id).toBe('hyperpure');
+    expect(tpl?.defaultSupplierName).toBe('Zomato Hyperpure');
+  });
+
+  it('returns null for an unknown id', () => {
+    expect(getTemplateById('nope')).toBeNull();
   });
 });

@@ -11,4 +11,8 @@ export function detectTemplate(text: PdfTextOutput): InvoiceTemplate | null {
   return null;
 }
 
+export function getTemplateById(id: string): InvoiceTemplate | null {
+  return REGISTRY.find((t) => t.id === id) ?? null;
+}
+
 export type { InvoiceTemplate, ParsedHeader, ParsedLine, ParseIssue, TemplateParseResult } from './types';
