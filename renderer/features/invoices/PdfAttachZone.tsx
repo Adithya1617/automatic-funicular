@@ -8,7 +8,7 @@ type Props = {
   invoiceId: string | null;
   filePath: string | null;
   disabled?: boolean;
-  onParsed?: (result: ParseResult) => void;
+  onParsed?: (result: ParseResult, bytes: Uint8Array) => void;
 };
 
 const MB = 1024 * 1024;
@@ -42,7 +42,7 @@ export function PdfAttachZone({ invoiceId, filePath, disabled, onParsed }: Props
       setError(err instanceof Error ? err.message : 'Could not parse PDF');
       return;
     }
-    if (onParsed) onParsed(parseResult);
+    if (onParsed) onParsed(parseResult, bytes);
 
     // Attach only if we have an invoice draft and the parse didn't say "duplicate".
     if (invoiceId && !(parseResult.ok === false && parseResult.reason === 'duplicate')) {
