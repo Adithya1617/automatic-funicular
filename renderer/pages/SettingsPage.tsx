@@ -1,5 +1,13 @@
-import { Placeholder } from '@renderer/components/Placeholder';
+import { AboutPanel } from '@renderer/features/settings/AboutPanel';
+import { BackupPanel } from '@renderer/features/settings/BackupPanel';
+import { ReconciliationPanel } from '@renderer/features/settings/ReconciliationPanel';
 
 export function SettingsPage() {
-  return <Placeholder name="Settings" description="Slice 9 will add backup folder, polling intervals, sound mute, theme." />;
+  return (
+    <div className="flex flex-col gap-3">
+      <BackupPanel />
+      <ReconciliationPanel />
+      <AboutPanel />
+    </div>
+  );
 }
