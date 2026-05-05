@@ -1,0 +1,36 @@
+appId: com.laurans.inventory
+productName: Laurans Inventory
+copyright: Copyright (c) 2026 Laurans Food Court
+asar: true
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**
+  - package.json
+  - "!node_modules/**/*"
+extraResources:
+  # Drizzle migrations must travel with the installer; the main process reads
+  # them from process.resourcesPath/db/migrations in production
+  # (main/index.ts bootstrap()).
+  - from: main/db/migrations
+    to: db/migrations
+    filter:
+      - "**/*"
+asarUnpack:
+  # better-sqlite3 ships a native .node — must NOT live inside an asar.
+  - "**/node_modules/better-sqlite3/**/*"
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: ${productName}-${version}-${arch}.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: Laurans Inventory
+publish: null
