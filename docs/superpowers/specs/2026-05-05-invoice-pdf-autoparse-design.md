@@ -89,18 +89,11 @@ renderer/
                                    banner. If editor is non-empty when a PDF
                                    is dropped, confirms before replacing.
 
-db/migrations/
-  0011_supplier_mapping_pack.sql NEW
-    ALTER TABLE supplier_item_mappings
-      ADD COLUMN pack_size REAL,
-      ADD COLUMN pack_unit TEXT;
-
-main/repositories/supplierItemMappingRepo.ts MOD
-  upsert() and findByDescription() include pack_size, pack_unit.
-
-main/services/InvoiceService.ts MOD
-  commit() reads pack_size/pack_unit when re-using an existing mapping
-  (no behavioural change for movement writes — same applyMovement call).
+No schema migration. The existing supplier_item_mappings table is
+sufficient — pack size is re-extracted from the description by regex
+on every parse, which works on 100% of real Hyperpure rows. The
+mapping table keeps its existing role: remembering ingredient_id and
+last quantity/unit/cost defaults per (supplier, raw_description).
 ```
 
 ## Data flow on PDF drop
@@ -131,11 +124,9 @@ main/services/InvoiceService.ts MOD
       Return immediately; nothing is attached.
    6. **Per-line mapping resolve:** for each parsed line, look up
       `supplier_item_mappings(supplier_id, raw_description)`. On hit:
-      attach `ingredient_id`, and prefer the *remembered* `pack_size` /
-      `pack_unit` over what the description regex produced (the
-      remembered value is what the user committed against last time;
-      it's authoritative). If the remembered `pack_unit` no longer
-      matches the ingredient's `base_unit`, treat as miss and re-extract.
+      attach `ingredient_id`. Pack size is always re-extracted from the
+      description regex (no separate cache) — this is correct for
+      Hyperpure where the pack size is part of the description string.
    7. **Quantity normalisation:** `quantity_in_base_unit = inv_qty ×
       pack_size`; `unit_cost = total_post_tax / quantity_in_base_unit`
       (D4: Total column from the PDF). After the normalisation table in
@@ -156,9 +147,9 @@ main/services/InvoiceService.ts MOD
 5. User maps any unmapped rows (often zero on second invoice onward),
    clicks **Map & commit**. Existing `InvoiceService.commit` runs
    unchanged: writes one `purchase` per line via
-   `InventoryService.applyMovement`. The repo upsert at commit time now
-   also writes `pack_size` + `pack_unit` to `supplier_item_mappings` so
-   the next invoice with this description has it remembered.
+   `InventoryService.applyMovement`, and the existing supplier-mapping
+   upsert at commit time records the (supplier, raw_description) →
+   ingredient mapping for next invoice.
 
 ## Hyperpure template
 
@@ -227,17 +218,20 @@ successful parse. The only ways `parse` returns `ok: false` are:
 
 ## Schema migration
 
-```sql
--- 0011_supplier_mapping_pack.sql
-ALTER TABLE supplier_item_mappings
-  ADD COLUMN pack_size REAL;
-ALTER TABLE supplier_item_mappings
-  ADD COLUMN pack_unit TEXT;
-```
+One small additive migration: add a nullable `gstin TEXT` column to the
+`suppliers` table. Required so the parser can resolve the supplier by
+the GSTIN extracted from the PDF. Existing rows survive (column is
+nullable); the supplier editor form gains a single GSTIN input.
 
-Both columns are nullable (existing rows survive; legacy mappings just
-fall back to the description regex on next parse). Drizzle schema
-updated to match. No backfill needed.
+The `supplier_item_mappings` table is **not** touched — pack size is
+re-extracted from the description regex on every parse, and the
+existing `defaultQuantity` / `defaultUnit` / `lastUnitCost` columns
+continue to mean "what the user committed last time" (autofill
+defaults in the popover), unchanged.
+
+Two new repository methods are added (no schema impact):
+- `supplierRepository.findByGstin(db, tenantId, gstin)`
+- `invoiceRepository.findByNumber(db, tenantId, supplierId, invoiceNumber)`
 
 ## IPC contract
 
@@ -297,7 +291,7 @@ IPC channel: `invoices:parse`. Handler is the standard 3-line
 | Encrypted/password PDF | pdfjs throws → caught, `pdf_extraction_failed`, fall back to manual. |
 | Template matches, header parse misses invoice_number or date | Issues emitted; whatever was parsed is returned. Editor leaves the missing field blank for user to fill. Header validation in editor still gates Save draft. |
 | Row's pack size unparseable | Issue emitted; row goes through with `quantity = inv_qty`, `unit = ''`. Renders as needs-review. |
-| Mapping exists but `pack_unit` no longer matches ingredient's `base_unit` (ingredient deleted/recreated) | Treat as mapping miss; re-extract from description. |
+| Mapping exists but the ingredient was soft-deleted | Treat as mapping miss; row renders as needs-review. |
 | Supplier GSTIN matches a soft-deleted supplier | Treat as `unknown_supplier`; user picks an active supplier. |
 | Multi-page PDFs | `pdfText.extract` returns all pages; template walks the joined item list. Sample is 2 pages and works fine. |
 | Same PDF dropped twice on the same draft | Confirm replace dialog (existing UX courtesy). Mapping memory makes the second parse identical. |
