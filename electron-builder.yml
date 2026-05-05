@@ -4,11 +4,9 @@ copyright: Copyright (c) 2026 Laurans Food Court
 asar: true
 directories:
   output: dist
-  buildResources: build
 files:
   - out/**
   - package.json
-  - "!node_modules/**/*"
 extraResources:
   # Drizzle migrations must travel with the installer; the main process reads
   # them from process.resourcesPath/db/migrations in production
