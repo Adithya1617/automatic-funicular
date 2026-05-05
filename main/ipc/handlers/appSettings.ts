@@ -47,10 +47,15 @@ export function registerAppSettingsHandlers(): void {
     IPC.appSettings.chooseDirectory,
     makeHandler(chooseDirectoryInputSchema, async (input) => {
       const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
-      const result = await dialog.showOpenDialog(win!, {
+      const opts: Electron.OpenDialogOptions = {
         title: input.title,
         properties: ['openDirectory', 'createDirectory'],
-      });
+      };
+      // Pass a parent when we have one (better modal behaviour); otherwise
+      // open the dialog without a parent — Electron supports both signatures.
+      const result = win
+        ? await dialog.showOpenDialog(win, opts)
+        : await dialog.showOpenDialog(opts);
       if (result.canceled || result.filePaths.length === 0) {
         return { folderPath: null };
       }

@@ -13,7 +13,7 @@ export function registerReconciliationHandlers(): void {
   ipcMain.handle(
     IPC.reconciliation.latest,
     makeHandler(z.object({}).default({}), () =>
-      latestReconciliationSnapshot() ?? { ranAtMs: 0, drifts: [] },
+      latestReconciliationSnapshot(),
     ),
   );
 

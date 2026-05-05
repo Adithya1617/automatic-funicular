@@ -270,7 +270,9 @@ const api = {
     restore: invoke<RestoreBackupInput, { ok: true }>(IPC.backup.restore),
   },
   reconciliation: {
-    latest: invoke<Record<string, never>, ReconciliationSnapshotApi>(IPC.reconciliation.latest),
+    latest: invoke<Record<string, never>, ReconciliationSnapshotApi | null>(
+      IPC.reconciliation.latest,
+    ),
     rerun: invoke<Record<string, never>, ReconciliationSnapshotApi>(IPC.reconciliation.rerun),
   },
 } as const;

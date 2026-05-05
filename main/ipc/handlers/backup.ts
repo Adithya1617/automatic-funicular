@@ -13,6 +13,19 @@ import { makeHandler } from './wrap';
 
 const DAILY_RETAIN = 30;
 
+async function reopenDb(): Promise<void> {
+  const { openDb } = await import('../../db/client');
+  const { join } = await import('node:path');
+  const userData = app.getPath('userData');
+  const migrationsFolder = app.isPackaged
+    ? join(process.resourcesPath, 'db/migrations')
+    : join(app.getAppPath(), 'main/db/migrations');
+  openDb({
+    filePath: join(userData, 'laurans.sqlite'),
+    migrationsFolder,
+  });
+}
+
 export function registerBackupHandlers(): void {
   ipcMain.handle(
     IPC.backup.list,
@@ -48,28 +61,28 @@ export function registerBackupHandlers(): void {
     makeHandler(restoreBackupInputSchema, async (input) => {
       // Restore is a destructive operation: caller (renderer) confirms intent.
       // We close the DB, copy the backup over, then schedule a relaunch so the
-      // next boot opens the restored DB cleanly.
+      // next boot opens the restored DB cleanly. On failure we re-open the DB
+      // and propagate so the renderer sees the error rather than relaunching
+      // into a half-copied state.
       getDb().close();
       try {
         await BackupService.restoreFromFolder({
           userDataDir: app.getPath('userData'),
           sourceFolder: input.folderPath,
         });
-      } finally {
-        // Re-open immediately so subsequent IPC calls (during the brief
-        // relaunch window) don't hit a closed handle.
-        // Note: we re-import openDb lazily to avoid a top-level cycle.
-        const { openDb } = await import('../../db/client');
-        const { join } = await import('node:path');
-        const userData = app.getPath('userData');
-        const migrationsFolder = app.isPackaged
-          ? join(process.resourcesPath, 'db/migrations')
-          : join(app.getAppPath(), 'main/db/migrations');
-        openDb({
-          filePath: join(userData, 'laurans.sqlite'),
-          migrationsFolder,
-        });
+      } catch (err) {
+        // Re-open against the original (possibly partially-overwritten) file
+        // so subsequent IPC calls don't hit a closed handle, then propagate.
+        try {
+          await reopenDb();
+        } catch (reopenErr) {
+          console.error('[backup:restore] failed to reopen DB after failed restore:', reopenErr);
+        }
+        throw err;
       }
+      // Success: re-open so the brief pre-relaunch window has a live DB,
+      // then ask Electron to restart cleanly.
+      await reopenDb();
       app.relaunch();
       app.exit(0);
       return { ok: true };
