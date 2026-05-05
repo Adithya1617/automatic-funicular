@@ -1,5 +1,13 @@
 import { app, BrowserWindow, shell } from 'electron';
 import { join } from 'node:path';
+import { getDb, openDb } from './db/client';
+import { DEFAULT_TENANT_ID } from '@shared/constants/system';
+import { registerIpcHandlers } from './ipc/register';
+import { runReconciliation } from './jobs/reconciliation';
+import { startBackupScheduler, stopBackupScheduler } from './jobs/backupScheduler';
+import { startOrderPoller, stopOrderPoller } from './jobs/orderPoller';
+import { LocalDiskStorage } from './adapters/storage/LocalDiskStorage';
+import { fileStorageRegistry } from './adapters/storage/registry';
 
 const isDev = !app.isPackaged;
 
@@ -30,7 +38,12 @@ function createMainWindow(): BrowserWindow {
   const devServerUrl = process.env['ELECTRON_RENDERER_URL'];
   if (isDev && devServerUrl) {
     void win.loadURL(devServerUrl);
-    win.webContents.openDevTools({ mode: 'detach' });
+    // DevTools is opt-in: it slows interactions noticeably in dev. Set
+    // LAURANS_DEVTOOLS=1 to auto-open, or hit F12 / Ctrl+Shift+I in the
+    // window when you actually need it.
+    if (process.env['LAURANS_DEVTOOLS'] === '1') {
+      win.webContents.openDevTools({ mode: 'detach' });
+    }
   } else {
     void win.loadFile(join(__dirname, '../renderer/index.html'));
   }
@@ -38,12 +51,41 @@ function createMainWindow(): BrowserWindow {
   return win;
 }
 
+function bootstrap(): void {
+  const userData = app.getPath('userData');
+  const dbPath = join(userData, 'laurans.sqlite');
+  const migrationsFolder = isDev
+    ? join(app.getAppPath(), 'main/db/migrations')
+    : join(process.resourcesPath, 'db/migrations');
+
+  openDb({ filePath: dbPath, migrationsFolder });
+  fileStorageRegistry.set(new LocalDiskStorage(userData));
+  registerIpcHandlers();
+
+  const drifts = runReconciliation(getDb().db, DEFAULT_TENANT_ID);
+  if (drifts.length > 0) {
+    console.error(
+      `[reconciliation] ${drifts.length} ingredient(s) have stock drift:`,
+      drifts,
+    );
+  }
+
+  startOrderPoller();
+  startBackupScheduler();
+}
+
 void app.whenReady().then(() => {
+  bootstrap();
   createMainWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
   });
+});
+
+app.on('before-quit', () => {
+  stopOrderPoller();
+  stopBackupScheduler();
 });
 
 app.on('window-all-closed', () => {
