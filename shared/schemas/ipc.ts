@@ -80,6 +80,7 @@ export const IPC = {
     replaceLines: 'invoice:replaceLines',
     commit: 'invoice:commit',
     attachPdf: 'invoice:attachPdf',
+    parse: 'invoice:parse',
   },
   supplierItemMapping: {
     suggest: 'supplierItemMapping:suggest',
