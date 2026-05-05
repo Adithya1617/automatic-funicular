@@ -212,7 +212,7 @@ The function `InventoryService.applyMovement(...)` is the only place `Ingredient
 
 Build in this exact order. Each slice is shippable end-to-end before the next starts.
 
-### Slice 0 — Skeleton (week 1)
+### Slice 1 — Skeleton (week 1)
 **Deliverable:** App boots. IPC ping/pong works. DB migrates on first run. Seed loader scaffold exists. Reconciliation runs on startup.
 
 Tasks:
@@ -228,7 +228,7 @@ Tasks:
 
 **Acceptance:** Run `npm run dev`, app launches, dev tools show "ping ok", DB file appears in user-data dir.
 
-### Slice 1 — Ingredients, suppliers, manual stock adjustments (week 2)
+### Slice 2 — Ingredients, suppliers, manual stock adjustments (week 2)
 **Deliverable:** User can create/edit ingredients and suppliers, manually adjust stock, view the ledger.
 
 Tasks:
@@ -242,7 +242,7 @@ Tasks:
 
 **Acceptance:** Create an ingredient with stock 10, adjust by -2 with reason wastage, ledger shows it, stock shows 8, reconciliation passes.
 
-### Slice 2 — Recipes, BoM, production batches (weeks 3–4)
+### Slice 3 — Recipes, BoM, production batches (weeks 3–4)
 **Deliverable:** User can define recipes for menu items and prepared ingredients, with BoM walking. Production batches record yield and prep loss.
 
 Tasks:
@@ -251,11 +251,11 @@ Tasks:
 3. `RecipeService.walkBoM(parentId, parentType, version)` — recursive walk with cycle detection (depth max 5, configurable).
 4. `ProductionService.recordBatch(...)` — generates `production_input`, `production_output`, optional `prep_loss` movements in one transaction.
 5. IPC handlers and renderer screens for recipe builder and "Make a batch" dialog.
-6. **Note:** menu items don't exist yet at this point. Recipes for prepared ingredients can still be built and tested. Defer `parent_type='menu_item'` recipes to slice 3 wiring.
+6. **Note:** menu items don't exist yet at this point. Recipes for prepared ingredients can still be built and tested. Defer `parent_type='menu_item'` recipes to slice 4 wiring.
 
 **Acceptance:** Define a "Biryani Masala" prepared ingredient with a recipe. Record a production batch. Verify input ingredients deducted, output stock incremented, prep loss logged if yield mismatch. Reconciliation still passes.
 
-### Slice 3 — Menu items, variants, availability (week 5)
+### Slice 4 — Menu items, variants, availability (week 5)
 **Deliverable:** Menu items with recipes (raw + prepared). Variants. Availability cache live.
 
 Tasks:
@@ -267,7 +267,7 @@ Tasks:
 
 **Acceptance:** Create a menu item using a prepared ingredient. Verify availability shows correctly, drops to 0 when prepared stock is 0, recovers after production batch.
 
-### Slice 4 — Mock ordering, order processing, cancellation (weeks 6–7)
+### Slice 5 — Mock ordering, order processing, cancellation (weeks 6–7)
 **Deliverable:** Two mock channels emit orders, orders deduct stock on delivery, cancellation prompts handle prepared/not-prepared.
 
 Tasks:
@@ -280,7 +280,7 @@ Tasks:
 
 **Acceptance:** Fire a test order via mock_online channel, observe stock deducted on delivery, cancel another order with "prepared = yes", verify wastage movements (not reversal). Reconciliation passes.
 
-### Slice 5 — Invoices, smart memory, PDF storage (weeks 8–9)
+### Slice 6 — Invoices, smart memory, PDF storage (weeks 8–9)
 **Deliverable:** User can enter invoices manually, system remembers per-supplier mappings, PDF stored on disk, stock and cost recomputed on commit.
 
 Tasks:
@@ -291,7 +291,7 @@ Tasks:
 
 **Acceptance:** Upload a PDF, enter line items, commit, observe stock increased and cost updated. Re-enter same supplier, see autocomplete from history.
 
-### Slice 6 — Stock take (week 10, first half)
+### Slice 7 — Stock take (week 10, first half)
 **Deliverable:** Periodic physical count flow with pause-the-poller behavior.
 
 Tasks:
@@ -301,7 +301,7 @@ Tasks:
 
 **Acceptance:** Start a stock take, count some ingredients with deltas, commit, verify adjustment movements written.
 
-### Slice 7 — Dashboard (weeks 10 second half – 11)
+### Slice 8 — Dashboard (weeks 10 second half – 11)
 **Deliverable:** All dashboard tiles working with daily/weekly/monthly/custom/YoY date ranges.
 
 Tasks:
@@ -312,7 +312,7 @@ Tasks:
 
 **Acceptance:** Dashboard loads under 1 second on seeded data covering 30 days. All tiles correct. YoY comparison works.
 
-### Slice 8 — CSV importer (week 12, first half)
+### Slice 9 — CSV importer (week 12, first half)
 **Deliverable:** Four CSV templates importable with validation, dry-run, error report.
 
 Tasks:
@@ -322,7 +322,7 @@ Tasks:
 
 **Acceptance:** Wipe DB, import all four CSVs of seeded data, app state matches what seed would produce.
 
-### Slice 9 — Backup, restore, packaging, polish (week 12 second half)
+### Slice 10 — Backup, restore, packaging, polish (week 12 second half)
 **Deliverable:** Production-ready Windows installer with backup/restore.
 
 Tasks:
@@ -339,12 +339,12 @@ Tasks:
 
 ## 7. The first prompt (paste-this-after-this-document)
 
-Once you've read this entire document, do not start writing feature code. **Start with Slice 0.** Your first PR should be the skeleton only. Specifically:
+Once you've read this entire document, do not start writing feature code. **Start with Slice 1.** Your first PR should be the skeleton only. Specifically:
 
 1. Read `SPECIFICATION.md` (the companion document) carefully.
-2. Confirm back to me your understanding of: (a) the locked decisions in §3, (b) the folder structure in §4, (c) the Slice 0 acceptance criteria.
+2. Confirm back to me your understanding of: (a) the locked decisions in §3, (b) the folder structure in §4, (c) the Slice 1 acceptance criteria.
 3. Ask me about anything ambiguous.
-4. Then begin Slice 0. Stop after Slice 0 and let me verify before moving to Slice 1.
+4. Then begin Slice 1. Stop after Slice 1 and let me verify before moving to Slice 2.
 
 ---
 

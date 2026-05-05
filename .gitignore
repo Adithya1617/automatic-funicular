@@ -72,3 +72,9 @@ userData/
 *.pid
 *.seed
 *.pid.lock
+
+# --- Playwright debug session artifacts ---
+.playwright-mcp/
+
+# --- Stray PDFs in the repo root (real invoice PDFs live under userData) ---
+/digital-pod-*.pdf

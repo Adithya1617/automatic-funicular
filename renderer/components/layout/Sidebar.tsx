@@ -1,6 +1,16 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@renderer/lib/cn';
 import { NAV_ITEMS, type NavItem } from './navItems';
+
+function pathMatchesNav(navPath: string, currentPath: string): boolean {
+  if (navPath === '/') return currentPath === '/';
+  // Treat /orders/* (live, new, …) as "Live orders" and /invoices/* as
+  // "Invoices" — sub-routes in the same family share the parent's nav entry.
+  let normalized = currentPath;
+  if (currentPath.startsWith('/orders/')) normalized = '/orders/live';
+  else if (currentPath.startsWith('/invoices/')) normalized = '/invoices';
+  return normalized === navPath || normalized.startsWith(`${navPath}/`);
+}
 
 const groupOrder: Array<{ key: 'operations' | 'system'; label: string }> = [
   { key: 'operations', label: 'Operations' },
@@ -33,20 +43,18 @@ export function Sidebar() {
 
 function SidebarLink({ item }: { item: NavItem }) {
   const Icon = item.icon;
-  const isIndex = item.path === '/';
+  const location = useLocation();
+  const active = pathMatchesNav(item.path, location.pathname);
 
   return (
     <NavLink
       to={item.path}
-      end={isIndex}
-      className={({ isActive }) =>
-        cn(
-          'flex min-h-[32px] items-center gap-2 rounded-[6px] px-2 py-1.5 text-[12px] text-text-secondary transition-colors',
-          'hover:bg-background-tertiary',
-          isActive &&
-            'border border-border-tertiary bg-background-primary font-medium text-text-primary hover:bg-background-primary',
-        )
-      }
+      className={cn(
+        'flex min-h-[32px] items-center gap-2 rounded-[6px] px-2 py-1.5 text-[12px] text-text-secondary transition-colors',
+        'hover:bg-background-tertiary',
+        active &&
+          'border border-border-tertiary bg-background-primary font-medium text-text-primary hover:bg-background-primary',
+      )}
     >
       <Icon className="h-[13px] w-[13px] shrink-0" strokeWidth={1.5} />
       <span className="truncate">{item.label}</span>

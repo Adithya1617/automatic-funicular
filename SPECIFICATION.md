@@ -510,16 +510,16 @@ Build in vertical slices, each shippable end-to-end before the next starts. Prev
 
 | # | Slice | Approx time |
 |---|---|---|
-| 0 | Skeleton: Electron + Vite + React + TS + Drizzle + folder structure + IPC ping/pong + DB migrate + seed loader scaffold | 1 wk |
-| 1 | Ingredients + suppliers + manual stock adjustments + stock movement ledger view | 1 wk |
-| 2 | Recipes / BoM + recipe versioning + production batches | 1.5 wks |
-| 3 | Menu items + variants + availability cache | 1 wk |
-| 4 | Mock ordering adapters + order processing + cancellation flow + manual order entry + "fire test order" | 1.5 wks |
-| 5 | Invoice entry with smart memory + PDF storage + supplier mappings | 1.5 wks |
-| 6 | Stock take flow | 0.5 wk |
-| 7 | Dashboard with all date ranges + reports + exports | 1.5 wks |
-| 8 | CSV importer | 1 wk |
-| 9 | Backup/restore + Windows packaging + installer + polish | 1 wk |
+| 1 | Skeleton: Electron + Vite + React + TS + Drizzle + folder structure + IPC ping/pong + DB migrate + seed loader scaffold | 1 wk |
+| 2 | Ingredients + suppliers + manual stock adjustments + stock movement ledger view | 1 wk |
+| 3 | Recipes / BoM + recipe versioning + production batches | 1.5 wks |
+| 4 | Menu items + variants + availability cache | 1 wk |
+| 5 | Mock ordering adapters + order processing + cancellation flow + manual order entry + "fire test order" | 1.5 wks |
+| 6 | Invoice entry with smart memory + PDF storage + supplier mappings | 1.5 wks |
+| 7 | Stock take flow | 0.5 wk |
+| 8 | Dashboard with all date ranges + reports + exports | 1.5 wks |
+| 9 | CSV importer | 1 wk |
+| 10 | Backup/restore + Windows packaging + installer + polish | 1 wk |
 
 **Total: ~11–12 weeks of focused build.**
 

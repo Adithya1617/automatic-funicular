@@ -5,12 +5,16 @@ import { NAV_ITEMS } from './navItems';
 
 export function AppShell() {
   const location = useLocation();
+  // /orders/* and /invoices/* all live under their parent nav entry.
+  let normalizedPath = location.pathname;
+  if (normalizedPath.startsWith('/orders/')) normalizedPath = '/orders/live';
+  else if (normalizedPath.startsWith('/invoices/')) normalizedPath = '/invoices';
   const active =
     NAV_ITEMS.find(
       (item) =>
         item.path === '/'
-          ? location.pathname === '/'
-          : location.pathname.startsWith(item.path),
+          ? normalizedPath === '/'
+          : normalizedPath.startsWith(item.path),
     ) ?? NAV_ITEMS[0];
 
   return (

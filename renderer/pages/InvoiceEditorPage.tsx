@@ -1,0 +1,327 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Plus } from 'lucide-react';
+import type { LineDraft } from '@shared/schemas/invoice';
+import { Badge } from '@renderer/components/ui/badge';
+import { Button } from '@renderer/components/ui/button';
+import { Table, TableBody, TableHead, TableHeader, TableRow } from '@renderer/components/ui/table';
+import { useIngredients } from '@renderer/hooks/ipc/useIngredients';
+import { useSuppliers } from '@renderer/hooks/ipc/useSuppliers';
+import {
+  useCommitInvoice,
+  useCreateInvoiceDraft,
+  useInvoice,
+  useReplaceInvoiceLines,
+  useUpdateInvoice,
+} from '@renderer/hooks/ipc/useInvoices';
+import { InvoiceHeaderForm, type InvoiceHeaderValues } from '@renderer/features/invoices/InvoiceHeaderForm';
+import { PdfAttachZone } from '@renderer/features/invoices/PdfAttachZone';
+import { InvoiceLineRow, type LineDraftRow } from '@renderer/features/invoices/InvoiceLineRow';
+import { InvoiceTotalsCard } from '@renderer/features/invoices/InvoiceTotalsCard';
+
+let lineKeyCounter = 0;
+const nextLineKey = () => `l-${++lineKeyCounter}`;
+
+function emptyLine(): LineDraftRow {
+  return {
+    key: nextLineKey(),
+    rawDescription: '',
+    ingredientId: null,
+    quantity: 0,
+    unit: '',
+    unitCost: 0,
+  };
+}
+
+function dateToInputValue(unixMs: number): string {
+  const d = new Date(unixMs);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function inputValueToUnixMs(value: string): number {
+  if (!value) return Date.now();
+  const [y, m, d] = value.split('-').map((s) => Number.parseInt(s, 10));
+  return new Date(y!, (m ?? 1) - 1, d ?? 1, 12, 0, 0).getTime();
+}
+
+export function InvoiceEditorPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const isNew = !id;
+
+  const { data: existing } = useInvoice(id);
+  const { data: suppliers = [] } = useSuppliers({ includeInactive: false });
+  const { data: ingredients = [] } = useIngredients({ includeInactive: false });
+
+  const createDraft = useCreateInvoiceDraft();
+  const updateInvoice = useUpdateInvoice();
+  const replaceLines = useReplaceInvoiceLines();
+  const commit = useCommitInvoice();
+
+  const isCommitted = existing?.status === 'committed';
+
+  const [header, setHeader] = useState<InvoiceHeaderValues>({
+    supplierId: '',
+    invoiceNumber: '',
+    invoiceDateInput: dateToInputValue(Date.now()),
+    notes: '',
+  });
+  const [rows, setRows] = useState<LineDraftRow[]>([emptyLine()]);
+  const [serverError, setServerError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (existing) {
+      setHeader({
+        supplierId: existing.supplierId,
+        invoiceNumber: existing.invoiceNumber,
+        invoiceDateInput: dateToInputValue(existing.invoiceDate),
+        notes: existing.notes ?? '',
+      });
+      setRows(
+        existing.lines.length === 0
+          ? [emptyLine()]
+          : existing.lines.map((line) => ({
+              key: nextLineKey(),
+              rawDescription: line.rawDescription,
+              ingredientId: line.ingredientId,
+              quantity: line.quantity,
+              unit: line.unit,
+              unitCost: line.unitCost,
+            })),
+      );
+    }
+  }, [existing?.id, existing?.lines.length]);
+
+  const subtotal = useMemo(
+    () => rows.reduce((acc, r) => acc + r.quantity * r.unitCost, 0),
+    [rows],
+  );
+
+  const allRowsValid = rows.every(
+    (r) =>
+      r.rawDescription.trim().length > 0 &&
+      r.ingredientId !== null &&
+      r.quantity > 0 &&
+      r.unit.length > 0 &&
+      r.unitCost >= 0,
+  );
+  const headerValid =
+    header.supplierId.length > 0 &&
+    header.invoiceNumber.trim().length > 0 &&
+    header.invoiceDateInput.length > 0;
+
+  function rowsToDraft(): LineDraft[] {
+    return rows.map((r, idx) => ({
+      rawDescription: r.rawDescription.trim(),
+      ingredientId: r.ingredientId,
+      quantity: r.quantity,
+      unit: r.unit,
+      unitCost: r.unitCost,
+      displayOrder: idx,
+    }));
+  }
+
+  async function handleSaveDraft() {
+    setServerError(null);
+    if (!headerValid) {
+      setServerError('Supplier, invoice number, and date are required.');
+      return;
+    }
+    try {
+      if (isNew) {
+        const created = await createDraft.mutateAsync({
+          supplierId: header.supplierId,
+          invoiceNumber: header.invoiceNumber.trim(),
+          invoiceDate: inputValueToUnixMs(header.invoiceDateInput),
+          notes: header.notes.trim() || null,
+          lines: rowsToDraft(),
+        });
+        navigate(`/invoices/${created.id}/edit`, { replace: true });
+      } else if (existing) {
+        await updateInvoice.mutateAsync({
+          id: existing.id,
+          supplierId: header.supplierId,
+          invoiceNumber: header.invoiceNumber.trim(),
+          invoiceDate: inputValueToUnixMs(header.invoiceDateInput),
+          notes: header.notes.trim() || null,
+        });
+        await replaceLines.mutateAsync({
+          id: existing.id,
+          lines: rowsToDraft(),
+        });
+      }
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : 'Could not save draft');
+    }
+  }
+
+  async function handleCommit() {
+    if (!existing) return;
+    setServerError(null);
+    try {
+      // Persist current state first, then commit.
+      await updateInvoice.mutateAsync({
+        id: existing.id,
+        supplierId: header.supplierId,
+        invoiceNumber: header.invoiceNumber.trim(),
+        invoiceDate: inputValueToUnixMs(header.invoiceDateInput),
+        notes: header.notes.trim() || null,
+      });
+      await replaceLines.mutateAsync({
+        id: existing.id,
+        lines: rowsToDraft(),
+      });
+      await commit.mutateAsync({ id: existing.id });
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : 'Could not commit invoice');
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-[12px] text-text-secondary">
+          <Link to="/invoices" className="inline-flex items-center gap-1 hover:text-text-primary">
+            <ArrowLeft className="h-3 w-3" /> Invoices
+          </Link>
+          <span className="text-text-tertiary">/</span>
+          <span className="text-text-primary">
+            {isNew ? 'New invoice' : existing?.invoiceNumber ?? '…'}
+          </span>
+          {existing ? (
+            <Badge variant={isCommitted ? 'success' : 'warning'} className="ml-1">
+              {isCommitted ? 'COMMITTED' : 'DRAFT'}
+            </Badge>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="ghost" size="md" onClick={() => navigate('/invoices')}>
+            {isCommitted ? 'Back' : 'Cancel'}
+          </Button>
+          {!isCommitted ? (
+            <>
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                onClick={handleSaveDraft}
+                disabled={
+                  !headerValid ||
+                  createDraft.isPending ||
+                  updateInvoice.isPending ||
+                  replaceLines.isPending
+                }
+              >
+                Save draft
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                onClick={handleCommit}
+                disabled={
+                  isNew ||
+                  !headerValid ||
+                  !allRowsValid ||
+                  rows.length === 0 ||
+                  commit.isPending
+                }
+                title={
+                  !allRowsValid
+                    ? 'Map every row to an ingredient before committing'
+                    : isNew
+                      ? 'Save the draft first'
+                      : undefined
+                }
+              >
+                Map &amp; commit
+              </Button>
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      <section className="rounded-lg border border-border-tertiary bg-background-primary p-4">
+        <h2 className="mb-3 text-[13px] font-medium text-text-primary">Header</h2>
+        <InvoiceHeaderForm
+          values={header}
+          onChange={setHeader}
+          suppliers={suppliers}
+          disabled={isCommitted}
+        />
+        {existing && !isCommitted ? (
+          <div className="mt-3">
+            <PdfAttachZone
+              invoiceId={existing.id}
+              filePath={existing.filePath}
+              disabled={isCommitted}
+            />
+          </div>
+        ) : !existing ? (
+          <div className="mt-3 rounded-md border border-dashed border-border-tertiary bg-background-secondary px-3 py-2 text-[11px] text-text-tertiary">
+            Save the draft once to attach a PDF.
+          </div>
+        ) : null}
+      </section>
+
+      <section className="rounded-lg border border-border-tertiary bg-background-primary p-4">
+        <h2 className="mb-2 text-[13px] font-medium text-text-primary">Line items</h2>
+        <div className="overflow-hidden rounded-lg border border-border-tertiary">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Description</TableHead>
+                <TableHead>Qty</TableHead>
+                <TableHead>Unit</TableHead>
+                <TableHead>Unit cost</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((row, idx) => (
+                <InvoiceLineRow
+                  key={row.key}
+                  draft={row}
+                  ingredients={ingredients}
+                  supplierId={header.supplierId || null}
+                  disabled={isCommitted}
+                  onChange={(next) =>
+                    setRows((prev) => prev.map((r, i) => (i === idx ? next : r)))
+                  }
+                  onRemove={() =>
+                    setRows((prev) =>
+                      prev.length === 1 ? [emptyLine()] : prev.filter((_, i) => i !== idx),
+                    )
+                  }
+                />
+              ))}
+            </TableBody>
+          </Table>
+          {!isCommitted ? (
+            <button
+              type="button"
+              onClick={() => setRows((prev) => [...prev, emptyLine()])}
+              className="flex w-full items-center justify-center gap-1 border-t border-border-tertiary py-2 text-[11px] italic text-text-info hover:bg-background-tertiary"
+            >
+              <Plus className="h-3 w-3" /> Add line item
+            </button>
+          ) : null}
+        </div>
+
+        <div className="mt-3 flex">
+          <InvoiceTotalsCard itemCount={rows.length} subtotal={subtotal} />
+        </div>
+      </section>
+
+      {serverError ? (
+        <div className="rounded-md bg-background-danger px-2.5 py-1.5 text-[12px] text-text-danger">
+          {serverError}
+        </div>
+      ) : null}
+    </div>
+  );
+}

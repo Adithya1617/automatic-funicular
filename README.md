@@ -33,7 +33,7 @@ render their placeholder. Dashboard is the landing route.
 
 ```bash
 npm run typecheck   # tsc --noEmit on both renderer and main/preload/shared
-npm run build       # electron-vite build (no installer yet — slice 9)
+npm run build       # electron-vite build (no installer yet — slice 10)
 ```
 
 ## Layout
