@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { Ingredient } from '@shared/schemas/ingredient';
+import type { IngredientSuggestion } from '@shared/invoiceTemplates/types';
 import { Button } from '@renderer/components/ui/button';
 import { Input } from '@renderer/components/ui/input';
 import {
@@ -28,18 +29,23 @@ type Props = {
   draft: LineDraftRow;
   ingredients: Ingredient[];
   supplierId: string | null;
+  /** Per-row template suggestion. Null when this row didn't come from a parsed PDF. */
+  suggestion: IngredientSuggestion | null;
   disabled?: boolean;
   onChange: (next: LineDraftRow) => void;
   onRemove: () => void;
+  onCreateNew: (suggestion: IngredientSuggestion) => void;
 };
 
 export function InvoiceLineRow({
   draft,
   ingredients,
   supplierId,
+  suggestion,
   disabled,
   onChange,
   onRemove,
+  onCreateNew,
 }: Props) {
   const [popoverOpen, setPopoverOpen] = useState(false);
   const child = draft.ingredientId
@@ -60,6 +66,7 @@ export function InvoiceLineRow({
           partial={draft.rawDescription}
           ingredients={ingredients}
           selectedIngredientId={draft.ingredientId}
+          suggestion={suggestion}
           onApplySuggestion={(s) => {
             onChange({
               ...draft,
@@ -78,6 +85,10 @@ export function InvoiceLineRow({
               unit: draft.unit || picked?.baseUnit || draft.unit,
             });
             setPopoverOpen(false);
+          }}
+          onCreateNew={(s) => {
+            setPopoverOpen(false);
+            onCreateNew(s);
           }}
           anchor={
             <Input
