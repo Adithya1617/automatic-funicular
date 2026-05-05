@@ -1,19 +1,22 @@
 import { useRef, useState } from 'react';
 import { FileUp, Paperclip, X } from 'lucide-react';
 import { Button } from '@renderer/components/ui/button';
-import { useAttachInvoicePdf } from '@renderer/hooks/ipc/useInvoices';
+import { useAttachInvoicePdf, useParseInvoice } from '@renderer/hooks/ipc/useInvoices';
+import type { ParseResult } from '@shared/schemas/invoiceParser';
 
 type Props = {
-  invoiceId: string;
+  invoiceId: string | null;
   filePath: string | null;
   disabled?: boolean;
+  onParsed?: (result: ParseResult) => void;
 };
 
 const MB = 1024 * 1024;
 
-export function PdfAttachZone({ invoiceId, filePath, disabled }: Props) {
+export function PdfAttachZone({ invoiceId, filePath, disabled, onParsed }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const attach = useAttachInvoicePdf();
+  const parse = useParseInvoice();
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(null);
   const [size, setSize] = useState<number | null>(null);
@@ -29,20 +32,35 @@ export function PdfAttachZone({ invoiceId, filePath, disabled }: Props) {
       return;
     }
     const buffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+
+    // Parse first.
+    let parseResult: ParseResult;
     try {
-      await attach.mutateAsync({
-        id: invoiceId,
-        fileName: file.name,
-        bytes: new Uint8Array(buffer),
-      });
-      setName(file.name);
-      setSize(file.size);
+      parseResult = await parse.mutateAsync(bytes);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not attach PDF');
+      setError(err instanceof Error ? err.message : 'Could not parse PDF');
+      return;
+    }
+    if (onParsed) onParsed(parseResult);
+
+    // Attach only if we have an invoice draft and the parse didn't say "duplicate".
+    if (invoiceId && !(parseResult.ok === false && parseResult.reason === 'duplicate')) {
+      try {
+        await attach.mutateAsync({
+          id: invoiceId,
+          fileName: file.name,
+          bytes,
+        });
+        setName(file.name);
+        setSize(file.size);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not attach PDF');
+      }
     }
   }
 
-  const attached = filePath !== null;
+  const attached = invoiceId !== null && filePath !== null;
 
   return (
     <div
@@ -104,14 +122,16 @@ export function PdfAttachZone({ invoiceId, filePath, disabled }: Props) {
       ) : (
         <button
           type="button"
-          disabled={disabled || attach.isPending}
+          disabled={disabled || attach.isPending || parse.isPending}
           onClick={() => inputRef.current?.click()}
           className="flex w-full items-center gap-2 text-left text-text-secondary"
         >
           <FileUp className="h-4 w-4" />
           <div className="flex flex-col">
             <span className="text-[12px] font-medium">
-              {attach.isPending ? 'Uploading…' : 'Drop a PDF here, or click to browse'}
+              {attach.isPending || parse.isPending
+                ? 'Working…'
+                : 'Drop a PDF here, or click to browse'}
             </span>
             <span className="text-[10px] text-text-tertiary">PDF only · max 10 MB</span>
           </div>

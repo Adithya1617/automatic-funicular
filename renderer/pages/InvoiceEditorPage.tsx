@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Plus } from 'lucide-react';
 import type { LineDraft } from '@shared/schemas/invoice';
+import type { ParseResult } from '@shared/schemas/invoiceParser';
 import { Badge } from '@renderer/components/ui/badge';
 import { Button } from '@renderer/components/ui/button';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@renderer/components/ui/table';
@@ -71,6 +72,54 @@ export function InvoiceEditorPage() {
   });
   const [rows, setRows] = useState<LineDraftRow[]>([emptyLine()]);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [parseInfo, setParseInfo] = useState<string | null>(null);
+  const [duplicateInvoiceId, setDuplicateInvoiceId] = useState<string | null>(null);
+
+  function handleParsed(result: ParseResult) {
+    setDuplicateInvoiceId(null);
+    setParseInfo(null);
+    if (!result.ok) {
+      if (result.reason === 'duplicate') {
+        setDuplicateInvoiceId(result.existingInvoiceId ?? null);
+        return;
+      }
+      if (result.reason === 'unknown_supplier_format') {
+        setParseInfo('PDF format not recognised — fill the invoice manually.');
+        return;
+      }
+      setParseInfo('Could not extract data from this PDF.');
+      return;
+    }
+    // Pre-fill header.
+    setHeader({
+      supplierId: result.header.supplierId ?? '',
+      invoiceNumber: result.header.invoiceNumber,
+      invoiceDateInput: dateToInputValue(result.header.invoiceDate),
+      notes: '',
+    });
+    // Pre-fill rows.
+    setRows(
+      result.lines.length === 0
+        ? [emptyLine()]
+        : result.lines.map((l) => ({
+            key: nextLineKey(),
+            rawDescription: l.rawDescription,
+            ingredientId: l.ingredientId,
+            quantity: l.quantity,
+            unit: l.unit,
+            unitCost: l.unitCost,
+          })),
+    );
+    // Build a one-line summary of issues.
+    const skipped = result.issues
+      .filter((i) => i.kind === 'skipped_charge')
+      .reduce((sum, i) => sum + (i as { total: number }).total, 0);
+    const unmapped = result.lines.filter((l) => l.ingredientId === null).length;
+    const parts: string[] = [];
+    if (unmapped > 0) parts.push(`${unmapped} line${unmapped === 1 ? '' : 's'} need an ingredient mapping`);
+    if (skipped > 0) parts.push(`₹${skipped.toFixed(2)} in fees not added to stock`);
+    if (parts.length > 0) setParseInfo(parts.join(' · '));
+  }
 
   useEffect(() => {
     if (existing) {
@@ -252,17 +301,27 @@ export function InvoiceEditorPage() {
           suppliers={suppliers}
           disabled={isCommitted}
         />
-        {existing && !isCommitted ? (
+        {!isCommitted ? (
           <div className="mt-3">
             <PdfAttachZone
-              invoiceId={existing.id}
-              filePath={existing.filePath}
+              invoiceId={existing?.id ?? null}
+              filePath={existing?.filePath ?? null}
               disabled={isCommitted}
+              onParsed={handleParsed}
             />
-          </div>
-        ) : !existing ? (
-          <div className="mt-3 rounded-md border border-dashed border-border-tertiary bg-background-secondary px-3 py-2 text-[11px] text-text-tertiary">
-            Save the draft once to attach a PDF.
+            {parseInfo ? (
+              <div className="mt-2 rounded-md border border-border-tertiary bg-background-secondary px-3 py-2 text-[12px] text-text-secondary">
+                {parseInfo}
+              </div>
+            ) : null}
+            {duplicateInvoiceId ? (
+              <div className="mt-2 rounded-md border border-border-tertiary bg-background-warning/30 px-3 py-2 text-[12px] text-text-warning">
+                This invoice was already imported.{' '}
+                <Link to={`/invoices/${duplicateInvoiceId}/edit`} className="underline">
+                  Open existing invoice
+                </Link>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </section>
