@@ -4,6 +4,7 @@ import { AppSettingsService } from '../services/AppSettingsService';
 import { BackupService } from '../services/BackupService';
 
 const DAILY_RETAIN_DEFAULT = 30;
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
 /**
@@ -41,6 +42,21 @@ function scheduleNext(): void {
     timer = setTimeout(scheduleNext, 60 * 60 * 1000);
     return;
   }
+  // Catch up on a missed slot: if the last successful run was more than
+  // 24h ago (or there's no recorded run yet), fire immediately rather
+  // than waiting for the next wall-clock slot. Spec §7.12 wants daily
+  // backups; if Windows was off across the slot we should still get one
+  // on next boot.
+  const sinceLastRun =
+    settings.backupLastRunAt === null
+      ? Number.POSITIVE_INFINITY
+      : Date.now() - settings.backupLastRunAt;
+  if (sinceLastRun > ONE_DAY_MS) {
+    timer = setTimeout(() => {
+      void runScheduledBackup();
+    }, 0);
+    return;
+  }
   const fireAt = nextFireMs(new Date(), settings.backupDailyAtMinutes);
   const delay = Math.max(0, fireAt - Date.now());
   timer = setTimeout(() => {
@@ -52,6 +68,10 @@ async function runScheduledBackup(): Promise<void> {
   try {
     const settings = AppSettingsService.snapshot(getDb().db);
     if (!settings.backupFolderPath) return;
+    // Force-flush WAL into the main DB file so the snapshot is hot-consistent.
+    // Without this, recent committed transactions sitting in laurans.sqlite-wal
+    // would be silently absent from the backup.
+    getDb().raw.pragma('wal_checkpoint(TRUNCATE)');
     await BackupService.runBackup({
       userDataDir: app.getPath('userData'),
       backupRoot: settings.backupFolderPath,

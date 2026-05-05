@@ -45,6 +45,10 @@ export function registerBackupHandlers(): void {
           'No backup folder configured — set one in Settings before running a backup',
         );
       }
+      // Force-flush WAL into the main DB file so the snapshot is hot-consistent.
+      // Without this, recent committed transactions sitting in laurans.sqlite-wal
+      // would be silently absent from the backup.
+      getDb().raw.pragma('wal_checkpoint(TRUNCATE)');
       const result = await BackupService.runBackup({
         userDataDir: app.getPath('userData'),
         backupRoot: root,

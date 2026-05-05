@@ -131,6 +131,11 @@ migration replaces this with HTTP, services unchanged.
 
 ## Active deferred work (must address by the slice noted)
 
+- **Slice 10 deferrals:** Weekly (12 Sundays) + monthly (12 first-of-months)
+  retention layered on top of the daily-30 already shipping (spec §7.12). And
+  first-boot auto-restore prompt: when the app launches with no `laurans.sqlite`
+  but a configured backup folder containing one or more snapshots, offer to
+  restore from the most recent (spec §7.12 line 466).
 - **Future polish:** Reverse-invoice flow (committed invoices write opposing
   movements). Today the editor is read-only on committed invoices and the
   spec calls reversal a v1.1 feature. PDF preview in-app (currently we store
