@@ -20,6 +20,10 @@ export function nextFireMs(now: Date, dailyAtMinutes: number): number {
 }
 
 export function startBackupScheduler(): void {
+  // Idempotent: cancel any in-flight timer before arming a new one. Mirrors
+  // orderPoller.startOrderPoller — re-entry from HMR / Electron `activate` /
+  // settings-change-driven restart must not stack parallel chains.
+  stopBackupScheduler();
   scheduleNext();
 }
 
