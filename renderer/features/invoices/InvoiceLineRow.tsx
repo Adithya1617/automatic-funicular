@@ -13,7 +13,6 @@ import {
 } from '@renderer/components/ui/select';
 import { TableCell, TableRow } from '@renderer/components/ui/table';
 import { unitsCompatibleWithBase } from '@shared/constants/unitConversions';
-import { formatINR } from '@shared/utils/currency';
 import { DescriptionMappingPopover } from './DescriptionMappingPopover';
 
 export type LineDraftRow = {
@@ -48,13 +47,20 @@ export function InvoiceLineRow({
   onCreateNew,
 }: Props) {
   const [popoverOpen, setPopoverOpen] = useState(false);
+  const [totalDraft, setTotalDraft] = useState<string | null>(null);
   const child = draft.ingredientId
     ? ingredients.find((i) => i.id === draft.ingredientId)
     : null;
   const compatibleUnits = child
     ? unitsCompatibleWithBase(child.baseUnit)
     : ['g', 'kg', 'ml', 'L', 'each'];
-  const total = draft.quantity * draft.unitCost;
+  const derivedTotal = draft.quantity * draft.unitCost;
+  const totalValue =
+    totalDraft !== null
+      ? totalDraft
+      : Number.isFinite(derivedTotal) && derivedTotal !== 0
+        ? String(Number(derivedTotal.toFixed(2)))
+        : '';
 
   return (
     <TableRow>
@@ -127,9 +133,15 @@ export function InvoiceLineRow({
           step="any"
           min={0}
           value={Number.isFinite(draft.quantity) ? draft.quantity : ''}
-          onChange={(e) =>
-            onChange({ ...draft, quantity: Number(e.target.value) })
-          }
+          onChange={(e) => {
+            const newQty = Number(e.target.value);
+            const oldTotal = draft.quantity * draft.unitCost;
+            const newUnitCost =
+              newQty > 0 && Number.isFinite(oldTotal)
+                ? oldTotal / newQty
+                : draft.unitCost;
+            onChange({ ...draft, quantity: newQty, unitCost: newUnitCost });
+          }}
           disabled={disabled}
         />
       </TableCell>
@@ -151,20 +163,26 @@ export function InvoiceLineRow({
           </SelectContent>
         </Select>
       </TableCell>
-      <TableCell className="w-[110px] align-top">
+      <TableCell className="w-[130px] align-top">
         <Input
           type="number"
           step="any"
           min={0}
-          value={Number.isFinite(draft.unitCost) ? draft.unitCost : ''}
-          onChange={(e) =>
-            onChange({ ...draft, unitCost: Number(e.target.value) })
-          }
+          value={totalValue}
+          onChange={(e) => {
+            const v = e.target.value;
+            setTotalDraft(v);
+            const num = Number(v);
+            if (Number.isFinite(num) && draft.quantity > 0) {
+              onChange({ ...draft, unitCost: num / draft.quantity });
+            } else if (v === '' || num === 0) {
+              onChange({ ...draft, unitCost: 0 });
+            }
+          }}
+          onBlur={() => setTotalDraft(null)}
           disabled={disabled}
+          className="text-right tabular-nums"
         />
-      </TableCell>
-      <TableCell className="w-[110px] text-right align-top tabular-nums">
-        {formatINR(total)}
       </TableCell>
       <TableCell className="w-[44px] text-right align-top">
         {!disabled ? (

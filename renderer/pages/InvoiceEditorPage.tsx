@@ -371,6 +371,7 @@ export function InvoiceEditorPage() {
           onChange={setHeader}
           suppliers={suppliers}
           disabled={isCommitted}
+          onAddSupplier={() => setSupplierDialogOpen(true)}
         />
         {!isCommitted ? (
           <div className="mt-3">
@@ -442,7 +443,6 @@ export function InvoiceEditorPage() {
                 <TableHead>Description</TableHead>
                 <TableHead>Qty</TableHead>
                 <TableHead>Unit</TableHead>
-                <TableHead>Unit cost</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead />
               </TableRow>
@@ -502,8 +502,11 @@ export function InvoiceEditorPage() {
         supplier={null}
         initialName={unknownSupplier ? (getTemplateById(unknownSupplier.templateId)?.defaultSupplierName ?? '') : ''}
         initialGstin={unknownSupplier?.gstin ?? ''}
-        onCreated={() => {
-          void reParseLastBytes();
+        onCreated={(supplier) => {
+          setHeader((h) => ({ ...h, supplierId: supplier.id }));
+          if (unknownSupplier && lastDroppedBytes) {
+            void reParseLastBytes();
+          }
         }}
       />
 

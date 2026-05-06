@@ -21,20 +21,33 @@ type Props = {
   onChange: (next: InvoiceHeaderValues) => void;
   suppliers: Supplier[];
   disabled?: boolean;
+  onAddSupplier?: () => void;
 };
 
-export function InvoiceHeaderForm({ values, onChange, suppliers, disabled }: Props) {
+export function InvoiceHeaderForm({ values, onChange, suppliers, disabled, onAddSupplier }: Props) {
+  const hasSuppliers = suppliers.length > 0;
   return (
     <div className="grid grid-cols-3 gap-3">
       <div className="grid gap-1">
-        <Label>Supplier</Label>
+        <div className="flex items-baseline justify-between">
+          <Label>Supplier</Label>
+          {onAddSupplier && !disabled ? (
+            <button
+              type="button"
+              onClick={onAddSupplier}
+              className="text-[11px] text-text-info hover:underline"
+            >
+              + New supplier
+            </button>
+          ) : null}
+        </div>
         <Select
           value={values.supplierId || undefined}
           onValueChange={(v) => onChange({ ...values, supplierId: v })}
-          disabled={disabled}
+          disabled={disabled || !hasSuppliers}
         >
           <SelectTrigger>
-            <SelectValue placeholder="Pick supplier" />
+            <SelectValue placeholder={hasSuppliers ? 'Pick supplier' : 'No suppliers — click + New supplier'} />
           </SelectTrigger>
           <SelectContent>
             {suppliers.map((s) => (

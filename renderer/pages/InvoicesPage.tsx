@@ -59,18 +59,10 @@ export function InvoicesPage() {
           variant="primary"
           size="md"
           onClick={() => navigate('/invoices/new')}
-          disabled={suppliers.length === 0}
         >
           <Plus className="h-3.5 w-3.5" /> New invoice
         </Button>
       </div>
-
-      {suppliers.length === 0 ? (
-        <div className="rounded-md bg-background-warning px-3 py-2 text-[12px] text-text-warning">
-          You need at least one supplier before creating invoices. Open the
-          Ingredients page → "Manage suppliers" to add one.
-        </div>
-      ) : null}
 
       {isLoading ? (
         <div className="rounded-lg border border-border-tertiary bg-background-primary px-4 py-6 text-text-tertiary">
