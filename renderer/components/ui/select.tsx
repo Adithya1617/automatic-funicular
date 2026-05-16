@@ -39,14 +39,16 @@ export const SelectContent = React.forwardRef<
       ref={ref}
       position={position}
       className={cn(
-        'relative z-50 max-h-[300px] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border border-border-tertiary bg-background-primary shadow-md',
+        'relative z-50 max-h-[300px] min-w-[var(--radix-select-trigger-width)] rounded-md border border-border-tertiary bg-background-primary shadow-md',
         'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
         position === 'popper' && 'data-[side=bottom]:translate-y-1',
         className,
       )}
       {...props}
     >
-      <SelectPrimitive.Viewport className="p-1">{children}</SelectPrimitive.Viewport>
+      <SelectPrimitive.Viewport className="max-h-[290px] overflow-y-auto p-1">
+        {children}
+      </SelectPrimitive.Viewport>
     </SelectPrimitive.Content>
   </SelectPrimitive.Portal>
 ));
