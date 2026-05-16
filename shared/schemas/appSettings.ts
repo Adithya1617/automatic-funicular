@@ -8,6 +8,9 @@ export const APP_SETTINGS_KEYS = [
   'backup.dailyAtMinutes',
   'backup.lastRunAt',
   'firstRunCompleted',
+  // Set to JSON `true` by main/db/client.ts after the first-boot seeds run.
+  // Gates ensureBikeTypes / ensureSeedParts so deleted seed rows stay deleted.
+  'bootstrap.seedsApplied',
 ] as const;
 export type AppSettingsKey = (typeof APP_SETTINGS_KEYS)[number];
 

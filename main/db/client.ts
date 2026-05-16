@@ -87,8 +87,35 @@ function ensureBootstrapRows(db: ConcreteDb): void {
     .onConflictDoNothing()
     .run();
 
-  ensureBikeTypes(db, now);
-  ensureSeedParts(db, now);
+  // Seeds (bike types + the 8 Hyprride parts) run on first boot only. Once
+  // `bootstrap.seedsApplied` is set we never re-insert — a deleted seed row
+  // stays deleted across relaunches and restores-from-backup.
+  if (!readSeedsAppliedFlag(db)) {
+    ensureBikeTypes(db, now);
+    ensureSeedParts(db, now);
+    db.insert(schema.appSettings)
+      .values({
+        key: 'bootstrap.seedsApplied',
+        value: JSON.stringify(true),
+        updatedAt: now,
+      })
+      .onConflictDoNothing()
+      .run();
+  }
+}
+
+function readSeedsAppliedFlag(db: ConcreteDb): boolean {
+  const row = db
+    .select()
+    .from(schema.appSettings)
+    .where(eq(schema.appSettings.key, 'bootstrap.seedsApplied'))
+    .get();
+  if (!row) return false;
+  try {
+    return JSON.parse(row.value) === true;
+  } catch {
+    return false;
+  }
 }
 
 function ensureBikeTypes(db: ConcreteDb, now: number): void {
