@@ -3,6 +3,7 @@ import { registerBackupHandlers } from './handlers/backup';
 import { registerBikeHandlers } from './handlers/bike';
 import { registerCsvImportHandlers } from './handlers/csvImport';
 import { registerDashboardHandlers } from './handlers/dashboard';
+import { registerDemoHandlers } from './handlers/demo';
 import { registerIngredientHandlers } from './handlers/ingredient';
 import { registerInventoryHandlers } from './handlers/inventory';
 import { registerInvoiceHandlers } from './handlers/invoice';
@@ -34,4 +35,5 @@ export function registerIpcHandlers(): void {
   registerAppSettingsHandlers();
   registerBackupHandlers();
   registerReconciliationHandlers();
+  registerDemoHandlers();
 }

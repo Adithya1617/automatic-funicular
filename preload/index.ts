@@ -125,6 +125,7 @@ import type {
   RunBackupInput,
   RunBackupResponse,
 } from '@shared/schemas/backup';
+import type { DemoSeedInput, DemoSeedResult } from '@shared/schemas/demo';
 
 type ReconciliationSnapshotApi = {
   ranAtMs: number;
@@ -282,6 +283,9 @@ const api = {
       IPC.reconciliation.latest,
     ),
     rerun: invoke<Record<string, never>, ReconciliationSnapshotApi>(IPC.reconciliation.rerun),
+  },
+  demo: {
+    seed: invoke<DemoSeedInput, DemoSeedResult>(IPC.demo.seed),
   },
 } as const;
 

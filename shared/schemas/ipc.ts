@@ -128,4 +128,7 @@ export const IPC = {
     latest: 'reconciliation:latest',
     rerun: 'reconciliation:rerun',
   },
+  demo: {
+    seed: 'demo:seed',
+  },
 } as const;

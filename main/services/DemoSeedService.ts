@@ -1,0 +1,385 @@
+import type { AppDb } from '../db/client';
+import { newId } from '../lib/ids';
+import { bikeRepository } from '../repositories/bikeRepository';
+import { bikeTypeRepository } from '../repositories/bikeTypeRepository';
+import { ingredientRepository } from '../repositories/ingredientRepository';
+import { serviceEventLineRepository } from '../repositories/serviceEventLineRepository';
+import { serviceEventRepository } from '../repositories/serviceEventRepository';
+import { supplierRepository } from '../repositories/supplierRepository';
+import { InventoryService } from './InventoryService';
+import { SYSTEM_USER_ID } from '@shared/constants/system';
+import type { BikeTypeRow, IngredientRow } from '../db/schema';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const SUPPLIER_SEEDS: Array<{
+  name: string;
+  contactInfo: string | null;
+  notes: string | null;
+}> = [
+  {
+    name: 'Bosch Spares',
+    contactInfo: 'orders@bosch-spares.example · +91 90000 10001',
+    notes: 'Brake parts + filters. Calls Mon–Sat.',
+  },
+  {
+    name: 'Castrol Distributor',
+    contactInfo: 'castrol-hyd@example.com · +91 90000 10002',
+    notes: 'Engine + gear oil in 1L cans.',
+  },
+  {
+    name: 'Local Garage Supply',
+    contactInfo: '+91 90000 10003',
+    notes: 'Cables, holders, miscellaneous.',
+  },
+];
+
+type BikeSeed = {
+  bikeNumber: string;
+  bikeTypeName: string;
+  engineCc: number;
+  licensePlate: string;
+  odometerKm: number;
+};
+
+// 34 bikes — plates from the real fleet, numbered 1..34 for friendly UI labels.
+const BIKE_SEEDS: BikeSeed[] = [
+  ...['TS08UL8345', 'TG08X0007', 'TG08T0480', 'TG08X0004', 'TG08T0483', 'TG08X0013', 'TS08UL8347']
+    .map<BikeSeed>((plate, i) => ({
+      bikeNumber: String(i + 1),
+      bikeTypeName: 'Activa',
+      engineCc: 110,
+      licensePlate: plate,
+      odometerKm: 4_500 + i * 700,
+    })),
+  ...['TG08T0481', 'TG08X0002', 'TG08V0534', 'TG08X0001', 'TG08AB4479', 'TG08X0017', 'TG08V0535', 'TS19G0100', 'TG08T0482', 'TG08T7938', 'TG08X0018', 'TG08X0019']
+    .map<BikeSeed>((plate, i) => ({
+      bikeNumber: String(i + 8),
+      bikeTypeName: 'Ntorq',
+      engineCc: 125,
+      licensePlate: plate,
+      odometerKm: 3_000 + i * 850,
+    })),
+  ...['TG08X0006', 'TG08X0005', 'TS08T5686', 'TG08X0003', 'TG08X0009', 'TG08X0010', 'TG08X0015']
+    .map<BikeSeed>((plate, i) => ({
+      bikeNumber: String(i + 20),
+      bikeTypeName: 'Jupiter',
+      engineCc: 125,
+      licensePlate: plate,
+      odometerKm: 5_500 + i * 600,
+    })),
+  { bikeNumber: '27', bikeTypeName: 'Raider', engineCc: 125, licensePlate: 'TS08UL8346', odometerKm: 2_400 },
+  { bikeNumber: '28', bikeTypeName: 'Yamaha RayZR', engineCc: 125, licensePlate: 'TS08UL6560', odometerKm: 6_100 },
+  { bikeNumber: '29', bikeTypeName: 'Hero Destiny', engineCc: 125, licensePlate: 'TS08UL4741', odometerKm: 8_300 },
+  ...['TG08X0014', 'TG08X0008', 'TG08X0012', 'TG08X0016', 'TG08X0011']
+    .map<BikeSeed>((plate, i) => ({
+      bikeNumber: String(i + 30),
+      bikeTypeName: 'Apache',
+      engineCc: 160,
+      licensePlate: plate,
+      odometerKm: 4_800 + i * 900,
+    })),
+];
+
+// Purchase batches — stocked 20 days ago so the weighted-avg cost is well-defined
+// by the time the first service event lands.
+const PURCHASE_SEEDS: Array<{
+  partName: string;
+  quantity: number;
+  unit: 'g' | 'ml' | 'each';
+  unitCost: number;
+  daysAgo: number;
+}> = [
+  { partName: 'Brake pad', quantity: 80, unit: 'each', unitCost: 200, daysAgo: 50 },
+  { partName: 'Brake pad', quantity: 40, unit: 'each', unitCost: 220, daysAgo: 18 },
+  { partName: 'Brake shoe', quantity: 50, unit: 'each', unitCost: 150, daysAgo: 50 },
+  { partName: 'Accelerator wire', quantity: 60, unit: 'each', unitCost: 80, daysAgo: 50 },
+  { partName: 'Clutch wire', quantity: 60, unit: 'each', unitCost: 100, daysAgo: 50 },
+  { partName: 'Engine oil', quantity: 30000, unit: 'ml', unitCost: 0.42, daysAgo: 50 },
+  { partName: 'Engine oil', quantity: 10000, unit: 'ml', unitCost: 0.46, daysAgo: 15 },
+  { partName: 'Gear oil', quantity: 15000, unit: 'ml', unitCost: 0.55, daysAgo: 50 },
+  { partName: 'Air filter', quantity: 30, unit: 'each', unitCost: 350, daysAgo: 50 },
+  { partName: 'Mobile holder', quantity: 20, unit: 'each', unitCost: 250, daysAgo: 50 },
+];
+
+// Service-event patterns — varied so dashboard rollups are interesting.
+type ServicePattern = {
+  label: string;
+  lines: Array<{ partName: string; quantity: number; unit: 'g' | 'ml' | 'each' }>;
+};
+const SERVICE_PATTERNS: ServicePattern[] = [
+  {
+    label: 'Oil change',
+    lines: [
+      { partName: 'Engine oil', quantity: 800, unit: 'ml' },
+      { partName: 'Air filter', quantity: 1, unit: 'each' },
+    ],
+  },
+  {
+    label: 'Brake job',
+    lines: [{ partName: 'Brake pad', quantity: 2, unit: 'each' }],
+  },
+  {
+    label: 'Full service',
+    lines: [
+      { partName: 'Engine oil', quantity: 900, unit: 'ml' },
+      { partName: 'Air filter', quantity: 1, unit: 'each' },
+      { partName: 'Brake pad', quantity: 2, unit: 'each' },
+    ],
+  },
+  {
+    label: 'Accelerator wire repair',
+    lines: [{ partName: 'Accelerator wire', quantity: 1, unit: 'each' }],
+  },
+  {
+    label: 'Clutch wire repair',
+    lines: [{ partName: 'Clutch wire', quantity: 1, unit: 'each' }],
+  },
+  {
+    label: 'Brake shoe (rear)',
+    lines: [{ partName: 'Brake shoe', quantity: 2, unit: 'each' }],
+  },
+  {
+    label: 'Gear oil top-up',
+    lines: [{ partName: 'Gear oil', quantity: 250, unit: 'ml' }],
+  },
+];
+
+export type DemoSeedSummary = {
+  suppliersCreated: number;
+  bikesCreated: number;
+  purchasesAdded: number;
+  serviceEventsAdded: number;
+  alreadyPopulated: boolean;
+};
+
+export const DemoSeedService = {
+  /**
+   * Idempotent-ish demo seeder for prototyping/demo. Fills suppliers, the
+   * 34-bike fleet, purchase movements for the 8 seeded parts, and ~30
+   * completed service events spread across the last 60 days so every
+   * dashboard tile lights up.
+   *
+   * Skipped if more than two suppliers OR more than ten service events
+   * already exist (treated as "already populated" — we don't want to
+   * double-stock a working install).
+   */
+  run(
+    db: AppDb,
+    tenantId: number,
+    actorId: string = SYSTEM_USER_ID,
+  ): DemoSeedSummary {
+    const existingSuppliers = supplierRepository.list(db, tenantId, {
+      includeInactive: true,
+    });
+    const existingEvents = serviceEventRepository.list(db, tenantId, { limit: 50 });
+    if (existingSuppliers.length >= 3 && existingEvents.length >= 10) {
+      return {
+        suppliersCreated: 0,
+        bikesCreated: 0,
+        purchasesAdded: 0,
+        serviceEventsAdded: 0,
+        alreadyPopulated: true,
+      };
+    }
+
+    const bikeTypes = bikeTypeRepository.list(db, tenantId, { includeInactive: true });
+    const bikeTypeKey = (cc: number, name: string) => `${cc}::${name.toLowerCase()}`;
+    const bikeTypeByKey = new Map<string, BikeTypeRow>();
+    for (const t of bikeTypes) bikeTypeByKey.set(bikeTypeKey(t.engineCc, t.name), t);
+
+    const partsByName = new Map<string, IngredientRow>();
+    for (const p of ingredientRepository.list(db, tenantId, { includeInactive: true })) {
+      partsByName.set(p.name.toLowerCase(), p);
+    }
+
+    const now = Date.now();
+    let suppliersCreated = 0;
+    let bikesCreated = 0;
+    let purchasesAdded = 0;
+    let serviceEventsAdded = 0;
+
+    // --- Suppliers (idempotent by name) ----------------------------------
+    for (const seed of SUPPLIER_SEEDS) {
+      const existing = supplierRepository.findByName(db, tenantId, seed.name);
+      if (existing) continue;
+      supplierRepository.insert(db, {
+        id: newId(),
+        tenantId,
+        name: seed.name,
+        contactInfo: seed.contactInfo,
+        notes: seed.notes,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: actorId,
+        updatedBy: actorId,
+      });
+      suppliersCreated += 1;
+    }
+
+    // --- Bikes (idempotent by bike_number) -------------------------------
+    for (const seed of BIKE_SEEDS) {
+      const existing = bikeRepository.findByBikeNumber(db, tenantId, seed.bikeNumber);
+      if (existing) continue;
+      const bikeType = bikeTypeByKey.get(bikeTypeKey(seed.engineCc, seed.bikeTypeName));
+      if (!bikeType) continue;
+      bikeRepository.insert(db, {
+        id: newId(),
+        tenantId,
+        bikeNumber: seed.bikeNumber,
+        bikeTypeId: bikeType.id,
+        licensePlate: seed.licensePlate,
+        odometerKm: seed.odometerKm,
+        notes: null,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: actorId,
+        updatedBy: actorId,
+      });
+      bikesCreated += 1;
+    }
+
+    // --- Stock purchases -------------------------------------------------
+    for (const purchase of PURCHASE_SEEDS) {
+      const part = partsByName.get(purchase.partName.toLowerCase());
+      if (!part) continue;
+      InventoryService.applyMovement(
+        db,
+        tenantId,
+        {
+          ingredientId: part.id,
+          quantity: purchase.quantity,
+          unit: purchase.unit,
+          reason: 'purchase',
+          referenceType: 'manual',
+          direction: 1,
+          costPerUnitAtTime: purchase.unitCost,
+          occurredAt: now - purchase.daysAgo * DAY_MS,
+        },
+        actorId,
+        { skipAvailabilityRecompute: true },
+      );
+      purchasesAdded += 1;
+    }
+
+    // Refresh part snapshots — applyMovement updated stock + avg cost.
+    const refreshedParts = new Map<string, IngredientRow>();
+    for (const p of ingredientRepository.list(db, tenantId, { includeInactive: true })) {
+      refreshedParts.set(p.name.toLowerCase(), p);
+    }
+
+    // --- Service events --------------------------------------------------
+    const activeBikes = bikeRepository.list(db, tenantId, { includeInactive: false });
+    if (activeBikes.length > 0) {
+      // 30 events over the last 60 days, deterministic schedule so dashboard
+      // numbers don't shift between reseeds within a day.
+      const EVENT_COUNT = 30;
+      for (let i = 0; i < EVENT_COUNT; i++) {
+        const bike = activeBikes[i % activeBikes.length]!;
+        const pattern = SERVICE_PATTERNS[i % SERVICE_PATTERNS.length]!;
+        const daysAgo = Math.floor((60 / EVENT_COUNT) * i) + 1; // 1..60
+        const occurredAt = now - daysAgo * DAY_MS;
+
+        // Verify every part has enough stock — skip the line if not, the demo
+        // can tolerate a missed service rather than failing the whole seed.
+        const usableLines = pattern.lines
+          .map((l) => ({ part: refreshedParts.get(l.partName.toLowerCase()), line: l }))
+          .filter(({ part, line }) => part && part.stockQuantity >= line.quantity);
+        if (usableLines.length === 0) continue;
+
+        try {
+          seedServiceEvent(db, tenantId, actorId, bike.id, occurredAt, pattern.label, usableLines.map(({ part, line }) => ({
+            ingredientId: part!.id,
+            quantity: line.quantity,
+            unit: line.unit,
+          })));
+          // Update local snapshot of part stock to mirror the deduction.
+          for (const { part, line } of usableLines) {
+            const cur = refreshedParts.get(part!.name.toLowerCase())!;
+            refreshedParts.set(part!.name.toLowerCase(), {
+              ...cur,
+              stockQuantity: cur.stockQuantity - line.quantity,
+            });
+          }
+          serviceEventsAdded += 1;
+        } catch {
+          // Best-effort — if a particular event throws (e.g. unit conversion
+          // edge), just skip it and continue.
+        }
+      }
+    }
+
+    return {
+      suppliersCreated,
+      bikesCreated,
+      purchasesAdded,
+      serviceEventsAdded,
+      alreadyPopulated: false,
+    };
+  },
+};
+
+function seedServiceEvent(
+  db: AppDb,
+  tenantId: number,
+  actorId: string,
+  bikeId: string,
+  occurredAt: number,
+  label: string,
+  lines: Array<{ ingredientId: string; quantity: number; unit: 'g' | 'ml' | 'each' }>,
+): void {
+  db.transaction((tx) => {
+    const event = serviceEventRepository.insert(tx, {
+      id: newId(),
+      tenantId,
+      bikeId,
+      serviceTemplateId: null,
+      serviceTemplateVersionId: null,
+      status: 'completed',
+      startedAt: occurredAt,
+      completedAt: occurredAt,
+      cancelledAt: null,
+      cancelledPartsUsed: null,
+      odometerKm: null,
+      notes: `Demo seed: ${label}`,
+      createdAt: occurredAt,
+      updatedAt: occurredAt,
+      createdBy: actorId,
+      updatedBy: actorId,
+    });
+
+    const inserted = serviceEventLineRepository.insertMany(
+      tx,
+      lines.map((l, idx) => ({
+        id: newId(),
+        serviceEventId: event.id,
+        ingredientId: l.ingredientId,
+        quantity: l.quantity,
+        unit: l.unit,
+        notes: null,
+        displayOrder: idx,
+      })),
+    );
+
+    for (const line of inserted) {
+      InventoryService.applyMovement(
+        tx,
+        tenantId,
+        {
+          ingredientId: line.ingredientId,
+          quantity: line.quantity,
+          unit: line.unit,
+          reason: 'service_consumed',
+          referenceType: 'service_event_line',
+          referenceId: line.id,
+          direction: -1,
+          occurredAt,
+        },
+        actorId,
+        { skipAvailabilityRecompute: true },
+      );
+    }
+  });
+}

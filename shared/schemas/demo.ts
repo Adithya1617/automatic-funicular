@@ -1,0 +1,13 @@
+import { z } from 'zod';
+
+export const demoSeedInputSchema = z.object({}).default({});
+export type DemoSeedInput = z.infer<typeof demoSeedInputSchema>;
+
+export const demoSeedResultSchema = z.object({
+  suppliersCreated: z.number().int().nonnegative(),
+  bikesCreated: z.number().int().nonnegative(),
+  purchasesAdded: z.number().int().nonnegative(),
+  serviceEventsAdded: z.number().int().nonnegative(),
+  alreadyPopulated: z.boolean(),
+});
+export type DemoSeedResult = z.infer<typeof demoSeedResultSchema>;
