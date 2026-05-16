@@ -26,6 +26,11 @@ export const STOCK_MOVEMENT_REASONS = [
   'production_output',
   'adjustment',
   'staff_meal',
+  // Hyprride: parts consumed during a completed service event, and the
+  // restore-stock counterpart written when a completed event is cancelled
+  // without the parts having been used.
+  'service_consumed',
+  'service_reversal',
 ] as const;
 export type StockMovementReason = (typeof STOCK_MOVEMENT_REASONS)[number];
 
@@ -35,6 +40,9 @@ export const STOCK_MOVEMENT_REFERENCE_TYPES = [
   'production_batch',
   'stock_take',
   'manual',
+  // Hyprride: links a stock_movement back to the service_event_line that
+  // caused it (consumption, wastage on cancel-after-completion, or reversal).
+  'service_event_line',
 ] as const;
 export type StockMovementReferenceType = (typeof STOCK_MOVEMENT_REFERENCE_TYPES)[number];
 

@@ -18,18 +18,21 @@ import { SYSTEM_USER_ID } from '@shared/constants/system';
 
 /**
  * Reasons whose direction is fixed regardless of caller intent. Wastage,
- * staff meal, prep loss, and `sale` always *decrease* stock; `purchase`,
- * `production_output`, and `sale_reversal` always *increase* it.
- * `adjustment` and `production_input` accept either direction.
+ * staff meal, prep loss, `sale`, and `service_consumed` always *decrease*
+ * stock; `purchase`, `production_output`, `sale_reversal`, and
+ * `service_reversal` always *increase* it. `adjustment` and
+ * `production_input` accept either direction.
  */
 const FORCED_DIRECTION: Partial<Record<ApplyMovementInput['reason'], 1 | -1>> = {
   purchase: 1,
   production_output: 1,
   sale_reversal: 1,
+  service_reversal: 1,
   sale: -1,
   wastage: -1,
   staff_meal: -1,
   prep_loss: -1,
+  service_consumed: -1,
 };
 
 /**
@@ -48,6 +51,8 @@ const REASONS_DEFAULT_COST_FROM_AVG: ReadonlyArray<ApplyMovementInput['reason']>
   'prep_loss',
   'staff_meal',
   'adjustment',
+  'service_consumed',
+  'service_reversal',
 ];
 
 export type ApplyMovementResult = {

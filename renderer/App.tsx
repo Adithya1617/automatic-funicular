@@ -7,6 +7,8 @@ import { IngredientsPage } from './pages/IngredientsPage';
 import { BikesPage } from './pages/BikesPage';
 import { ServiceTemplatesPage } from './pages/ServiceTemplatesPage';
 import { ServiceTemplateEditorPage } from './pages/ServiceTemplateEditorPage';
+import { ServicesPage } from './pages/ServicesPage';
+import { ServiceEventEditorPage } from './pages/ServiceEventEditorPage';
 import { MenuPage } from './pages/MenuPage';
 import { MenuEditorPage } from './pages/MenuEditorPage';
 import { InvoicesPage } from './pages/InvoicesPage';
@@ -24,6 +26,8 @@ export function App() {
         <Route path="orders/new" element={<ManualOrderPage />} />
         <Route path="parts" element={<IngredientsPage />} />
         <Route path="bikes" element={<BikesPage />} />
+        <Route path="services" element={<ServicesPage />} />
+        <Route path="services/:id/edit" element={<ServiceEventEditorPage />} />
         <Route path="services/templates" element={<ServiceTemplatesPage />} />
         <Route path="services/templates/new" element={<ServiceTemplateEditorPage />} />
         <Route path="services/templates/:id/edit" element={<ServiceTemplateEditorPage />} />

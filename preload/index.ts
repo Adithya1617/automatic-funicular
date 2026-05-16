@@ -35,6 +35,16 @@ import type {
   UpdateServiceTemplateInput,
 } from '@shared/schemas/serviceTemplate';
 import type {
+  CancelServiceEventInput,
+  CompleteServiceEventInput,
+  CreateServiceEventInput,
+  GetServiceEventInput,
+  ListServiceEventsInput,
+  ServiceEvent,
+  ServiceEventWithLines,
+  UpdateServiceEventLinesInput,
+} from '@shared/schemas/serviceEvent';
+import type {
   ListStockMovementsInput,
   StockMovement,
 } from '@shared/schemas/stockMovement';
@@ -196,6 +206,18 @@ const api = {
     deactivate: invoke<DeactivateServiceTemplateInput, ServiceTemplate>(
       IPC.serviceTemplate.deactivate,
     ),
+  },
+  serviceEvent: {
+    list: invoke<ListServiceEventsInput, ServiceEvent[]>(IPC.serviceEvent.list),
+    get: invoke<GetServiceEventInput, ServiceEventWithLines>(IPC.serviceEvent.get),
+    create: invoke<CreateServiceEventInput, ServiceEventWithLines>(IPC.serviceEvent.create),
+    updateLines: invoke<UpdateServiceEventLinesInput, ServiceEventWithLines>(
+      IPC.serviceEvent.updateLines,
+    ),
+    complete: invoke<CompleteServiceEventInput, ServiceEventWithLines>(
+      IPC.serviceEvent.complete,
+    ),
+    cancel: invoke<CancelServiceEventInput, ServiceEventWithLines>(IPC.serviceEvent.cancel),
   },
   stockMovement: {
     list: invoke<ListStockMovementsInput, StockMovement[]>(IPC.stockMovement.list),

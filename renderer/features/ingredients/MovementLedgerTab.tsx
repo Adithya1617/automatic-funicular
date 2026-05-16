@@ -16,6 +16,8 @@ const REASON_VARIANT: Record<StockMovementReason, BadgeProps['variant']> = {
   production_input: 'prepared',
   production_output: 'prepared',
   adjustment: 'neutral',
+  service_consumed: 'info',
+  service_reversal: 'info',
 };
 
 const REASON_LABEL: Record<StockMovementReason, string> = {
@@ -28,6 +30,8 @@ const REASON_LABEL: Record<StockMovementReason, string> = {
   production_input: 'prep input',
   production_output: 'prep output',
   adjustment: 'adjustment',
+  service_consumed: 'service',
+  service_reversal: 'service reversal',
 };
 
 export function MovementLedgerTab({ ingredient }: { ingredient: Ingredient }) {

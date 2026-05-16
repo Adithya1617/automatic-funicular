@@ -50,6 +50,14 @@ export const IPC = {
     update: 'serviceTemplate:update',
     deactivate: 'serviceTemplate:deactivate',
   },
+  serviceEvent: {
+    list: 'serviceEvent:list',
+    get: 'serviceEvent:get',
+    create: 'serviceEvent:create',
+    updateLines: 'serviceEvent:updateLines',
+    complete: 'serviceEvent:complete',
+    cancel: 'serviceEvent:cancel',
+  },
   stockMovement: {
     list: 'stockMovement:list',
   },

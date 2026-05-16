@@ -4,10 +4,15 @@ import { NAV_ITEMS, type NavItem } from './navItems';
 
 function pathMatchesNav(navPath: string, currentPath: string): boolean {
   if (navPath === '/') return currentPath === '/';
-  // Treat /orders/* (live, new, …) as "Live orders" and /invoices/* as
-  // "Invoices" — sub-routes in the same family share the parent's nav entry.
+  // Treat sub-routes as members of the same nav family — orders / invoices /
+  // service events / service templates. Service templates live under
+  // /services/templates/*, which is a child of /services/*, so we test
+  // service-templates first so the more-specific nav entry wins.
   let normalized = currentPath;
-  if (currentPath.startsWith('/orders/')) normalized = '/orders/live';
+  if (currentPath.startsWith('/services/templates'))
+    normalized = '/services/templates';
+  else if (currentPath.startsWith('/services/')) normalized = '/services';
+  else if (currentPath.startsWith('/orders/')) normalized = '/orders/live';
   else if (currentPath.startsWith('/invoices/')) normalized = '/invoices';
   return normalized === navPath || normalized.startsWith(`${navPath}/`);
 }

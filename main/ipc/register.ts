@@ -14,6 +14,7 @@ import { registerProductionHandlers } from './handlers/production';
 import { registerReconciliationHandlers } from './handlers/reconciliation';
 import { registerRecipeHandlers } from './handlers/recipe';
 import { registerReportHandlers } from './handlers/report';
+import { registerServiceEventHandlers } from './handlers/serviceEvent';
 import { registerServiceTemplateHandlers } from './handlers/serviceTemplate';
 import { registerStockMovementHandlers } from './handlers/stockMovement';
 import { registerStockTakeHandlers } from './handlers/stockTake';
@@ -25,6 +26,7 @@ export function registerIpcHandlers(): void {
   registerSupplierHandlers();
   registerBikeHandlers();
   registerServiceTemplateHandlers();
+  registerServiceEventHandlers();
   registerStockMovementHandlers();
   registerInventoryHandlers();
   registerRecipeHandlers();

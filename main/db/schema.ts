@@ -91,10 +91,19 @@ export const stockMovements = sqliteTable(
         'production_output',
         'adjustment',
         'staff_meal',
+        'service_consumed',
+        'service_reversal',
       ],
     }).notNull(),
     referenceType: text('reference_type', {
-      enum: ['invoice_line', 'order_line', 'production_batch', 'stock_take', 'manual'],
+      enum: [
+        'invoice_line',
+        'order_line',
+        'production_batch',
+        'stock_take',
+        'manual',
+        'service_event_line',
+      ],
     }).notNull(),
     referenceId: text('reference_id'),
     notes: text('notes'),
@@ -538,3 +547,82 @@ export const serviceTemplates = sqliteTable(
 
 export type ServiceTemplateRow = typeof serviceTemplates.$inferSelect;
 export type ServiceTemplateInsert = typeof serviceTemplates.$inferInsert;
+
+// Service events — one row per servicing. Links a bike to a service template
+// version (Path A snapshot) and tracks the parts consumed. Stock deduction
+// fires on status='completed' via InventoryService.applyMovement.
+export const serviceEvents = sqliteTable(
+  'service_events',
+  {
+    id: text('id').primaryKey(),
+    tenantId: integer('tenant_id').notNull(),
+    bikeId: text('bike_id')
+      .notNull()
+      .references(() => bikes.id),
+    serviceTemplateId: text('service_template_id')
+      .notNull()
+      .references(() => serviceTemplates.id),
+    // Captured at create time — completion always walks this version even if
+    // the template has been edited since.
+    serviceTemplateVersionId: text('service_template_version_id')
+      .notNull()
+      .references(() => recipeVersions.id),
+    status: text('status', {
+      enum: ['in_progress', 'completed', 'cancelled'],
+    })
+      .notNull()
+      .default('in_progress'),
+    startedAt: integer('started_at').notNull(),
+    completedAt: integer('completed_at'),
+    cancelledAt: integer('cancelled_at'),
+    /** Set when cancelling a completed event: true → wastage, false → reversal. */
+    cancelledPartsUsed: integer('cancelled_parts_used', { mode: 'boolean' }),
+    odometerKm: real('odometer_km'),
+    notes: text('notes'),
+    ...audit,
+  },
+  (t) => ({
+    tenantStatusIdx: index('idx_service_events_tenant_status_started').on(
+      t.tenantId,
+      t.status,
+      t.startedAt,
+    ),
+    tenantBikeIdx: index('idx_service_events_tenant_bike_started').on(
+      t.tenantId,
+      t.bikeId,
+      t.startedAt,
+    ),
+    tenantTemplateIdx: index('idx_service_events_tenant_template_started').on(
+      t.tenantId,
+      t.serviceTemplateId,
+      t.startedAt,
+    ),
+  }),
+);
+
+// Per-event part lines — copied from the captured recipe version at create
+// time. Editable while the parent event is in_progress; frozen on complete.
+export const serviceEventLines = sqliteTable(
+  'service_event_lines',
+  {
+    id: text('id').primaryKey(),
+    serviceEventId: text('service_event_id')
+      .notNull()
+      .references(() => serviceEvents.id),
+    ingredientId: text('ingredient_id')
+      .notNull()
+      .references(() => ingredients.id),
+    quantity: real('quantity').notNull(),
+    unit: text('unit').notNull(),
+    notes: text('notes'),
+    displayOrder: integer('display_order').notNull().default(0),
+  },
+  (t) => ({
+    eventIdx: index('idx_service_event_lines_event').on(t.serviceEventId),
+  }),
+);
+
+export type ServiceEventRow = typeof serviceEvents.$inferSelect;
+export type ServiceEventInsert = typeof serviceEvents.$inferInsert;
+export type ServiceEventLineRow = typeof serviceEventLines.$inferSelect;
+export type ServiceEventLineInsert = typeof serviceEventLines.$inferInsert;
