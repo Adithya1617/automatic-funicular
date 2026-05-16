@@ -50,7 +50,7 @@ export function BikesPage() {
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-1 items-center gap-2">
           <Input
-            placeholder="Search by bike number…"
+            placeholder="Search by bike number or plate…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-[320px]"

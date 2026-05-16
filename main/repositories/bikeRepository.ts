@@ -1,4 +1,4 @@
-import { and, asc, eq, like } from 'drizzle-orm';
+import { and, asc, eq, like, or } from 'drizzle-orm';
 import type { AppDb } from '../db/client';
 import { bikes, type BikeRow, type BikeInsert } from '../db/schema';
 
@@ -14,7 +14,15 @@ export const bikeRepository = {
     if (!filter.includeInactive) conditions.push(eq(bikes.isActive, true));
     if (filter.bikeTypeId) conditions.push(eq(bikes.bikeTypeId, filter.bikeTypeId));
     if (filter.search) {
-      conditions.push(like(bikes.bikeNumber, `%${filter.search.toLowerCase()}%`));
+      const term = `%${filter.search.toLowerCase()}%`;
+      // Plate numbers are the operator's real-world identifier — match on
+      // either the internal bike_number or the license_plate so a typed
+      // "TG08X0007" or "8345" both land.
+      const matcher = or(
+        like(bikes.bikeNumber, term),
+        like(bikes.licensePlate, term),
+      );
+      if (matcher) conditions.push(matcher);
     }
     return db
       .select()
