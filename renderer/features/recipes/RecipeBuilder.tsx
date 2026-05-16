@@ -22,7 +22,7 @@ import { Label } from '@renderer/components/ui/label';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@renderer/components/ui/table';
 import { useSaveRecipeVersion } from '@renderer/hooks/ipc/useRecipe';
 import { RecipeRow, type DraftRow } from './RecipeRow';
-import { RecipeDiffModal } from '@renderer/features/menu/RecipeDiffModal';
+import { RecipeDiffModal } from './RecipeDiffModal';
 
 type Props = {
   parentId: string;

@@ -5,7 +5,6 @@ import { DEFAULT_TENANT_ID } from '@shared/constants/system';
 import { registerIpcHandlers } from './ipc/register';
 import { runReconciliation } from './jobs/reconciliation';
 import { startBackupScheduler, stopBackupScheduler } from './jobs/backupScheduler';
-import { startOrderPoller, stopOrderPoller } from './jobs/orderPoller';
 import { LocalDiskStorage } from './adapters/storage/LocalDiskStorage';
 import { fileStorageRegistry } from './adapters/storage/registry';
 
@@ -70,7 +69,6 @@ function bootstrap(): void {
     );
   }
 
-  startOrderPoller();
   startBackupScheduler();
 }
 
@@ -84,7 +82,6 @@ void app.whenReady().then(() => {
 });
 
 app.on('before-quit', () => {
-  stopOrderPoller();
   stopBackupScheduler();
 });
 

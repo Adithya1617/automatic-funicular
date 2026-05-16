@@ -4,7 +4,6 @@ import { invoiceLineRepository } from '../repositories/invoiceLineRepository';
 import { invoiceRepository } from '../repositories/invoiceRepository';
 import { stockMovementRepository } from '../repositories/stockMovementRepository';
 import { supplierRepository } from '../repositories/supplierRepository';
-import { DashboardService } from './DashboardService';
 import { toCsv } from '@shared/utils/csv';
 import type { ExportReportInput, ExportReportResponse } from '@shared/schemas/report';
 
@@ -17,8 +16,6 @@ export const ReportService = {
     switch (input.kind) {
       case 'movements':
         return exportMovements(db, tenantId, input);
-      case 'cogs':
-        return exportCogs(db, tenantId, input);
       case 'spending':
         return exportSpending(db, tenantId, input);
     }
@@ -62,26 +59,6 @@ function exportMovements(
 
   return {
     filename: filenameFor('movements', input.range),
-    content: toCsv([header, ...rows]),
-  };
-}
-
-function exportCogs(
-  db: AppDb,
-  tenantId: number,
-  input: ExportReportInput,
-): ExportReportResponse {
-  const cogs = DashboardService.cogs(db, tenantId, input.range);
-  const header = ['menu_item', 'qty_sold', 'cogs', 'revenue', 'food_cost_percent'];
-  const rows = cogs.rows.map((r) => [
-    r.menuItemName,
-    r.qtySold,
-    r.cogs,
-    r.revenue,
-    r.revenue > 0 ? Math.round((r.cogs / r.revenue) * 10_000) / 100 : '',
-  ]);
-  return {
-    filename: filenameFor('cogs', input.range),
     content: toCsv([header, ...rows]),
   };
 }

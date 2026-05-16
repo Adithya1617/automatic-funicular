@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { idSchema } from './id';
-import { ORDER_SOURCES } from '../constants/enums';
 
 export const dateRangeSchema = z
   .object({
@@ -32,23 +31,6 @@ export const stockValueSeriesResponseSchema = z.object({
   points: z.array(stockValueSeriesPointSchema),
 });
 export type StockValueSeriesResponse = z.infer<typeof stockValueSeriesResponseSchema>;
-
-/* --------------------------------- COGS ---------------------------------- */
-export const cogsByMenuItemSchema = z.object({
-  menuItemId: idSchema,
-  menuItemName: z.string(),
-  qtySold: z.number(),
-  cogs: z.number().nonnegative(),
-  revenue: z.number().nonnegative(),
-});
-export type CogsByMenuItem = z.infer<typeof cogsByMenuItemSchema>;
-
-export const cogsResponseSchema = z.object({
-  totalCogs: z.number().nonnegative(),
-  totalRevenue: z.number().nonnegative(),
-  rows: z.array(cogsByMenuItemSchema),
-});
-export type CogsResponse = z.infer<typeof cogsResponseSchema>;
 
 /* -------------------------------- Spending ------------------------------- */
 export const spendingByCategorySchema = z.object({
@@ -86,12 +68,6 @@ export const wastageResponseSchema = z.object({
 });
 export type WastageResponse = z.infer<typeof wastageResponseSchema>;
 
-/* ------------------------------ Top dishes ------------------------------- */
-export const topDishesResponseSchema = z.object({
-  rows: z.array(cogsByMenuItemSchema),
-});
-export type TopDishesResponse = z.infer<typeof topDishesResponseSchema>;
-
 /* ------------------------------ Low stock -------------------------------- */
 export const lowStockRowSchema = z.object({
   ingredientId: idSchema,
@@ -126,34 +102,6 @@ export const reorderResponseSchema = z.object({
   rows: z.array(reorderRowSchema),
 });
 export type ReorderResponse = z.infer<typeof reorderResponseSchema>;
-
-/* ----------------------------- Food cost % ------------------------------- */
-export const foodCostRowSchema = z.object({
-  menuItemId: idSchema,
-  menuItemName: z.string(),
-  sellingPrice: z.number().nonnegative(),
-  recipeCost: z.number().nonnegative(),
-  foodCostPercent: z.number().nullable(),
-});
-export type FoodCostRow = z.infer<typeof foodCostRowSchema>;
-
-export const foodCostResponseSchema = z.object({
-  rows: z.array(foodCostRowSchema),
-});
-export type FoodCostResponse = z.infer<typeof foodCostResponseSchema>;
-
-/* ---------------------------- Channel rollups ---------------------------- */
-export const channelRevenueRowSchema = z.object({
-  source: z.enum(ORDER_SOURCES),
-  revenue: z.number().nonnegative(),
-  orderCount: z.number().int().nonnegative(),
-});
-export type ChannelRevenueRow = z.infer<typeof channelRevenueRowSchema>;
-
-export const channelRollupResponseSchema = z.object({
-  rows: z.array(channelRevenueRowSchema),
-});
-export type ChannelRollupResponse = z.infer<typeof channelRollupResponseSchema>;
 
 /* ---------------- Hyprride: bike-centric tiles --------------------------- */
 

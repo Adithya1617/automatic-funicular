@@ -7,7 +7,6 @@ import type { ReportKind } from '@shared/schemas/report';
 
 const REPORT_LABELS: Record<ReportKind, string> = {
   movements: 'Movements',
-  cogs: 'COGS',
   spending: 'Spending',
 };
 

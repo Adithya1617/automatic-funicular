@@ -4,12 +4,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@renderer/components/u
 import { formatINR } from '@shared/utils/currency';
 import { formatStock } from '@renderer/lib/format';
 import { MovementLedgerTab } from './MovementLedgerTab';
-import { RecipeTab } from '@renderer/features/recipes/RecipeTab';
-import { BatchesTab } from '@renderer/features/production/BatchesTab';
 
 export function IngredientDetailPanel({ ingredient }: { ingredient: Ingredient }) {
   const stockValue = ingredient.stockQuantity * ingredient.currentAvgCostPerUnit;
-  const isPrepared = ingredient.type === 'prepared';
 
   return (
     <div className="rounded-lg border border-border-tertiary bg-background-primary p-4">
@@ -38,28 +35,12 @@ export function IngredientDetailPanel({ ingredient }: { ingredient: Ingredient }
       <Tabs defaultValue="movements">
         <TabsList>
           <TabsTrigger value="movements">Movements</TabsTrigger>
-          <TabsTrigger value="recipe" disabled={!isPrepared}>
-            Recipe
-          </TabsTrigger>
-          <TabsTrigger value="batches" disabled={!isPrepared}>
-            Batches
-          </TabsTrigger>
           <TabsTrigger value="suppliers" disabled>Suppliers</TabsTrigger>
           <TabsTrigger value="edit" disabled>Edit</TabsTrigger>
         </TabsList>
         <TabsContent value="movements">
           <MovementLedgerTab ingredient={ingredient} />
         </TabsContent>
-        {isPrepared ? (
-          <>
-            <TabsContent value="recipe">
-              <RecipeTab parent={ingredient} />
-            </TabsContent>
-            <TabsContent value="batches">
-              <BatchesTab parent={ingredient} />
-            </TabsContent>
-          </>
-        ) : null}
       </Tabs>
     </div>
   );

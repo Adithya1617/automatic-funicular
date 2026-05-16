@@ -87,7 +87,6 @@ function ensureBootstrapRows(db: ConcreteDb): void {
     .onConflictDoNothing()
     .run();
 
-  ensureMockOrderingChannels(db, now);
   ensureBikeTypes(db, now);
 }
 
@@ -123,30 +122,3 @@ function ensureBikeTypes(db: ConcreteDb, now: number): void {
   }
 }
 
-function ensureMockOrderingChannels(db: ConcreteDb, now: number): void {
-  const seeds: Array<{ key: string; displayName: string }> = [
-    { key: 'mock_online', displayName: 'Mock online (Swiggy)' },
-    { key: 'mock_offline', displayName: 'Mock offline POS' },
-  ];
-  for (const seed of seeds) {
-    const existing = db
-      .select()
-      .from(schema.orderingChannels)
-      .where(eq(schema.orderingChannels.key, seed.key))
-      .all();
-    if (existing.length > 0) continue;
-    db.insert(schema.orderingChannels)
-      .values({
-        id: newId(),
-        tenantId: DEFAULT_TENANT_ID,
-        key: seed.key,
-        displayName: seed.displayName,
-        enabled: true,
-        pollingIntervalSeconds: 30,
-        isMock: true,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .run();
-  }
-}

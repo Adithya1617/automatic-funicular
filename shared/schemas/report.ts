@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { dateRangeSchema } from './dashboard';
 
-export const REPORT_KINDS = ['movements', 'cogs', 'spending'] as const;
+export const REPORT_KINDS = ['movements', 'spending'] as const;
 export type ReportKind = (typeof REPORT_KINDS)[number];
 
 export const exportReportInputSchema = z.object({

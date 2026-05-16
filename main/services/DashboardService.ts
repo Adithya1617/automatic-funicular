@@ -4,24 +4,17 @@ import { bikeTypeRepository } from '../repositories/bikeTypeRepository';
 import { ingredientRepository } from '../repositories/ingredientRepository';
 import { invoiceLineRepository } from '../repositories/invoiceLineRepository';
 import { invoiceRepository } from '../repositories/invoiceRepository';
-import { menuItemRepository } from '../repositories/menuItemRepository';
-import { orderLineRepository } from '../repositories/orderLineRepository';
-import { orderRepository } from '../repositories/orderRepository';
 import { recipeRepository } from '../repositories/recipeRepository';
 import { serviceEventLineRepository } from '../repositories/serviceEventLineRepository';
 import { serviceEventRepository } from '../repositories/serviceEventRepository';
 import { serviceTemplateRepository } from '../repositories/serviceTemplateRepository';
 import { stockMovementRepository } from '../repositories/stockMovementRepository';
 import type {
-  ChannelRollupResponse,
-  CogsByMenuItem,
-  CogsResponse,
   CostPerBikeResponse,
   CostPerBikeRow,
   CostPerBikeTypeResponse,
   CostPerBikeTypeRow,
   DateRange,
-  FoodCostResponse,
   LowStockResponse,
   ReorderResponse,
   ServiceVolumeResponse,
@@ -34,11 +27,9 @@ import type {
   TheoreticalServiceCostRow,
   TopConsumedPartsResponse,
   TopConsumedPartsRow,
-  TopDishesResponse,
   WastageResponse,
 } from '@shared/schemas/dashboard';
-import type { OrderSource, StockMovementReason } from '@shared/constants/enums';
-import { ORDER_SOURCES } from '@shared/constants/enums';
+import type { StockMovementReason } from '@shared/constants/enums';
 import { REORDER_LEAD_TIME_DAYS } from '@shared/constants/system';
 import { toBase } from '@shared/utils/unitConverter';
 
@@ -171,66 +162,6 @@ export const DashboardService = {
     };
   },
 
-  /* --------------------------------- Tile 4 (COGS) ------------------------- */
-  cogs(db: AppDb, tenantId: number, range: DateRange): CogsResponse {
-    const movements = stockMovementRepository.listInRange(db, tenantId, range, ['sale']);
-    const orderLineIds = uniq(
-      movements
-        .filter((m) => m.referenceType === 'order_line' && m.referenceId)
-        .map((m) => m.referenceId as string),
-    );
-    const orderLines = orderLineRepository.listForOrders(db, orderLineIds);
-    const orderLineById = new Map(orderLines.map((l) => [l.id, l]));
-    const menuItems = menuItemRepository.list(db, tenantId, { includeInactive: true });
-    const menuItemById = new Map(menuItems.map((m) => [m.id, m]));
-
-    type Agg = { menuItemId: string; menuItemName: string; qtySold: number; cogs: number; revenue: number };
-    const byMenuItem = new Map<string, Agg>();
-    const seenLines = new Set<string>();
-
-    function ensure(menuItemId: string): Agg {
-      const existing = byMenuItem.get(menuItemId);
-      if (existing) return existing;
-      const item = menuItemById.get(menuItemId);
-      const created: Agg = {
-        menuItemId,
-        menuItemName: item?.name ?? '(deleted)',
-        qtySold: 0,
-        cogs: 0,
-        revenue: 0,
-      };
-      byMenuItem.set(menuItemId, created);
-      return created;
-    }
-
-    for (const m of movements) {
-      const lineId = m.referenceId;
-      if (!lineId) continue;
-      const line = orderLineById.get(lineId);
-      if (!line) continue;
-      const agg = ensure(line.menuItemId);
-      // Sale change is negative; absolute it.
-      const cost = m.costPerUnitAtTime ?? 0;
-      agg.cogs += Math.abs(m.changeQuantity) * cost;
-
-      if (!seenLines.has(line.id)) {
-        agg.qtySold += line.quantity;
-        agg.revenue += line.unitPrice * line.quantity;
-        seenLines.add(line.id);
-      }
-    }
-
-    const rows: CogsByMenuItem[] = [...byMenuItem.values()]
-      .map((r) => ({ ...r, cogs: round2(r.cogs), revenue: round2(r.revenue) }))
-      .sort((a, b) => b.cogs - a.cogs);
-
-    return {
-      totalCogs: round2(rows.reduce((acc, r) => acc + r.cogs, 0)),
-      totalRevenue: round2(rows.reduce((acc, r) => acc + r.revenue, 0)),
-      rows,
-    };
-  },
-
   /* --------------------------------- Tile 5 (Wastage) ---------------------- */
   wastage(db: AppDb, tenantId: number, range: DateRange): WastageResponse {
     const reasons: StockMovementReason[] = ['wastage', 'prep_loss', 'staff_meal'];
@@ -263,12 +194,6 @@ export const DashboardService = {
         .sort((a, b) => b.amount - a.amount)
         .slice(0, 10),
     };
-  },
-
-  /* --------------------------------- Tile 6 (Top dishes) ------------------- */
-  topDishes(db: AppDb, tenantId: number, range: DateRange, limit = 10): TopDishesResponse {
-    const cogs = DashboardService.cogs(db, tenantId, range);
-    return { rows: cogs.rows.slice(0, limit) };
   },
 
   /* --------------------------------- Tile 7 (Low stock) -------------------- */
@@ -333,82 +258,6 @@ export const DashboardService = {
         return ad - bd;
       });
     return { rows };
-  },
-
-  /* --------------------------------- Tile 9 (Food cost %) ------------------ */
-  foodCost(db: AppDb, tenantId: number): FoodCostResponse {
-    const menuItems = menuItemRepository.list(db, tenantId, { includeInactive: false });
-    const ingredients = ingredientRepository.list(db, tenantId, { includeInactive: true });
-    const ingredientById = new Map(ingredients.map((i) => [i.id, i]));
-
-    const rows = menuItems.map((mi) => {
-      const recipe = recipeRepository.findActiveVersion(db, {
-        tenantId,
-        parentId: mi.id,
-        parentType: 'menu_item',
-      });
-      let recipeCost = 0;
-      if (recipe) {
-        const lines = recipeRepository.ingredientsForVersion(db, recipe.id);
-        for (const line of lines) {
-          const ing = ingredientById.get(line.childIngredientId);
-          if (!ing) continue;
-          const baseQty = safeToBase(line.quantity, line.unit, ing.baseUnit, ing.densityGPerMl);
-          if (baseQty === null) continue;
-          recipeCost += baseQty * ing.currentAvgCostPerUnit;
-        }
-      }
-      const fcp = mi.sellingPrice > 0 ? recipeCost / mi.sellingPrice : null;
-      return {
-        menuItemId: mi.id,
-        menuItemName: mi.name,
-        sellingPrice: mi.sellingPrice,
-        recipeCost: round2(recipeCost),
-        foodCostPercent: fcp === null ? null : round4(fcp),
-      };
-    });
-    return { rows };
-  },
-
-  /* ------------------------- Tile 10 + 11 (Channel rollups) --------------- */
-  revenueByChannel(db: AppDb, tenantId: number, range: DateRange): ChannelRollupResponse {
-    const orders = orderRepository.listInRange(db, tenantId, range, 'delivered');
-    const totals = new Map<OrderSource, { revenue: number; orderCount: number }>();
-    for (const source of ORDER_SOURCES) totals.set(source, { revenue: 0, orderCount: 0 });
-    for (const o of orders) {
-      const cur = totals.get(o.source) ?? { revenue: 0, orderCount: 0 };
-      cur.revenue += o.totalAmount;
-      cur.orderCount += 1;
-      totals.set(o.source, cur);
-    }
-    return {
-      rows: ORDER_SOURCES.map((source) => ({
-        source,
-        revenue: round2(totals.get(source)!.revenue),
-        orderCount: totals.get(source)!.orderCount,
-      })),
-    };
-  },
-
-  orderVolumeByChannel(db: AppDb, tenantId: number, range: DateRange): ChannelRollupResponse {
-    // Same shape — but counts every placed order regardless of status so
-    // operators see incoming volume even if a chunk gets cancelled.
-    const orders = orderRepository.listInRange(db, tenantId, range);
-    const totals = new Map<OrderSource, { revenue: number; orderCount: number }>();
-    for (const source of ORDER_SOURCES) totals.set(source, { revenue: 0, orderCount: 0 });
-    for (const o of orders) {
-      const cur = totals.get(o.source) ?? { revenue: 0, orderCount: 0 };
-      cur.revenue += o.totalAmount;
-      cur.orderCount += 1;
-      totals.set(o.source, cur);
-    }
-    return {
-      rows: ORDER_SOURCES.map((source) => ({
-        source,
-        revenue: round2(totals.get(source)!.revenue),
-        orderCount: totals.get(source)!.orderCount,
-      })),
-    };
   },
 
   /* --------------- Hyprride Tile A — Cost per bike ------------------------ */
@@ -741,8 +590,4 @@ function uniq<T>(xs: T[]): T[] {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
-}
-
-function round4(n: number): number {
-  return Math.round(n * 10_000) / 10_000;
 }

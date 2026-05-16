@@ -30,23 +30,9 @@ export function registerDashboardHandlers(): void {
   );
 
   ipcMain.handle(
-    IPC.dashboard.cogs,
-    makeHandler(rangedQuerySchema, (input) =>
-      DashboardService.cogs(getDb().db, DEFAULT_TENANT_ID, input.range),
-    ),
-  );
-
-  ipcMain.handle(
     IPC.dashboard.wastage,
     makeHandler(rangedQuerySchema, (input) =>
       DashboardService.wastage(getDb().db, DEFAULT_TENANT_ID, input.range),
-    ),
-  );
-
-  ipcMain.handle(
-    IPC.dashboard.topDishes,
-    makeHandler(rangedQuerySchema, (input) =>
-      DashboardService.topDishes(getDb().db, DEFAULT_TENANT_ID, input.range),
     ),
   );
 
@@ -61,27 +47,6 @@ export function registerDashboardHandlers(): void {
     IPC.dashboard.reorder,
     makeHandler(rangedQuerySchema, (input) =>
       DashboardService.reorder(getDb().db, DEFAULT_TENANT_ID, input.range),
-    ),
-  );
-
-  ipcMain.handle(
-    IPC.dashboard.foodCost,
-    makeHandler(z.object({}).default({}), () =>
-      DashboardService.foodCost(getDb().db, DEFAULT_TENANT_ID),
-    ),
-  );
-
-  ipcMain.handle(
-    IPC.dashboard.revenueByChannel,
-    makeHandler(rangedQuerySchema, (input) =>
-      DashboardService.revenueByChannel(getDb().db, DEFAULT_TENANT_ID, input.range),
-    ),
-  );
-
-  ipcMain.handle(
-    IPC.dashboard.orderVolumeByChannel,
-    makeHandler(rangedQuerySchema, (input) =>
-      DashboardService.orderVolumeByChannel(getDb().db, DEFAULT_TENANT_ID, input.range),
     ),
   );
 

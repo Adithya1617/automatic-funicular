@@ -57,39 +57,6 @@ import type {
   SaveRecipeVersionInput,
 } from '@shared/schemas/recipe';
 import type {
-  ListBatchesInput,
-  ProductionBatch,
-  RecordBatchInput,
-  RecordBatchResult,
-} from '@shared/schemas/production';
-import type {
-  CreateMenuItemInput,
-  CreateVariantInput,
-  DeactivateMenuItemInput,
-  GetMenuItemInput,
-  ListMenuItemsInput,
-  MenuItem,
-  UpdateMenuItemInput,
-} from '@shared/schemas/menuItem';
-import type {
-  ListAvailabilityInput,
-  MenuItemAvailability,
-} from '@shared/schemas/availability';
-import type {
-  CancelOrderInput,
-  GetOrderInput,
-  ListOrdersInput,
-  MarkOrderInput,
-  Order,
-  OrderWithLines,
-} from '@shared/schemas/order';
-import type {
-  ListOrderingChannelsInput,
-  OrderingChannel,
-  SubmitManualOrderInput,
-} from '@shared/schemas/ordering';
-import type { OrderSource } from '@shared/constants/enums';
-import type {
   AttachPdfInput,
   CommitInvoiceInput,
   CreateInvoiceDraftInput,
@@ -120,11 +87,8 @@ import type {
   StockTakeWithLines,
 } from '@shared/schemas/stockTake';
 import type {
-  ChannelRollupResponse,
-  CogsResponse,
   CostPerBikeResponse,
   CostPerBikeTypeResponse,
-  FoodCostResponse,
   LowStockResponse,
   RangedQuery,
   ReorderResponse,
@@ -134,7 +98,6 @@ import type {
   StockValueSeriesResponse,
   TheoreticalServiceCostResponse,
   TopConsumedPartsResponse,
-  TopDishesResponse,
   WastageResponse,
 } from '@shared/schemas/dashboard';
 import type {
@@ -238,38 +201,6 @@ const api = {
     listVersions: invoke<ListRecipeVersionsInput, RecipeVersion[]>(IPC.recipe.listVersions),
     saveVersion: invoke<SaveRecipeVersionInput, RecipeWithIngredients>(IPC.recipe.saveVersion),
   },
-  production: {
-    list: invoke<ListBatchesInput, ProductionBatch[]>(IPC.production.list),
-    recordBatch: invoke<RecordBatchInput, RecordBatchResult>(IPC.production.recordBatch),
-  },
-  menuItem: {
-    list: invoke<ListMenuItemsInput, MenuItem[]>(IPC.menuItem.list),
-    get: invoke<GetMenuItemInput, MenuItem>(IPC.menuItem.get),
-    create: invoke<CreateMenuItemInput, MenuItem>(IPC.menuItem.create),
-    update: invoke<UpdateMenuItemInput, MenuItem>(IPC.menuItem.update),
-    deactivate: invoke<DeactivateMenuItemInput, MenuItem>(IPC.menuItem.deactivate),
-    createVariant: invoke<
-      CreateVariantInput,
-      { menuItem: MenuItem; recipe: RecipeWithIngredients | null }
-    >(IPC.menuItem.createVariant),
-  },
-  availability: {
-    list: invoke<ListAvailabilityInput, MenuItemAvailability[]>(IPC.availability.list),
-  },
-  order: {
-    list: invoke<ListOrdersInput, Order[]>(IPC.order.list),
-    get: invoke<GetOrderInput, OrderWithLines>(IPC.order.get),
-    submitManual: invoke<
-      SubmitManualOrderInput,
-      OrderWithLines | { queuedOn: OrderSource }
-    >(IPC.order.submitManual),
-    markPreparing: invoke<MarkOrderInput, Order>(IPC.order.markPreparing),
-    markDelivered: invoke<MarkOrderInput, OrderWithLines>(IPC.order.markDelivered),
-    cancel: invoke<CancelOrderInput, OrderWithLines>(IPC.order.cancel),
-  },
-  orderingChannel: {
-    list: invoke<ListOrderingChannelsInput, OrderingChannel[]>(IPC.orderingChannel.list),
-  },
   invoice: {
     list: invoke<ListInvoicesInput, Invoice[]>(IPC.invoice.list),
     get: invoke<GetInvoiceInput, InvoiceWithLines>(IPC.invoice.get),
@@ -300,16 +231,9 @@ const api = {
     stockValue: invoke<Record<string, never>, StockValueResponse>(IPC.dashboard.stockValue),
     stockValueSeries: invoke<RangedQuery, StockValueSeriesResponse>(IPC.dashboard.stockValueSeries),
     spending: invoke<RangedQuery, SpendingResponse>(IPC.dashboard.spending),
-    cogs: invoke<RangedQuery, CogsResponse>(IPC.dashboard.cogs),
     wastage: invoke<RangedQuery, WastageResponse>(IPC.dashboard.wastage),
-    topDishes: invoke<RangedQuery, TopDishesResponse>(IPC.dashboard.topDishes),
     lowStock: invoke<RangedQuery, LowStockResponse>(IPC.dashboard.lowStock),
     reorder: invoke<RangedQuery, ReorderResponse>(IPC.dashboard.reorder),
-    foodCost: invoke<Record<string, never>, FoodCostResponse>(IPC.dashboard.foodCost),
-    revenueByChannel: invoke<RangedQuery, ChannelRollupResponse>(IPC.dashboard.revenueByChannel),
-    orderVolumeByChannel: invoke<RangedQuery, ChannelRollupResponse>(
-      IPC.dashboard.orderVolumeByChannel,
-    ),
     costPerBike: invoke<RangedQuery, CostPerBikeResponse>(IPC.dashboard.costPerBike),
     costPerBikeType: invoke<RangedQuery, CostPerBikeTypeResponse>(
       IPC.dashboard.costPerBikeType,

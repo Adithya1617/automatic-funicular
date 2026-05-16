@@ -25,24 +25,10 @@ export function useSpending(range: DateRange) {
   });
 }
 
-export function useCogs(range: DateRange) {
-  return useQuery({
-    queryKey: ['dashboard', 'cogs', ...rangeKey(range)],
-    queryFn: () => unwrap(window.hyprride.dashboard.cogs({ range })),
-  });
-}
-
 export function useWastage(range: DateRange) {
   return useQuery({
     queryKey: ['dashboard', 'wastage', ...rangeKey(range)],
     queryFn: () => unwrap(window.hyprride.dashboard.wastage({ range })),
-  });
-}
-
-export function useTopDishes(range: DateRange) {
-  return useQuery({
-    queryKey: ['dashboard', 'topDishes', ...rangeKey(range)],
-    queryFn: () => unwrap(window.hyprride.dashboard.topDishes({ range })),
   });
 }
 
@@ -57,27 +43,6 @@ export function useReorder(range: DateRange) {
   return useQuery({
     queryKey: ['dashboard', 'reorder', ...rangeKey(range)],
     queryFn: () => unwrap(window.hyprride.dashboard.reorder({ range })),
-  });
-}
-
-export function useFoodCost() {
-  return useQuery({
-    queryKey: ['dashboard', 'foodCost'],
-    queryFn: () => unwrap(window.hyprride.dashboard.foodCost({})),
-  });
-}
-
-export function useRevenueByChannel(range: DateRange) {
-  return useQuery({
-    queryKey: ['dashboard', 'revenueByChannel', ...rangeKey(range)],
-    queryFn: () => unwrap(window.hyprride.dashboard.revenueByChannel({ range })),
-  });
-}
-
-export function useOrderVolumeByChannel(range: DateRange) {
-  return useQuery({
-    queryKey: ['dashboard', 'orderVolumeByChannel', ...rangeKey(range)],
-    queryFn: () => unwrap(window.hyprride.dashboard.orderVolumeByChannel({ range })),
   });
 }
 

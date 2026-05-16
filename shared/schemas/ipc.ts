@@ -69,32 +69,6 @@ export const IPC = {
     listVersions: 'recipe:listVersions',
     saveVersion: 'recipe:saveVersion',
   },
-  production: {
-    list: 'production:list',
-    recordBatch: 'production:recordBatch',
-  },
-  menuItem: {
-    list: 'menuItem:list',
-    get: 'menuItem:get',
-    create: 'menuItem:create',
-    update: 'menuItem:update',
-    deactivate: 'menuItem:deactivate',
-    createVariant: 'menuItem:createVariant',
-  },
-  availability: {
-    list: 'availability:list',
-  },
-  order: {
-    list: 'order:list',
-    get: 'order:get',
-    submitManual: 'order:submitManual',
-    markPreparing: 'order:markPreparing',
-    markDelivered: 'order:markDelivered',
-    cancel: 'order:cancel',
-  },
-  orderingChannel: {
-    list: 'orderingChannel:list',
-  },
   invoice: {
     list: 'invoice:list',
     get: 'invoice:get',
@@ -121,15 +95,9 @@ export const IPC = {
     stockValue: 'dashboard:stockValue',
     stockValueSeries: 'dashboard:stockValueSeries',
     spending: 'dashboard:spending',
-    cogs: 'dashboard:cogs',
     wastage: 'dashboard:wastage',
-    topDishes: 'dashboard:topDishes',
     lowStock: 'dashboard:lowStock',
     reorder: 'dashboard:reorder',
-    foodCost: 'dashboard:foodCost',
-    revenueByChannel: 'dashboard:revenueByChannel',
-    orderVolumeByChannel: 'dashboard:orderVolumeByChannel',
-    // Hyprride bike-centric tiles.
     costPerBike: 'dashboard:costPerBike',
     costPerBikeType: 'dashboard:costPerBikeType',
     topConsumedParts: 'dashboard:topConsumedParts',
