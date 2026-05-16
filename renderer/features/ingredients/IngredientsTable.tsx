@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { flexRender, getCoreRowModel, useReactTable, createColumnHelper } from '@tanstack/react-table';
 import type { Ingredient } from '@shared/schemas/ingredient';
-import { Badge } from '@renderer/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@renderer/components/ui/table';
 import { formatINR } from '@shared/utils/currency';
 import { formatRelativeTime, formatStock } from '@renderer/lib/format';
@@ -24,14 +23,6 @@ export function IngredientsTable({ rows, selectedId, onSelect }: Props) {
             <span className="font-medium text-text-primary">{cell.getValue()}</span>
             <span className="text-[10px] text-text-tertiary">{cell.row.original.category}</span>
           </div>
-        ),
-      }),
-      columnHelper.accessor('type', {
-        header: 'Type',
-        cell: (cell) => (
-          <Badge variant={cell.getValue() === 'prepared' ? 'prepared' : 'neutral'}>
-            {cell.getValue()}
-          </Badge>
         ),
       }),
       columnHelper.accessor('stockQuantity', {
@@ -100,7 +91,7 @@ export function IngredientsTable({ rows, selectedId, onSelect }: Props) {
           {rows.length === 0 ? (
             <TableRow>
               <TableCell colSpan={columns.length} className="text-center text-text-tertiary">
-                No ingredients yet — click <span className="font-medium">+ New ingredient</span> to add one.
+                No parts yet — click <span className="font-medium">+ New part</span> to add one.
               </TableCell>
             </TableRow>
           ) : null}

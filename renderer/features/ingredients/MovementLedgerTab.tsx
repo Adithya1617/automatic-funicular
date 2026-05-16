@@ -42,7 +42,7 @@ export function MovementLedgerTab({ ingredient }: { ingredient: Ingredient }) {
   if (movements.length === 0) {
     return (
       <div className="rounded-md border border-dashed border-border-tertiary bg-background-secondary px-3 py-6 text-center text-text-tertiary">
-        No movements yet · this ingredient has never been bought, sold, or counted.
+        No movements yet · this part has never been bought, used in service, or counted.
       </div>
     );
   }

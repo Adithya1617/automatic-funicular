@@ -16,30 +16,30 @@ import { IngredientDetailPanel } from '@renderer/features/ingredients/Ingredient
 import { ManualAdjustmentDialog } from '@renderer/features/ingredients/ManualAdjustmentDialog';
 import { NewIngredientDialog } from '@renderer/features/ingredients/NewIngredientDialog';
 import { ManageSuppliersDialog } from '@renderer/features/suppliers/ManageSuppliersDialog';
-import { INGREDIENT_TYPES, type IngredientType } from '@shared/constants/enums';
+import { PART_CATEGORIES } from '@shared/constants/enums';
 
-const TYPE_FILTER_VALUES = ['all', ...INGREDIENT_TYPES] as const;
-type TypeFilter = (typeof TYPE_FILTER_VALUES)[number];
+const CATEGORY_FILTER_VALUES = ['all', ...PART_CATEGORIES] as const;
+type CategoryFilter = (typeof CATEGORY_FILTER_VALUES)[number];
 
 export function IngredientsPage() {
   const [params, setParams] = useSearchParams();
   const selectedId = params.get('selected') ?? undefined;
 
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
 
   const filter = useMemo(() => {
     const f: Parameters<typeof useIngredients>[0] = { includeInactive: false };
     if (search.trim()) f.search = search.trim();
-    if (typeFilter !== 'all') f.type = typeFilter as IngredientType;
+    if (categoryFilter !== 'all') f.category = categoryFilter;
     return f;
-  }, [search, typeFilter]);
+  }, [search, categoryFilter]);
 
-  const { data: ingredients = [], isLoading } = useIngredients(filter);
+  const { data: parts = [], isLoading } = useIngredients(filter);
 
-  const selectedIngredient = useMemo(
-    () => ingredients.find((i) => i.id === selectedId),
-    [ingredients, selectedId],
+  const selectedPart = useMemo(
+    () => parts.find((p) => p.id === selectedId),
+    [parts, selectedId],
   );
 
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -57,20 +57,20 @@ export function IngredientsPage() {
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-1 items-center gap-2">
           <Input
-            placeholder="Search ingredients…"
+            placeholder="Search parts…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-[320px]"
           />
-          <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
-            <SelectTrigger className="w-[140px]">
+          <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as CategoryFilter)}>
+            <SelectTrigger className="w-[160px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Type: all</SelectItem>
-              {INGREDIENT_TYPES.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {t}
+              <SelectItem value="all">All categories</SelectItem>
+              {PART_CATEGORIES.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -89,7 +89,7 @@ export function IngredientsPage() {
             type="button"
             variant="secondary"
             size="md"
-            disabled={!selectedIngredient}
+            disabled={!selectedPart}
             onClick={() => setAdjustOpen(true)}
           >
             <Sliders className="h-3.5 w-3.5" /> Adjust stock
@@ -100,27 +100,27 @@ export function IngredientsPage() {
             size="md"
             onClick={() => setNewOpen(true)}
           >
-            <Plus className="h-3.5 w-3.5" /> New ingredient
+            <Plus className="h-3.5 w-3.5" /> New part
           </Button>
         </div>
       </div>
 
       {isLoading ? (
         <div className="rounded-lg border border-border-tertiary bg-background-primary px-4 py-6 text-text-tertiary">
-          Loading ingredients…
+          Loading parts…
         </div>
       ) : (
-        <IngredientsTable rows={ingredients} selectedId={selectedId} onSelect={handleSelect} />
+        <IngredientsTable rows={parts} selectedId={selectedId} onSelect={handleSelect} />
       )}
 
-      {selectedIngredient ? (
-        <IngredientDetailPanel ingredient={selectedIngredient} />
+      {selectedPart ? (
+        <IngredientDetailPanel ingredient={selectedPart} />
       ) : null}
 
       <ManualAdjustmentDialog
         open={adjustOpen}
         onOpenChange={setAdjustOpen}
-        ingredient={selectedIngredient ?? null}
+        ingredient={selectedPart ?? null}
       />
       <NewIngredientDialog open={newOpen} onOpenChange={setNewOpen} />
       <ManageSuppliersDialog open={suppliersOpen} onOpenChange={setSuppliersOpen} />

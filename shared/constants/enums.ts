@@ -1,6 +1,18 @@
 export const INGREDIENT_TYPES = ['raw', 'prepared'] as const;
 export type IngredientType = (typeof INGREDIENT_TYPES)[number];
 
+// Hyprride: presets shown in the "New part" / "Edit part" dialogs. Free-text
+// remains in the underlying ingredients.category column, but the editor
+// offers these to keep dashboards groupable.
+export const PART_CATEGORIES = [
+  'Oil',
+  'Brake',
+  'Filter',
+  'Tyre',
+  'Misc',
+] as const;
+export type PartCategory = (typeof PART_CATEGORIES)[number];
+
 export const BASE_UNITS = ['g', 'ml', 'each'] as const;
 export type BaseUnit = (typeof BASE_UNITS)[number];
 

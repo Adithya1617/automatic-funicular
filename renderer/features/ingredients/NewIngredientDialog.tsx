@@ -22,9 +22,10 @@ import {
 } from '@renderer/components/ui/select';
 import {
   BASE_UNITS,
-  INGREDIENT_TYPES,
+  PART_CATEGORIES,
   type BaseUnit,
   type IngredientType,
+  type PartCategory,
 } from '@shared/constants/enums';
 import { useCreateIngredient } from '@renderer/hooks/ipc/useIngredients';
 
@@ -42,12 +43,17 @@ type Props = {
 
 type FormValues = {
   name: string;
-  category: string;
-  type: IngredientType;
+  category: PartCategory;
   baseUnit: BaseUnit;
   lowStockThreshold: number;
   densityGPerMl: string; // textual, blank means null
 };
+
+function asCategory(value: string | undefined): PartCategory {
+  return (PART_CATEGORIES as readonly string[]).includes(value ?? '')
+    ? (value as PartCategory)
+    : 'Misc';
+}
 
 export function NewIngredientDialog({ open, onOpenChange, initial, onCreated }: Props) {
   const create = useCreateIngredient();
@@ -55,9 +61,8 @@ export function NewIngredientDialog({ open, onOpenChange, initial, onCreated }: 
   const { register, handleSubmit, reset, watch, setValue, formState } = useForm<FormValues>({
     defaultValues: {
       name: initial?.name ?? '',
-      category: initial?.category ?? '',
-      type: initial?.type ?? 'raw',
-      baseUnit: initial?.baseUnit ?? 'g',
+      category: asCategory(initial?.category),
+      baseUnit: initial?.baseUnit ?? 'ml',
       lowStockThreshold: 0,
       densityGPerMl: '',
     },
@@ -67,18 +72,17 @@ export function NewIngredientDialog({ open, onOpenChange, initial, onCreated }: 
     if (open) {
       reset({
         name: initial?.name ?? '',
-        category: initial?.category ?? '',
-        type: initial?.type ?? 'raw',
-        baseUnit: initial?.baseUnit ?? 'g',
+        category: asCategory(initial?.category),
+        baseUnit: initial?.baseUnit ?? 'ml',
         lowStockThreshold: 0,
         densityGPerMl: '',
       });
       setServerError(null);
     }
-  }, [open, initial?.name, initial?.category, initial?.baseUnit, initial?.type, reset]);
+  }, [open, initial?.name, initial?.category, initial?.baseUnit, reset]);
 
   const baseUnit = watch('baseUnit');
-  const type = watch('type');
+  const category = watch('category');
 
   const onSubmit = handleSubmit(async (values) => {
     setServerError(null);
@@ -86,8 +90,10 @@ export function NewIngredientDialog({ open, onOpenChange, initial, onCreated }: 
       const densityNum = values.densityGPerMl.trim() === '' ? null : Number(values.densityGPerMl);
       const created = await create.mutateAsync({
         name: values.name.trim(),
-        category: values.category.trim(),
-        type: values.type,
+        category: values.category,
+        // Bike parts are always raw purchases — the prepared/recipe pathway
+        // is restaurant-only and stays out of the Hyprride flow.
+        type: 'raw',
         baseUnit: values.baseUnit,
         lowStockThreshold: Number(values.lowStockThreshold) || 0,
         densityGPerMl: densityNum != null && Number.isFinite(densityNum) && densityNum > 0 ? densityNum : null,
@@ -96,7 +102,7 @@ export function NewIngredientDialog({ open, onOpenChange, initial, onCreated }: 
       reset();
       onOpenChange(false);
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : 'Could not save ingredient');
+      setServerError(err instanceof Error ? err.message : 'Could not save part');
     }
   });
 
@@ -104,35 +110,35 @@ export function NewIngredientDialog({ open, onOpenChange, initial, onCreated }: 
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New ingredient</DialogTitle>
+          <DialogTitle>New part</DialogTitle>
           <DialogDescription>
-            Base unit becomes immutable once any movement is recorded.
+            Base unit becomes immutable once any movement is recorded. Pick the
+            unit you'll actually invoice in (mL for oils, each for pads / filters).
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={onSubmit} className="grid gap-3">
           <div className="grid gap-1">
-            <Label htmlFor="ing-name">Name</Label>
-            <Input id="ing-name" {...register('name', { required: true, maxLength: 120 })} autoFocus />
+            <Label htmlFor="part-name">Name</Label>
+            <Input
+              id="part-name"
+              {...register('name', { required: true, maxLength: 120 })}
+              autoFocus
+              placeholder="e.g. Castrol 10W30 800ml"
+            />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="grid gap-1">
-              <Label htmlFor="ing-category">Category</Label>
-              <Input id="ing-category" {...register('category', { required: true, maxLength: 60 })} />
-            </div>
-            <div className="grid gap-1">
-              <Label>Type</Label>
-              <Select value={type} onValueChange={(v) => setValue('type', v as IngredientType)}>
+              <Label>Category</Label>
+              <Select value={category} onValueChange={(v) => setValue('category', v as PartCategory)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {INGREDIENT_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  {PART_CATEGORIES.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
             <div className="grid gap-1">
               <Label>Base unit</Label>
               <Select value={baseUnit} onValueChange={(v) => setValue('baseUnit', v as BaseUnit)}>
@@ -144,10 +150,12 @@ export function NewIngredientDialog({ open, onOpenChange, initial, onCreated }: 
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
             <div className="grid gap-1">
-              <Label htmlFor="ing-low">Low stock at</Label>
+              <Label htmlFor="part-low">Low stock at</Label>
               <Input
-                id="ing-low"
+                id="part-low"
                 type="number"
                 min={0}
                 step="any"
@@ -155,13 +163,13 @@ export function NewIngredientDialog({ open, onOpenChange, initial, onCreated }: 
               />
             </div>
             <div className="grid gap-1">
-              <Label htmlFor="ing-density">Density (g/ml)</Label>
+              <Label htmlFor="part-density">Density (g/ml)</Label>
               <Input
-                id="ing-density"
+                id="part-density"
                 type="number"
                 min={0}
                 step="any"
-                placeholder="optional"
+                placeholder="optional · oils only"
                 {...register('densityGPerMl')}
               />
             </div>
@@ -178,7 +186,7 @@ export function NewIngredientDialog({ open, onOpenChange, initial, onCreated }: 
               <Button type="button" variant="ghost" size="md">Cancel</Button>
             </DialogClose>
             <Button type="submit" variant="primary" size="md" disabled={formState.isSubmitting || create.isPending}>
-              Create ingredient
+              Create part
             </Button>
           </DialogFooter>
         </form>

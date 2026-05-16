@@ -20,7 +20,7 @@ export function App() {
         <Route index element={<DashboardPage />} />
         <Route path="orders/live" element={<LiveOrdersPage />} />
         <Route path="orders/new" element={<ManualOrderPage />} />
-        <Route path="ingredients" element={<IngredientsPage />} />
+        <Route path="parts" element={<IngredientsPage />} />
         <Route path="bikes" element={<BikesPage />} />
         <Route path="menu" element={<MenuPage />} />
         <Route path="menu/new" element={<MenuEditorPage />} />
