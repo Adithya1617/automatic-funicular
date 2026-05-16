@@ -54,6 +54,7 @@ export const IPC = {
     list: 'serviceEvent:list',
     get: 'serviceEvent:get',
     create: 'serviceEvent:create',
+    createAdHoc: 'serviceEvent:createAdHoc',
     updateLines: 'serviceEvent:updateLines',
     complete: 'serviceEvent:complete',
     cancel: 'serviceEvent:cancel',

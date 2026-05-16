@@ -6,6 +6,7 @@ import { IPC } from '@shared/schemas/ipc';
 import {
   cancelServiceEventInputSchema,
   completeServiceEventInputSchema,
+  createAdHocServiceEventInputSchema,
   createServiceEventInputSchema,
   getServiceEventInputSchema,
   listServiceEventsInputSchema,
@@ -32,6 +33,13 @@ export function registerServiceEventHandlers(): void {
     IPC.serviceEvent.create,
     makeHandler(createServiceEventInputSchema, (input) =>
       ServiceService.create(getDb().db, DEFAULT_TENANT_ID, input),
+    ),
+  );
+
+  ipcMain.handle(
+    IPC.serviceEvent.createAdHoc,
+    makeHandler(createAdHocServiceEventInputSchema, (input) =>
+      ServiceService.createAdHoc(getDb().db, DEFAULT_TENANT_ID, input),
     ),
   );
 

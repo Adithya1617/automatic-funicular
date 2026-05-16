@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   CancelServiceEventInput,
+  CreateAdHocServiceEventInput,
   CreateServiceEventInput,
   ListServiceEventsInput,
   ServiceEvent,
@@ -44,6 +45,23 @@ export function useCreateServiceEvent() {
       unwrap(window.hyprride.serviceEvent.create(input)),
     onSuccess: (created: ServiceEventWithLines) => {
       qc.invalidateQueries({ queryKey: ['serviceEvents'] });
+      qc.setQueryData(itemKey(created.id), created);
+    },
+  });
+}
+
+export function useCreateAdHocServiceEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateAdHocServiceEventInput) =>
+      unwrap(window.hyprride.serviceEvent.createAdHoc(input)),
+    onSuccess: (created: ServiceEventWithLines) => {
+      qc.invalidateQueries({ queryKey: ['serviceEvents'] });
+      // Ad-hoc create deducts stock in the same tx, so refresh part stock
+      // counts + movement timelines too.
+      qc.invalidateQueries({ queryKey: ['ingredients'] });
+      qc.invalidateQueries({ queryKey: ['stockMovements'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
       qc.setQueryData(itemKey(created.id), created);
     },
   });

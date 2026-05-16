@@ -19,8 +19,10 @@ export const serviceEventSchema = z.object({
   id: idSchema,
   tenantId: z.number().int(),
   bikeId: idSchema,
-  serviceTemplateId: idSchema,
-  serviceTemplateVersionId: idSchema,
+  // Null on ad-hoc events (operator-driven quick service); set on
+  // template-driven events with the captured version id.
+  serviceTemplateId: idSchema.nullable(),
+  serviceTemplateVersionId: idSchema.nullable(),
   status: z.enum(SERVICE_EVENT_STATUSES),
   startedAt: z.number().int(),
   completedAt: z.number().int().nullable(),
@@ -47,6 +49,31 @@ export const createServiceEventInputSchema = z.object({
   notes: z.string().max(2000).nullable().default(null),
 });
 export type CreateServiceEventInput = z.infer<typeof createServiceEventInputSchema>;
+
+/**
+ * Ad-hoc service event input — bike + a free-form list of parts the operator
+ * actually used. Used by the "Start servicing" quick flow that skips the
+ * template step. The event is created with status='completed' and stock is
+ * deducted in the same transaction.
+ */
+export const createAdHocServiceEventInputSchema = z.object({
+  bikeId: idSchema,
+  lines: z
+    .array(
+      z.object({
+        ingredientId: idSchema,
+        quantity: z.number().positive(),
+        unit: z.string().min(1),
+        notes: z.string().max(500).nullable().default(null),
+      }),
+    )
+    .min(1),
+  odometerKm: z.number().nonnegative().nullable().default(null),
+  notes: z.string().max(2000).nullable().default(null),
+});
+export type CreateAdHocServiceEventInput = z.infer<
+  typeof createAdHocServiceEventInputSchema
+>;
 
 export const serviceEventLineInputSchema = z.object({
   ingredientId: idSchema,

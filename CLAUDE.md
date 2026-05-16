@@ -41,8 +41,8 @@ disagrees with those, **this file wins**.
 | Invoice (+ PDF parsing) | `invoices` / `invoice_lines` | Owner uploads supplier bills; commits write one `purchase` movement per line. |
 | Bike type | (new in slice H4) `bike_types` | Fixed enum-style rows: `110cc Activa`, `125cc Ntorq`, `160cc Apache RTR`. |
 | Bike | (new in slice H2) `bikes` | ~40 instances. `bike_number` unique, `bike_type_id` FK, optional plate / odometer / notes. |
-| Service template | (new in slice H4) reuses RecipeVersion-style versioning per bike type | "Standard service", "Oil change", "Brake job". Versioned — edits create new version; past service events keep their snapshot. |
-| Service event | (new in slice H5) replaces `orders` | Linked to one bike + one service template version. Status: `draft → in_progress → completed`. On `completed`, deducts parts via `applyMovement`. |
+| Service template | (new in slice H4) reuses RecipeVersion-style versioning per bike type | "Standard service", "Oil change", "Brake job". Versioned — edits create new version; past service events keep their snapshot. **Optional** as of H10: the primary flow doesn't use templates. |
+| Service event | (new in slice H5, ad-hoc flow added H10) replaces `orders` | Linked to one bike. `service_template_id` / `..._version_id` are **nullable** — the primary "Start servicing" UX is ad-hoc (operator ticks parts, stock deducts in one tx via `ServiceService.createAdHoc`). Template-driven events still capture the active version at create time (Path A snapshot). Status: `in_progress → completed`, with `cancelled` as a terminal state. On `completed` (or one-shot ad-hoc create), deducts parts via `applyMovement`. |
 | Stock take | `stock_takes` | Unchanged. |
 | Dashboard | rebuilt slice H6 | Bike-centric tiles: cost per bike, cost per bike type, parts consumed, top-consumed parts, low stock, reorder suggestions, service volume by bike type, wastage, theoretical service cost per template. |
 | CSV importer | retarget slice H8 | Kinds become `parts`, `suppliers`, `bikes`, `service_templates`. |
@@ -144,6 +144,7 @@ contract. The preload bridge is now `window.hyprride` (was `window.laurans`).
 | H7 | pending | **Code deletion.** Drop `MockOnlineDeliveryAdapter`, `MockOfflinePOSAdapter`, `orderPoller`, `menuItemAvailability` cache, production batches module, old menu pages. IPC cleanup. |
 | H8 | pending | **CSV importer retargeting.** Kinds: `parts`, `suppliers`, `bikes`, `service_templates`. Drop `menu_items` / `recipes` template variants. |
 | H9 | pending | **Settings rebrand + about page.** New About copy for Hyprride. Optionally rename underlying tables (`ingredients`→`parts`, `orders`→`service_events`) via Drizzle migration if appetite; otherwise punt further. |
+| H10 | pending | **Ad-hoc "Start servicing" flow.** Migration 0012 nullable `service_events.service_template_id` / `..._version_id`; new `ServiceService.createAdHoc(bikeId, lines[])` creates + completes in one tx, deducting stock; `QuickServiceDialog` (bike picker + part checkboxes with quantity inputs) becomes the primary Services tab entry point. |
 
 ---
 

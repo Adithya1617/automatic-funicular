@@ -9,6 +9,7 @@ import { serviceTemplateRepository } from '../repositories/serviceTemplateReposi
 import { InventoryService } from './InventoryService';
 import type {
   CancelServiceEventInput,
+  CreateAdHocServiceEventInput,
   CreateServiceEventInput,
   ListServiceEventsInput,
   ServiceEvent,
@@ -127,6 +128,91 @@ export const ServiceService = {
           displayOrder: row.displayOrder || idx,
         })),
       );
+
+      return {
+        ...(event as unknown as ServiceEvent),
+        lines: lines as unknown as ServiceEventLine[],
+      };
+    });
+  },
+
+  /**
+   * One-shot "Start servicing" flow — create + complete in the same
+   * transaction. No template captured; lines come straight from the operator's
+   * checkbox selection. Stock is deducted via InventoryService.applyMovement
+   * per line; if any line fails (insufficient stock, bad unit) the whole
+   * thing rolls back and nothing is recorded.
+   */
+  createAdHoc(
+    db: AppDb,
+    tenantId: number,
+    input: CreateAdHocServiceEventInput,
+    actorId: string = SYSTEM_USER_ID,
+  ): ServiceEventWithLines {
+    const bike = bikeRepository.findById(db, tenantId, input.bikeId);
+    if (!bike) throw new NotFoundError('Bike', input.bikeId);
+
+    // Validate every line up-front so we don't half-write an event then fail
+    // on the third applyMovement call.
+    for (const line of input.lines) {
+      const ing = ingredientRepository.findById(db, tenantId, line.ingredientId);
+      if (!ing) throw new NotFoundError('Ingredient', line.ingredientId);
+      toBase(line.quantity, line.unit, ing.baseUnit, {
+        densityGPerMl: ing.densityGPerMl ?? undefined,
+      });
+    }
+
+    return db.transaction((tx) => {
+      const now = Date.now();
+      const event = serviceEventRepository.insert(tx, {
+        id: newId(),
+        tenantId,
+        bikeId: input.bikeId,
+        serviceTemplateId: null,
+        serviceTemplateVersionId: null,
+        status: 'completed',
+        startedAt: now,
+        completedAt: now,
+        cancelledAt: null,
+        cancelledPartsUsed: null,
+        odometerKm: input.odometerKm ?? null,
+        notes: input.notes,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: actorId,
+        updatedBy: actorId,
+      });
+
+      const lines = serviceEventLineRepository.insertMany(
+        tx,
+        input.lines.map((line, idx) => ({
+          id: newId(),
+          serviceEventId: event.id,
+          ingredientId: line.ingredientId,
+          quantity: line.quantity,
+          unit: line.unit,
+          notes: line.notes ?? null,
+          displayOrder: idx,
+        })),
+      );
+
+      for (const line of lines) {
+        InventoryService.applyMovement(
+          tx,
+          tenantId,
+          {
+            ingredientId: line.ingredientId,
+            quantity: line.quantity,
+            unit: line.unit,
+            reason: 'service_consumed',
+            referenceType: 'service_event_line',
+            referenceId: line.id,
+            direction: -1,
+          },
+          actorId,
+          { skipAvailabilityRecompute: true },
+        );
+      }
 
       return {
         ...(event as unknown as ServiceEvent),

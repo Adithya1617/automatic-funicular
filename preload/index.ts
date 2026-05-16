@@ -37,6 +37,7 @@ import type {
 import type {
   CancelServiceEventInput,
   CompleteServiceEventInput,
+  CreateAdHocServiceEventInput,
   CreateServiceEventInput,
   GetServiceEventInput,
   ListServiceEventsInput,
@@ -179,6 +180,9 @@ const api = {
     list: invoke<ListServiceEventsInput, ServiceEvent[]>(IPC.serviceEvent.list),
     get: invoke<GetServiceEventInput, ServiceEventWithLines>(IPC.serviceEvent.get),
     create: invoke<CreateServiceEventInput, ServiceEventWithLines>(IPC.serviceEvent.create),
+    createAdHoc: invoke<CreateAdHocServiceEventInput, ServiceEventWithLines>(
+      IPC.serviceEvent.createAdHoc,
+    ),
     updateLines: invoke<UpdateServiceEventLinesInput, ServiceEventWithLines>(
       IPC.serviceEvent.updateLines,
     ),

@@ -300,6 +300,168 @@ describe('ServiceService.create — start a service event', () => {
   });
 });
 
+// --- createAdHoc ----------------------------------------------------------
+
+describe('ServiceService.createAdHoc — quick "Start servicing" flow', () => {
+  it('throws NotFoundError when the bike does not exist', () => {
+    vi.spyOn(bikeRepository, 'findById').mockReturnValue(undefined);
+    expect(() =>
+      ServiceService.createAdHoc(makeFakeDb() as never, DEFAULT_TENANT_ID, {
+        bikeId: BIKE_ID,
+        lines: [{ ingredientId: PART_OIL, quantity: 800, unit: 'ml', notes: null }],
+        odometerKm: null,
+        notes: null,
+      }),
+    ).toThrow(NotFoundError);
+  });
+
+  it('throws NotFoundError when a referenced part does not exist', () => {
+    vi.spyOn(bikeRepository, 'findById').mockReturnValue(bike());
+    vi.spyOn(ingredientRepository, 'findById').mockReturnValue(undefined);
+    expect(() =>
+      ServiceService.createAdHoc(makeFakeDb() as never, DEFAULT_TENANT_ID, {
+        bikeId: BIKE_ID,
+        lines: [{ ingredientId: PART_OIL, quantity: 800, unit: 'ml', notes: null }],
+        odometerKm: null,
+        notes: null,
+      }),
+    ).toThrow(NotFoundError);
+  });
+
+  it("throws ValidationError when a line's unit cannot convert to the part's base unit", () => {
+    vi.spyOn(bikeRepository, 'findById').mockReturnValue(bike());
+    vi.spyOn(ingredientRepository, 'findById').mockReturnValue(
+      ingredient({ id: PART_BRAKE_PAD, name: 'Brake pad', baseUnit: 'each' }),
+    );
+    expect(() =>
+      ServiceService.createAdHoc(makeFakeDb() as never, DEFAULT_TENANT_ID, {
+        bikeId: BIKE_ID,
+        // brake pads are 'each' — ml doesn't convert.
+        lines: [
+          { ingredientId: PART_BRAKE_PAD, quantity: 100, unit: 'ml', notes: null },
+        ],
+        odometerKm: null,
+        notes: null,
+      }),
+    ).toThrow(ValidationError);
+  });
+
+  it('inserts an event with status=completed and null template fields, plus one line per input', () => {
+    const db = makeFakeDb();
+    vi.spyOn(bikeRepository, 'findById').mockReturnValue(bike());
+    vi.spyOn(ingredientRepository, 'findById').mockImplementation((_db, _t, id) => {
+      if (id === PART_OIL) return ingredient({ id: PART_OIL, baseUnit: 'ml' });
+      if (id === PART_BRAKE_PAD)
+        return ingredient({ id: PART_BRAKE_PAD, baseUnit: 'each' });
+      return undefined;
+    });
+    const insertEvent = vi
+      .spyOn(serviceEventRepository, 'insert')
+      .mockImplementation((_db, row) => row as ServiceEventRow);
+    const insertLines = vi
+      .spyOn(serviceEventLineRepository, 'insertMany')
+      .mockImplementation((_db, rows) => rows as ServiceEventLineRow[]);
+
+    const result = ServiceService.createAdHoc(db as never, DEFAULT_TENANT_ID, {
+      bikeId: BIKE_ID,
+      lines: [
+        { ingredientId: PART_OIL, quantity: 800, unit: 'ml', notes: null },
+        { ingredientId: PART_BRAKE_PAD, quantity: 2, unit: 'each', notes: null },
+      ],
+      odometerKm: 1500,
+      notes: null,
+    });
+
+    const inserted = insertEvent.mock.calls[0]![1] as ServiceEventRow;
+    expect(inserted.status).toBe('completed');
+    expect(inserted.serviceTemplateId).toBeNull();
+    expect(inserted.serviceTemplateVersionId).toBeNull();
+    expect(inserted.completedAt).not.toBeNull();
+    expect(inserted.odometerKm).toBe(1500);
+
+    const lines = insertLines.mock.calls[0]![1] as ServiceEventLineRow[];
+    expect(lines).toHaveLength(2);
+    expect(lines[0]!.ingredientId).toBe(PART_OIL);
+    expect(lines[1]!.ingredientId).toBe(PART_BRAKE_PAD);
+    expect(result.lines).toHaveLength(2);
+  });
+
+  it('calls applyMovement per line with direction=-1 and reason=service_consumed', () => {
+    const db = makeFakeDb();
+    vi.spyOn(bikeRepository, 'findById').mockReturnValue(bike());
+    vi.spyOn(ingredientRepository, 'findById').mockReturnValue(
+      ingredient({ id: PART_OIL, baseUnit: 'ml' }),
+    );
+    vi.spyOn(serviceEventRepository, 'insert').mockImplementation(
+      (_db, row) => row as ServiceEventRow,
+    );
+    vi.spyOn(serviceEventLineRepository, 'insertMany').mockImplementation(
+      (_db, rows) => rows as ServiceEventLineRow[],
+    );
+
+    ServiceService.createAdHoc(db as never, DEFAULT_TENANT_ID, {
+      bikeId: BIKE_ID,
+      lines: [{ ingredientId: PART_OIL, quantity: 800, unit: 'ml', notes: null }],
+      odometerKm: null,
+      notes: null,
+    });
+
+    expect(InventoryService.applyMovement).toHaveBeenCalledTimes(1);
+    const callInput = (InventoryService.applyMovement as never as { mock: { calls: unknown[][] } })
+      .mock.calls[0]![2] as {
+      direction: number;
+      reason: string;
+      referenceType: string;
+      ingredientId: string;
+      quantity: number;
+    };
+    expect(callInput.direction).toBe(-1);
+    expect(callInput.reason).toBe('service_consumed');
+    expect(callInput.referenceType).toBe('service_event_line');
+    expect(callInput.ingredientId).toBe(PART_OIL);
+    expect(callInput.quantity).toBe(800);
+  });
+
+  it('rolls back the whole create when applyMovement throws on a later line (atomic)', () => {
+    const db = makeFakeDb();
+    vi.spyOn(bikeRepository, 'findById').mockReturnValue(bike());
+    vi.spyOn(ingredientRepository, 'findById').mockImplementation((_db, _t, id) => {
+      if (id === PART_OIL) return ingredient({ id: PART_OIL, baseUnit: 'ml' });
+      if (id === PART_BRAKE_PAD)
+        return ingredient({ id: PART_BRAKE_PAD, baseUnit: 'each' });
+      return undefined;
+    });
+    vi.spyOn(serviceEventRepository, 'insert').mockImplementation(
+      (_db, row) => row as ServiceEventRow,
+    );
+    vi.spyOn(serviceEventLineRepository, 'insertMany').mockImplementation(
+      (_db, rows) => rows as ServiceEventLineRow[],
+    );
+    // First call passes, second blows up — caller should see the throw and
+    // (in real db) the surrounding tx rolls back.
+    let call = 0;
+    (InventoryService.applyMovement as never as { mockImplementation: (fn: () => unknown) => unknown }).mockImplementation(
+      () => {
+        call += 1;
+        if (call === 2) throw new InvariantViolationError('insufficient stock');
+        return { movement: {} as never, newStockQuantity: 0 };
+      },
+    );
+
+    expect(() =>
+      ServiceService.createAdHoc(db as never, DEFAULT_TENANT_ID, {
+        bikeId: BIKE_ID,
+        lines: [
+          { ingredientId: PART_OIL, quantity: 800, unit: 'ml', notes: null },
+          { ingredientId: PART_BRAKE_PAD, quantity: 2, unit: 'each', notes: null },
+        ],
+        odometerKm: null,
+        notes: null,
+      }),
+    ).toThrow(InvariantViolationError);
+  });
+});
+
 // --- updateLines ----------------------------------------------------------
 
 describe('ServiceService.updateLines — editable while in_progress', () => {

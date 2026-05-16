@@ -21,9 +21,10 @@ import { Badge } from '@renderer/components/ui/badge';
 import { useServiceEvents } from '@renderer/hooks/ipc/useServiceEvents';
 import { useBikes } from '@renderer/hooks/ipc/useBikes';
 import { useServiceTemplates } from '@renderer/hooks/ipc/useServiceTemplates';
+import { useIngredients } from '@renderer/hooks/ipc/useIngredients';
 import { formatRelativeTime } from '@renderer/lib/format';
 import { SERVICE_EVENT_STATUSES, type ServiceEventStatus } from '@shared/schemas/serviceEvent';
-import { NewServiceEventDialog } from '@renderer/features/services/NewServiceEventDialog';
+import { QuickServiceDialog } from '@renderer/features/services/QuickServiceDialog';
 
 const STATUS_FILTER_VALUES = ['all', ...SERVICE_EVENT_STATUSES] as const;
 type StatusFilter = (typeof STATUS_FILTER_VALUES)[number];
@@ -42,6 +43,7 @@ export function ServicesPage() {
   const { data: events = [], isLoading } = useServiceEvents(filter);
   const { data: bikes = [] } = useBikes({ includeInactive: true });
   const { data: templates = [] } = useServiceTemplates({ includeInactive: true });
+  const { data: parts = [] } = useIngredients({ includeInactive: false });
 
   const bikeById = useMemo(() => new Map(bikes.map((b) => [b.id, b])), [bikes]);
   const templateById = useMemo(
@@ -49,7 +51,9 @@ export function ServicesPage() {
     [templates],
   );
 
-  const canStart = bikes.some((b) => b.isActive) && templates.some((t) => t.isActive);
+  // Quick service only needs a bike + at least one part. Templates are
+  // optional; they're only used by the legacy template-driven path.
+  const canStart = bikes.some((b) => b.isActive) && parts.some((p) => p.isActive);
 
   return (
     <div className="flex flex-col gap-4">
@@ -76,13 +80,13 @@ export function ServicesPage() {
           onClick={() => setDialogOpen(true)}
           disabled={!canStart}
         >
-          <Plus className="h-3.5 w-3.5" /> Start service
+          <Plus className="h-3.5 w-3.5" /> Start servicing
         </Button>
       </div>
 
       {!canStart ? (
         <div className="rounded-lg border border-dashed border-border-tertiary bg-background-secondary px-4 py-3 text-[12px] text-text-tertiary">
-          Add at least one active bike and one active service template before starting a service.
+          Add at least one active bike and one active part before starting a service.
         </div>
       ) : null}
 
@@ -106,7 +110,7 @@ export function ServicesPage() {
               {events.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-text-tertiary">
-                    No service events yet — click <span className="font-medium">+ Start service</span> to record one.
+                    No service events yet — click <span className="font-medium">+ Start servicing</span> to record one.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -123,7 +127,9 @@ export function ServicesPage() {
                     </TableCell>
                     <TableCell>
                       <span className="text-text-secondary">
-                        {templateById.get(e.serviceTemplateId)?.name ?? '—'}
+                        {e.serviceTemplateId
+                          ? templateById.get(e.serviceTemplateId)?.name ?? '—'
+                          : 'Quick service'}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -145,7 +151,7 @@ export function ServicesPage() {
         </div>
       )}
 
-      <NewServiceEventDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <QuickServiceDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   );
 }

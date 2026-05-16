@@ -216,7 +216,8 @@ export function ServiceEventEditorPage() {
           </Link>
           <span className="text-text-tertiary">/</span>
           <span className="text-text-primary">
-            {bike?.bikeNumber ?? '…'} · {template?.name ?? '…'}
+            {bike?.bikeNumber ?? '…'} ·{' '}
+            {event.serviceTemplateId ? template?.name ?? '…' : 'Quick service'}
           </span>
           <StatusBadge status={event.status} />
         </div>
@@ -269,7 +270,14 @@ export function ServiceEventEditorPage() {
         <h2 className="mb-3 text-[13px] font-medium text-text-primary">Details</h2>
         <div className="grid grid-cols-4 gap-3 text-[12px]">
           <Detail label="Bike" value={bike?.bikeNumber ?? '—'} />
-          <Detail label="Template" value={template?.name ?? '—'} />
+          <Detail
+            label="Template"
+            value={
+              event.serviceTemplateId
+                ? template?.name ?? '—'
+                : 'Quick service (ad-hoc)'
+            }
+          />
           <Detail
             label="Odometer"
             value={event.odometerKm != null ? `${event.odometerKm.toLocaleString('en-IN')} km` : '—'}

@@ -559,14 +559,15 @@ export const serviceEvents = sqliteTable(
     bikeId: text('bike_id')
       .notNull()
       .references(() => bikes.id),
-    serviceTemplateId: text('service_template_id')
-      .notNull()
-      .references(() => serviceTemplates.id),
-    // Captured at create time — completion always walks this version even if
-    // the template has been edited since.
-    serviceTemplateVersionId: text('service_template_version_id')
-      .notNull()
-      .references(() => recipeVersions.id),
+    // Nullable since the ad-hoc flow (operator picks a bike + ticks parts)
+    // doesn't go through a template. Template-driven events still capture the
+    // active recipe version at create time for snapshot semantics.
+    serviceTemplateId: text('service_template_id').references(
+      () => serviceTemplates.id,
+    ),
+    serviceTemplateVersionId: text('service_template_version_id').references(
+      () => recipeVersions.id,
+    ),
     status: text('status', {
       enum: ['in_progress', 'completed', 'cancelled'],
     })
