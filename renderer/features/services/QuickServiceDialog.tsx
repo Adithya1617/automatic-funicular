@@ -163,8 +163,9 @@ export function QuickServiceDialog({ open, onOpenChange }: Props) {
                     const t = bikeTypeById.get(b.bikeTypeId);
                     return (
                       <SelectItem key={b.id} value={b.id}>
-                        {b.bikeNumber}
+                        #{b.bikeNumber}
                         {t ? ` · ${formatBikeTypeLabel(t)}` : ''}
+                        {b.licensePlate ? ` · ${b.licensePlate}` : ''}
                       </SelectItem>
                     );
                   })}
