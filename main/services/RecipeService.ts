@@ -3,6 +3,7 @@ import { newId } from '../lib/ids';
 import { ingredientRepository } from '../repositories/ingredientRepository';
 import { menuItemRepository } from '../repositories/menuItemRepository';
 import { recipeRepository } from '../repositories/recipeRepository';
+import { serviceTemplateRepository } from '../repositories/serviceTemplateRepository';
 import { AvailabilityService } from './AvailabilityService';
 import type {
   RecipeWithIngredients,
@@ -78,6 +79,10 @@ export const RecipeService = {
       const menuItem = menuItemRepository.findById(db, tenantId, input.parentId);
       if (!menuItem) throw new NotFoundError('MenuItem', input.parentId);
       parentName = menuItem.name;
+    } else if (input.parentType === 'service_template') {
+      const template = serviceTemplateRepository.findById(db, tenantId, input.parentId);
+      if (!template) throw new NotFoundError('ServiceTemplate', input.parentId);
+      parentName = template.name;
     } else {
       const ingredient = ingredientRepository.findById(db, tenantId, input.parentId);
       if (!ingredient) throw new NotFoundError('Ingredient', input.parentId);
@@ -170,7 +175,7 @@ export const RecipeService = {
     // reads inside the recompute see the new rows.
     if (input.parentType === 'menu_item') {
       AvailabilityService.recomputeForMenuItem(db, tenantId, input.parentId);
-    } else {
+    } else if (input.parentType === 'ingredient') {
       // Editing a prepared ingredient's recipe affects every menu using it
       // (the recipe rows changed but stock didn't — still need to refresh
       // the cache because the ingredient's "qty per serving" path is now
@@ -178,6 +183,8 @@ export const RecipeService = {
       // recompute menus that depend on this prepared ingredient.)
       AvailabilityService.recomputeForIngredients(db, tenantId, [input.parentId]);
     }
+    // service_template: no availability cache to bust — service events compute
+    // feasibility on demand from the active template.
 
     return result;
   },

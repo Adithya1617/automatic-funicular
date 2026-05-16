@@ -4,6 +4,7 @@ import { AvailabilityService } from '../../main/services/AvailabilityService';
 import { ingredientRepository } from '../../main/repositories/ingredientRepository';
 import { menuItemRepository } from '../../main/repositories/menuItemRepository';
 import { recipeRepository } from '../../main/repositories/recipeRepository';
+import { serviceTemplateRepository } from '../../main/repositories/serviceTemplateRepository';
 import { DEFAULT_TENANT_ID, SYSTEM_USER_ID } from '@shared/constants/system';
 import { ConflictError, NotFoundError, ValidationError } from '@shared/errors/DomainError';
 import type { IngredientRow, RecipeIngredientRow, RecipeVersionRow } from '../../main/db/schema';
@@ -298,5 +299,68 @@ describe('RecipeService.walkBoM', () => {
     expect(tree[1]!.type).toBe('prepared');
     expect(tree[1]!.children).toHaveLength(1);
     expect(tree[1]!.children[0]!.ingredientId).toBe(RAW_A);
+  });
+});
+
+describe('RecipeService.saveVersion — service_template parent (Hyprride)', () => {
+  it('resolves the parent via serviceTemplateRepository and skips availability recompute', () => {
+    const db = makeFakeDb();
+    const tplId = '01900000-0000-7000-8000-0000000000d1';
+    vi.spyOn(serviceTemplateRepository, 'findById').mockReturnValue({
+      id: tplId,
+      tenantId: DEFAULT_TENANT_ID,
+      name: 'Standard service',
+      bikeTypeId: '01900000-0000-7000-8000-0000000000a1',
+      displayOrder: 0,
+      isActive: true,
+      createdAt: 0,
+      updatedAt: 0,
+      createdBy: SYSTEM_USER_ID,
+      updatedBy: SYSTEM_USER_ID,
+    });
+    vi.spyOn(ingredientRepository, 'findById').mockImplementation((_db, _tid, id) => {
+      if (id === RAW_A) return ing({ id: RAW_A, type: 'raw', baseUnit: 'ml' });
+      return undefined;
+    });
+    vi.spyOn(recipeRepository, 'findActiveVersion').mockReturnValue(undefined);
+    vi.spyOn(recipeRepository, 'ingredientsForVersion').mockReturnValue([]);
+    vi.spyOn(recipeRepository, 'clearCurrentFlag').mockImplementation(() => undefined);
+    vi.spyOn(recipeRepository, 'nextVersionNumber').mockReturnValue(1);
+    vi.spyOn(recipeRepository, 'insertVersion').mockImplementation((_db, row) =>
+      ({ ...row, isCurrent: true }) as RecipeVersionRow,
+    );
+    vi.spyOn(recipeRepository, 'insertIngredients').mockImplementation((_db, rows) => rows as RecipeIngredientRow[]);
+
+    const result = RecipeService.saveVersion(db as never, DEFAULT_TENANT_ID, {
+      parentId: tplId,
+      parentType: 'service_template',
+      targetYield: 1,
+      notes: null,
+      rows: [
+        { childIngredientId: RAW_A, quantity: 800, unit: 'ml', notes: null, displayOrder: 0 },
+      ],
+    });
+
+    expect(result.parentType).toBe('service_template');
+    // Service templates have no availability cache — neither recompute should fire.
+    expect(AvailabilityService.recomputeForMenuItem).not.toHaveBeenCalled();
+    expect(AvailabilityService.recomputeForIngredients).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFoundError when the service_template parent does not exist', () => {
+    const db = makeFakeDb();
+    vi.spyOn(serviceTemplateRepository, 'findById').mockReturnValue(undefined);
+
+    expect(() =>
+      RecipeService.saveVersion(db as never, DEFAULT_TENANT_ID, {
+        parentId: '01900000-0000-7000-8000-0000000000d9',
+        parentType: 'service_template',
+        targetYield: 1,
+        notes: null,
+        rows: [
+          { childIngredientId: RAW_A, quantity: 1, unit: 'ml', notes: null, displayOrder: 0 },
+        ],
+      }),
+    ).toThrow(NotFoundError);
   });
 });

@@ -121,7 +121,9 @@ export const recipeVersions = sqliteTable(
     id: text('id').primaryKey(),
     tenantId: integer('tenant_id').notNull(),
     parentId: text('parent_id').notNull(),
-    parentType: text('parent_type', { enum: ['menu_item', 'ingredient'] }).notNull(),
+    parentType: text('parent_type', {
+      enum: ['menu_item', 'ingredient', 'service_template'],
+    }).notNull(),
     versionNumber: integer('version_number').notNull(),
     isCurrent: integer('is_current', { mode: 'boolean' }).notNull().default(false),
     targetYield: real('target_yield').notNull().default(1),
@@ -504,3 +506,35 @@ export type BikeTypeRow = typeof bikeTypes.$inferSelect;
 export type BikeTypeInsert = typeof bikeTypes.$inferInsert;
 export type BikeRow = typeof bikes.$inferSelect;
 export type BikeInsert = typeof bikes.$inferInsert;
+
+// Service templates — one per bike-type / service-name combo (e.g.
+// "110cc Activa · Standard service"). Versioned via the existing
+// recipe_versions table with parent_type='service_template'.
+export const serviceTemplates = sqliteTable(
+  'service_templates',
+  {
+    id: text('id').primaryKey(),
+    tenantId: integer('tenant_id').notNull(),
+    name: text('name').notNull(),
+    bikeTypeId: text('bike_type_id')
+      .notNull()
+      .references(() => bikeTypes.id),
+    displayOrder: integer('display_order').notNull().default(0),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    ...audit,
+  },
+  (t) => ({
+    tenantBikeTypeIdx: index('idx_service_templates_tenant_bike_type').on(
+      t.tenantId,
+      t.bikeTypeId,
+    ),
+    tenantNameIdx: index('idx_service_templates_tenant_name').on(t.tenantId, t.name),
+    tenantActiveIdx: index('idx_service_templates_tenant_active').on(
+      t.tenantId,
+      t.isActive,
+    ),
+  }),
+);
+
+export type ServiceTemplateRow = typeof serviceTemplates.$inferSelect;
+export type ServiceTemplateInsert = typeof serviceTemplates.$inferInsert;

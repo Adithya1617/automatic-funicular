@@ -27,6 +27,14 @@ import type {
   UpdateBikeInput,
 } from '@shared/schemas/bike';
 import type {
+  CreateServiceTemplateInput,
+  DeactivateServiceTemplateInput,
+  GetServiceTemplateInput,
+  ListServiceTemplatesInput,
+  ServiceTemplate,
+  UpdateServiceTemplateInput,
+} from '@shared/schemas/serviceTemplate';
+import type {
   ListStockMovementsInput,
   StockMovement,
 } from '@shared/schemas/stockMovement';
@@ -179,6 +187,15 @@ const api = {
     update: invoke<UpdateBikeInput, Bike>(IPC.bike.update),
     deactivate: invoke<DeactivateBikeInput, Bike>(IPC.bike.deactivate),
     listTypes: invoke<ListBikeTypesInput, BikeType[]>(IPC.bike.listTypes),
+  },
+  serviceTemplate: {
+    list: invoke<ListServiceTemplatesInput, ServiceTemplate[]>(IPC.serviceTemplate.list),
+    get: invoke<GetServiceTemplateInput, ServiceTemplate>(IPC.serviceTemplate.get),
+    create: invoke<CreateServiceTemplateInput, ServiceTemplate>(IPC.serviceTemplate.create),
+    update: invoke<UpdateServiceTemplateInput, ServiceTemplate>(IPC.serviceTemplate.update),
+    deactivate: invoke<DeactivateServiceTemplateInput, ServiceTemplate>(
+      IPC.serviceTemplate.deactivate,
+    ),
   },
   stockMovement: {
     list: invoke<ListStockMovementsInput, StockMovement[]>(IPC.stockMovement.list),

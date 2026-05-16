@@ -43,6 +43,13 @@ export const IPC = {
     deactivate: 'bike:deactivate',
     listTypes: 'bike:listTypes',
   },
+  serviceTemplate: {
+    list: 'serviceTemplate:list',
+    get: 'serviceTemplate:get',
+    create: 'serviceTemplate:create',
+    update: 'serviceTemplate:update',
+    deactivate: 'serviceTemplate:deactivate',
+  },
   stockMovement: {
     list: 'stockMovement:list',
   },
