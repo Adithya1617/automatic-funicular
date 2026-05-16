@@ -129,6 +129,12 @@ export const IPC = {
     foodCost: 'dashboard:foodCost',
     revenueByChannel: 'dashboard:revenueByChannel',
     orderVolumeByChannel: 'dashboard:orderVolumeByChannel',
+    // Hyprride bike-centric tiles.
+    costPerBike: 'dashboard:costPerBike',
+    costPerBikeType: 'dashboard:costPerBikeType',
+    topConsumedParts: 'dashboard:topConsumedParts',
+    serviceVolumeByBikeType: 'dashboard:serviceVolumeByBikeType',
+    theoreticalServiceCost: 'dashboard:theoreticalServiceCost',
   },
   report: {
     exportCsv: 'report:exportCsv',

@@ -84,4 +84,44 @@ export function registerDashboardHandlers(): void {
       DashboardService.orderVolumeByChannel(getDb().db, DEFAULT_TENANT_ID, input.range),
     ),
   );
+
+  // Hyprride bike-centric tiles.
+  ipcMain.handle(
+    IPC.dashboard.costPerBike,
+    makeHandler(rangedQuerySchema, (input) =>
+      DashboardService.costPerBike(getDb().db, DEFAULT_TENANT_ID, input.range),
+    ),
+  );
+
+  ipcMain.handle(
+    IPC.dashboard.costPerBikeType,
+    makeHandler(rangedQuerySchema, (input) =>
+      DashboardService.costPerBikeType(getDb().db, DEFAULT_TENANT_ID, input.range),
+    ),
+  );
+
+  ipcMain.handle(
+    IPC.dashboard.topConsumedParts,
+    makeHandler(rangedQuerySchema, (input) =>
+      DashboardService.topConsumedParts(getDb().db, DEFAULT_TENANT_ID, input.range),
+    ),
+  );
+
+  ipcMain.handle(
+    IPC.dashboard.serviceVolumeByBikeType,
+    makeHandler(rangedQuerySchema, (input) =>
+      DashboardService.serviceVolumeByBikeType(
+        getDb().db,
+        DEFAULT_TENANT_ID,
+        input.range,
+      ),
+    ),
+  );
+
+  ipcMain.handle(
+    IPC.dashboard.theoreticalServiceCost,
+    makeHandler(z.object({}).default({}), () =>
+      DashboardService.theoreticalServiceCost(getDb().db, DEFAULT_TENANT_ID),
+    ),
+  );
 }

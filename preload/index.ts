@@ -122,13 +122,18 @@ import type {
 import type {
   ChannelRollupResponse,
   CogsResponse,
+  CostPerBikeResponse,
+  CostPerBikeTypeResponse,
   FoodCostResponse,
   LowStockResponse,
   RangedQuery,
   ReorderResponse,
+  ServiceVolumeResponse,
   SpendingResponse,
   StockValueResponse,
   StockValueSeriesResponse,
+  TheoreticalServiceCostResponse,
+  TopConsumedPartsResponse,
   TopDishesResponse,
   WastageResponse,
 } from '@shared/schemas/dashboard';
@@ -304,6 +309,19 @@ const api = {
     revenueByChannel: invoke<RangedQuery, ChannelRollupResponse>(IPC.dashboard.revenueByChannel),
     orderVolumeByChannel: invoke<RangedQuery, ChannelRollupResponse>(
       IPC.dashboard.orderVolumeByChannel,
+    ),
+    costPerBike: invoke<RangedQuery, CostPerBikeResponse>(IPC.dashboard.costPerBike),
+    costPerBikeType: invoke<RangedQuery, CostPerBikeTypeResponse>(
+      IPC.dashboard.costPerBikeType,
+    ),
+    topConsumedParts: invoke<RangedQuery, TopConsumedPartsResponse>(
+      IPC.dashboard.topConsumedParts,
+    ),
+    serviceVolumeByBikeType: invoke<RangedQuery, ServiceVolumeResponse>(
+      IPC.dashboard.serviceVolumeByBikeType,
+    ),
+    theoreticalServiceCost: invoke<Record<string, never>, TheoreticalServiceCostResponse>(
+      IPC.dashboard.theoreticalServiceCost,
     ),
   },
   report: {

@@ -7,16 +7,18 @@ import {
 import { DateRangePicker } from '@renderer/features/dashboard/DateRangePicker';
 import { StockValueTile } from '@renderer/features/dashboard/StockValueTile';
 import {
-  ChannelRevenueTile,
-  ChannelVolumeTile,
-  CogsTile,
-  FoodCostTile,
   LowStockTile,
   ReorderTile,
   SpendingTile,
-  TopDishesTile,
   WastageTile,
 } from '@renderer/features/dashboard/SimpleTiles';
+import {
+  CostPerBikeTile,
+  CostPerBikeTypeTile,
+  ServiceVolumeTile,
+  TheoreticalServiceCostTile,
+  TopConsumedPartsTile,
+} from '@renderer/features/dashboard/BikeTiles';
 import { ExportButtons } from '@renderer/features/dashboard/ExportButtons';
 import type { DateRange } from '@shared/schemas/dashboard';
 
@@ -59,14 +61,14 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         <StockValueTile range={range} />
         <SpendingTile range={range} />
-        <CogsTile range={range} />
         <WastageTile range={range} />
-        <TopDishesTile range={range} />
-        <FoodCostTile />
+        <CostPerBikeTile range={range} />
+        <CostPerBikeTypeTile range={range} />
+        <TopConsumedPartsTile range={range} />
+        <ServiceVolumeTile range={range} />
+        <TheoreticalServiceCostTile />
         <LowStockTile range={range} />
         <ReorderTile range={range} />
-        <ChannelRevenueTile range={range} />
-        <ChannelVolumeTile range={range} />
       </div>
 
       {compareRange ? <CompareSection range={compareRange} /> : null}
@@ -84,10 +86,9 @@ function CompareSection({ range }: { range: DateRange }) {
       </h2>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         <SpendingTile range={range} />
-        <CogsTile range={range} />
-        <ChannelRevenueTile range={range} />
+        <CostPerBikeTile range={range} />
+        <ServiceVolumeTile range={range} />
       </div>
     </div>
   );
 }
-

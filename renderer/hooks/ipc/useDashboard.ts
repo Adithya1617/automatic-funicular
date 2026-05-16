@@ -80,3 +80,40 @@ export function useOrderVolumeByChannel(range: DateRange) {
     queryFn: () => unwrap(window.hyprride.dashboard.orderVolumeByChannel({ range })),
   });
 }
+
+// Hyprride bike-centric tiles.
+export function useCostPerBike(range: DateRange) {
+  return useQuery({
+    queryKey: ['dashboard', 'costPerBike', ...rangeKey(range)],
+    queryFn: () => unwrap(window.hyprride.dashboard.costPerBike({ range })),
+  });
+}
+
+export function useCostPerBikeType(range: DateRange) {
+  return useQuery({
+    queryKey: ['dashboard', 'costPerBikeType', ...rangeKey(range)],
+    queryFn: () => unwrap(window.hyprride.dashboard.costPerBikeType({ range })),
+  });
+}
+
+export function useTopConsumedParts(range: DateRange) {
+  return useQuery({
+    queryKey: ['dashboard', 'topConsumedParts', ...rangeKey(range)],
+    queryFn: () => unwrap(window.hyprride.dashboard.topConsumedParts({ range })),
+  });
+}
+
+export function useServiceVolumeByBikeType(range: DateRange) {
+  return useQuery({
+    queryKey: ['dashboard', 'serviceVolumeByBikeType', ...rangeKey(range)],
+    queryFn: () =>
+      unwrap(window.hyprride.dashboard.serviceVolumeByBikeType({ range })),
+  });
+}
+
+export function useTheoreticalServiceCost() {
+  return useQuery({
+    queryKey: ['dashboard', 'theoreticalServiceCost'],
+    queryFn: () => unwrap(window.hyprride.dashboard.theoreticalServiceCost({})),
+  });
+}
