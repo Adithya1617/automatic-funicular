@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CSV_IMPORT_KINDS = ['ingredients', 'suppliers', 'menu_items', 'recipes'] as const;
+export const CSV_IMPORT_KINDS = ['parts', 'suppliers', 'bikes', 'service_templates'] as const;
 export type CsvImportKind = (typeof CSV_IMPORT_KINDS)[number];
 
 export const csvImportIssueSchema = z.object({

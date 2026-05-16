@@ -1,7 +1,9 @@
 import type { AppDb } from '../db/client';
 import { newId } from '../lib/ids';
+import { bikeRepository } from '../repositories/bikeRepository';
+import { bikeTypeRepository } from '../repositories/bikeTypeRepository';
 import { ingredientRepository } from '../repositories/ingredientRepository';
-import { menuItemRepository } from '../repositories/menuItemRepository';
+import { serviceTemplateRepository } from '../repositories/serviceTemplateRepository';
 import { supplierRepository } from '../repositories/supplierRepository';
 import { stockMovementRepository } from '../repositories/stockMovementRepository';
 import { RecipeService } from './RecipeService';
@@ -14,22 +16,18 @@ import {
   type CsvImportIssue,
   type CsvImportResult,
 } from '@shared/schemas/csvImport';
-import { BASE_UNITS, INGREDIENT_TYPES } from '@shared/constants/enums';
+import { BASE_UNITS } from '@shared/constants/enums';
 import { SYSTEM_USER_ID } from '@shared/constants/system';
 import { toBase } from '@shared/utils/unitConverter';
-import type { IngredientRow, MenuItemRow, SupplierRow } from '../db/schema';
+import type {
+  BikeRow,
+  BikeTypeRow,
+  IngredientRow,
+  ServiceTemplateRow,
+  SupplierRow,
+} from '../db/schema';
 
 type Issue = CsvImportIssue;
-
-type RecipeRow = {
-  parentName: string;
-  parentType: 'menu_item' | 'ingredient';
-  childName: string;
-  quantity: number;
-  unit: string;
-  notes: string | null;
-  lineNumber: number;
-};
 
 export const CsvImportService = {
   run(
@@ -40,21 +38,24 @@ export const CsvImportService = {
   ): CsvImportResult {
     const table = parseCsvTable(input.content);
     switch (input.kind) {
-      case 'ingredients':
-        return importIngredients(db, tenantId, table, input.dryRun, actorId);
+      case 'parts':
+        return importParts(db, tenantId, table, input.dryRun, actorId);
       case 'suppliers':
         return importSuppliers(db, tenantId, table, input.dryRun, actorId);
-      case 'menu_items':
-        return importMenuItems(db, tenantId, table, input.dryRun, actorId);
-      case 'recipes':
-        return importRecipes(db, tenantId, table, input.dryRun, actorId);
+      case 'bikes':
+        return importBikes(db, tenantId, table, input.dryRun, actorId);
+      case 'service_templates':
+        return importServiceTemplates(db, tenantId, table, input.dryRun, actorId);
     }
   },
 };
 
-/* ============================ Ingredients =============================== */
+/* =============================== Parts =================================== */
+// Hyprride: parts live in the `ingredients` table (rename punted to slice H9).
+// CSV always sets type='raw' — there are no "prepared" parts for bike rentals,
+// so we don't expose that column to the operator.
 
-function importIngredients(
+function importParts(
   db: AppDb,
   tenantId: number,
   table: CsvTable,
@@ -62,14 +63,14 @@ function importIngredients(
   actorId: string,
 ): CsvImportResult {
   const issues: Issue[] = [];
-  requireHeaders(table, ['name', 'category', 'type', 'base_unit'], 'ingredients', issues);
+  requireHeaders(table, ['name', 'category', 'base_unit'], 'parts', issues);
 
   type Plan =
-    | { mode: 'create'; row: RowDraftIngredient; lineNumber: number }
+    | { mode: 'create'; row: RowDraftPart; lineNumber: number }
     | {
         mode: 'update';
         existing: IngredientRow;
-        row: RowDraftIngredient;
+        row: RowDraftPart;
         lineNumber: number;
       };
   const plans: Plan[] = [];
@@ -79,7 +80,7 @@ function importIngredients(
   }
 
   for (const row of table.rows) {
-    const draft = parseIngredientRow(row.values, row.lineNumber, issues);
+    const draft = parsePartRow(row.values, row.lineNumber, issues);
     if (!draft) continue;
     const existing = existingByName.get(draft.name.toLowerCase());
     if (existing) {
@@ -109,7 +110,7 @@ function importIngredients(
     toUpdate: plans.filter((p) => p.mode === 'update').length,
     skipped: table.rows.length - plans.length,
   };
-  return finishImport('ingredients', summary, issues, dryRun, () => {
+  return finishImport('parts', summary, issues, dryRun, () => {
     db.transaction((tx) => {
       const now = Date.now();
       for (const plan of plans) {
@@ -119,7 +120,7 @@ function importIngredients(
             tenantId,
             name: plan.row.name,
             category: plan.row.category,
-            type: plan.row.type,
+            type: 'raw',
             baseUnit: plan.row.baseUnit,
             stockQuantity: 0,
             reservedQuantity: 0,
@@ -136,7 +137,6 @@ function importIngredients(
           ingredientRepository.update(tx, tenantId, plan.existing.id, {
             name: plan.row.name,
             category: plan.row.category,
-            type: plan.row.type,
             baseUnit: plan.row.baseUnit,
             lowStockThreshold: plan.row.lowStockThreshold,
             densityGPerMl: plan.row.densityGPerMl,
@@ -149,23 +149,21 @@ function importIngredients(
   });
 }
 
-type RowDraftIngredient = {
+type RowDraftPart = {
   name: string;
   category: string;
-  type: 'raw' | 'prepared';
   baseUnit: 'g' | 'ml' | 'each';
   lowStockThreshold: number;
   densityGPerMl: number | null;
 };
 
-function parseIngredientRow(
+function parsePartRow(
   v: Record<string, string>,
   lineNumber: number,
   issues: Issue[],
-): RowDraftIngredient | null {
+): RowDraftPart | null {
   const name = v.name?.trim();
   const category = v.category?.trim();
-  const type = v.type?.trim() as 'raw' | 'prepared';
   const baseUnit = v.base_unit?.trim() as 'g' | 'ml' | 'each';
   const thresholdStr = v.low_stock_threshold?.trim() ?? '';
   const densityStr = v.density_g_per_ml?.trim() ?? '';
@@ -177,14 +175,6 @@ function parseIngredientRow(
   }
   if (!category) {
     issues.push({ lineNumber, field: 'category', message: 'category is required' });
-    ok = false;
-  }
-  if (!INGREDIENT_TYPES.includes(type)) {
-    issues.push({
-      lineNumber,
-      field: 'type',
-      message: `type must be one of ${INGREDIENT_TYPES.join(', ')}`,
-    });
     ok = false;
   }
   if (!BASE_UNITS.includes(baseUnit)) {
@@ -224,7 +214,7 @@ function parseIngredientRow(
     }
   }
   if (!ok || !name || !category) return null;
-  return { name, category, type, baseUnit, lowStockThreshold, densityGPerMl };
+  return { name, category, baseUnit, lowStockThreshold, densityGPerMl };
 }
 
 /* ============================== Suppliers ================================ */
@@ -307,9 +297,13 @@ type RowDraftSupplier = {
   notes: string | null;
 };
 
-/* ============================== Menu items =============================== */
+/* =============================== Bikes =================================== */
+// bike_number is the natural key. bike_type is resolved by (engine_cc, name)
+// against bike_types — unknown combos become row-level errors rather than
+// inserting orphan types (CLAUDE.md treats bike_types as a fixed roster
+// that's seeded via migration).
 
-function importMenuItems(
+function importBikes(
   db: AppDb,
   tenantId: number,
   table: CsvTable,
@@ -317,26 +311,51 @@ function importMenuItems(
   actorId: string,
 ): CsvImportResult {
   const issues: Issue[] = [];
-  requireHeaders(table, ['name', 'category', 'selling_price'], 'menu_items', issues);
+  requireHeaders(table, ['bike_number', 'engine_cc', 'bike_type'], 'bikes', issues);
+
+  const allBikeTypes = bikeTypeRepository.list(db, tenantId, { includeInactive: true });
+  const bikeTypeKey = (cc: number, name: string) => `${cc}::${name.toLowerCase()}`;
+  const bikeTypeByKey = new Map<string, BikeTypeRow>();
+  for (const t of allBikeTypes) {
+    bikeTypeByKey.set(bikeTypeKey(t.engineCc, t.name), t);
+  }
 
   type Plan =
-    | { mode: 'create'; row: RowDraftMenuItem; lineNumber: number }
-    | { mode: 'update'; existing: MenuItemRow; row: RowDraftMenuItem; lineNumber: number };
+    | { mode: 'create'; row: RowDraftBikeResolved; lineNumber: number }
+    | { mode: 'update'; existing: BikeRow; row: RowDraftBikeResolved; lineNumber: number };
   const plans: Plan[] = [];
-  const existingByName = new Map<string, MenuItemRow>();
-  for (const m of menuItemRepository.list(db, tenantId, { includeInactive: true })) {
-    existingByName.set(m.name.toLowerCase(), m);
+  const existingByNumber = new Map<string, BikeRow>();
+  for (const b of bikeRepository.list(db, tenantId, { includeInactive: true })) {
+    existingByNumber.set(b.bikeNumber.toLowerCase(), b);
   }
-  // Cache variant_group label → groupId, so multiple rows in the same import
-  // sharing a variant_group share the same UUID.
-  const groupLabelToId = new Map<string, string>();
 
   for (const row of table.rows) {
-    const draft = parseMenuItemRow(row.values, row.lineNumber, issues, groupLabelToId);
+    const draft = parseBikeRow(row.values, row.lineNumber, issues);
     if (!draft) continue;
-    const existing = existingByName.get(draft.name.toLowerCase());
-    if (existing) plans.push({ mode: 'update', existing, row: draft, lineNumber: row.lineNumber });
-    else plans.push({ mode: 'create', row: draft, lineNumber: row.lineNumber });
+
+    const bikeType = bikeTypeByKey.get(bikeTypeKey(draft.engineCc, draft.bikeTypeName));
+    if (!bikeType) {
+      issues.push({
+        lineNumber: row.lineNumber,
+        field: 'bike_type',
+        message: `Bike type "${draft.engineCc}cc ${draft.bikeTypeName}" not found — add it via bike_types seed first`,
+      });
+      continue;
+    }
+
+    const planRow: RowDraftBikeResolved = {
+      bikeNumber: draft.bikeNumber,
+      bikeTypeId: bikeType.id,
+      licensePlate: draft.licensePlate,
+      odometerKm: draft.odometerKm,
+      notes: draft.notes,
+    };
+    const existing = existingByNumber.get(draft.bikeNumber.toLowerCase());
+    if (existing) {
+      plans.push({ mode: 'update', existing, row: planRow, lineNumber: row.lineNumber });
+    } else {
+      plans.push({ mode: 'create', row: planRow, lineNumber: row.lineNumber });
+    }
   }
 
   const summary = {
@@ -345,19 +364,19 @@ function importMenuItems(
     toUpdate: plans.filter((p) => p.mode === 'update').length,
     skipped: table.rows.length - plans.length,
   };
-  return finishImport('menu_items', summary, issues, dryRun, () => {
+  return finishImport('bikes', summary, issues, dryRun, () => {
     db.transaction((tx) => {
       const now = Date.now();
       for (const plan of plans) {
         if (plan.mode === 'create') {
-          menuItemRepository.insert(tx, {
+          bikeRepository.insert(tx, {
             id: newId(),
             tenantId,
-            name: plan.row.name,
-            category: plan.row.category,
-            sellingPrice: plan.row.sellingPrice,
-            variantGroupId: plan.row.variantGroupId,
-            displayOrder: plan.row.displayOrder,
+            bikeNumber: plan.row.bikeNumber,
+            bikeTypeId: plan.row.bikeTypeId,
+            licensePlate: plan.row.licensePlate,
+            odometerKm: plan.row.odometerKm,
+            notes: plan.row.notes,
             isActive: true,
             createdAt: now,
             updatedAt: now,
@@ -365,12 +384,12 @@ function importMenuItems(
             updatedBy: actorId,
           });
         } else {
-          menuItemRepository.update(tx, tenantId, plan.existing.id, {
-            name: plan.row.name,
-            category: plan.row.category,
-            sellingPrice: plan.row.sellingPrice,
-            variantGroupId: plan.row.variantGroupId ?? plan.existing.variantGroupId,
-            displayOrder: plan.row.displayOrder,
+          bikeRepository.update(tx, tenantId, plan.existing.id, {
+            bikeNumber: plan.row.bikeNumber,
+            bikeTypeId: plan.row.bikeTypeId,
+            licensePlate: plan.row.licensePlate,
+            odometerKm: plan.row.odometerKm,
+            notes: plan.row.notes,
             updatedAt: now,
             updatedBy: actorId,
           });
@@ -380,81 +399,99 @@ function importMenuItems(
   });
 }
 
-type RowDraftMenuItem = {
-  name: string;
-  category: string;
-  sellingPrice: number;
-  variantGroupId: string | null;
-  displayOrder: number;
+type RowDraftBike = {
+  bikeNumber: string;
+  engineCc: number;
+  bikeTypeName: string;
+  licensePlate: string | null;
+  odometerKm: number | null;
+  notes: string | null;
 };
 
-function parseMenuItemRow(
+type RowDraftBikeResolved = {
+  bikeNumber: string;
+  bikeTypeId: string;
+  licensePlate: string | null;
+  odometerKm: number | null;
+  notes: string | null;
+};
+
+function parseBikeRow(
   v: Record<string, string>,
   lineNumber: number,
   issues: Issue[],
-  groupLabelToId: Map<string, string>,
-): RowDraftMenuItem | null {
-  const name = v.name?.trim();
-  const category = v.category?.trim();
-  const priceStr = v.selling_price?.trim() ?? '';
-  const groupLabel = v.variant_group?.trim() ?? '';
-  const displayStr = v.display_order?.trim() ?? '';
+): RowDraftBike | null {
+  const bikeNumber = v.bike_number?.trim();
+  const engineCcStr = v.engine_cc?.trim() ?? '';
+  const bikeTypeName = v.bike_type?.trim();
+  const odoStr = v.odometer_km?.trim() ?? '';
 
   let ok = true;
-  if (!name) {
-    issues.push({ lineNumber, field: 'name', message: 'name is required' });
+  if (!bikeNumber) {
+    issues.push({ lineNumber, field: 'bike_number', message: 'bike_number is required' });
     ok = false;
   }
-  if (!category) {
-    issues.push({ lineNumber, field: 'category', message: 'category is required' });
+  let engineCc = 0;
+  const ccN = Number.parseInt(engineCcStr, 10);
+  if (!Number.isFinite(ccN) || ccN <= 0) {
+    issues.push({
+      lineNumber,
+      field: 'engine_cc',
+      message: 'engine_cc must be a positive integer',
+    });
+    ok = false;
+  } else {
+    engineCc = ccN;
+  }
+  if (!bikeTypeName) {
+    issues.push({ lineNumber, field: 'bike_type', message: 'bike_type is required' });
     ok = false;
   }
-  let sellingPrice = 0;
-  if (priceStr) {
-    const n = Number.parseFloat(priceStr);
+  let odometerKm: number | null = null;
+  if (odoStr) {
+    const n = Number.parseFloat(odoStr);
     if (!Number.isFinite(n) || n < 0) {
       issues.push({
         lineNumber,
-        field: 'selling_price',
-        message: 'selling_price must be a non-negative number',
+        field: 'odometer_km',
+        message: 'odometer_km must be a non-negative number',
       });
       ok = false;
     } else {
-      sellingPrice = n;
+      odometerKm = n;
     }
   }
-  let displayOrder = 0;
-  if (displayStr) {
-    const n = Number.parseInt(displayStr, 10);
-    if (!Number.isFinite(n)) {
-      issues.push({
-        lineNumber,
-        field: 'display_order',
-        message: 'display_order must be an integer',
-      });
-      ok = false;
-    } else {
-      displayOrder = n;
-    }
-  }
-  let variantGroupId: string | null = null;
-  if (groupLabel) {
-    const cached = groupLabelToId.get(groupLabel);
-    if (cached) {
-      variantGroupId = cached;
-    } else {
-      const fresh = newId();
-      groupLabelToId.set(groupLabel, fresh);
-      variantGroupId = fresh;
-    }
-  }
-  if (!ok || !name || !category) return null;
-  return { name, category, sellingPrice, variantGroupId, displayOrder };
+  if (!ok || !bikeNumber || !bikeTypeName) return null;
+  return {
+    bikeNumber,
+    engineCc,
+    bikeTypeName,
+    licensePlate: v.license_plate?.trim() || null,
+    odometerKm,
+    notes: v.notes?.trim() || null,
+  };
 }
 
-/* =============================== Recipes ================================= */
+/* ========================== Service templates ============================ */
+// Each row is one part line. Rows sharing (template_name, engine_cc, bike_type)
+// belong to the same template — multiple rows per template define the recipe.
+// On commit we find-or-create the template, then save a new recipe version
+// with the captured rows (Path A: editing a template creates a new version,
+// past events keep their snapshot).
 
-function importRecipes(
+type ServiceTemplateRowDraft = {
+  templateName: string;
+  engineCc: number;
+  bikeTypeName: string;
+  partName: string;
+  quantity: number;
+  unit: string;
+  displayOrder: number | null;
+  notes: string | null;
+  lineNumber: number;
+};
+
+function importServiceTemplates(
   db: AppDb,
   tenantId: number,
   table: CsvTable,
@@ -464,78 +501,61 @@ function importRecipes(
   const issues: Issue[] = [];
   requireHeaders(
     table,
-    ['parent_name', 'parent_type', 'child_ingredient_name', 'quantity', 'unit'],
-    'recipes',
+    ['template_name', 'engine_cc', 'bike_type', 'part_name', 'quantity', 'unit'],
+    'service_templates',
     issues,
   );
 
+  const allBikeTypes = bikeTypeRepository.list(db, tenantId, { includeInactive: true });
+  const bikeTypeKey = (cc: number, name: string) => `${cc}::${name.toLowerCase()}`;
+  const bikeTypeByKey = new Map<string, BikeTypeRow>();
+  for (const t of allBikeTypes) {
+    bikeTypeByKey.set(bikeTypeKey(t.engineCc, t.name), t);
+  }
   const ingredientsByName = new Map<string, IngredientRow>();
   for (const i of ingredientRepository.list(db, tenantId, { includeInactive: true })) {
     ingredientsByName.set(i.name.toLowerCase(), i);
   }
-  const menuItemsByName = new Map<string, MenuItemRow>();
-  for (const m of menuItemRepository.list(db, tenantId, { includeInactive: true })) {
-    menuItemsByName.set(m.name.toLowerCase(), m);
-  }
 
-  // Group rows by (parentType, parentName).
   type Group = {
-    parentId: string;
-    parentType: 'menu_item' | 'ingredient';
-    parentName: string;
-    rows: RecipeRow[];
+    templateName: string;
+    bikeTypeId: string;
+    rows: Array<{
+      childIngredientId: string;
+      quantity: number;
+      unit: string;
+      notes: string | null;
+      displayOrder: number;
+    }>;
     firstLine: number;
   };
   const groups = new Map<string, Group>();
 
   for (const row of table.rows) {
-    const draft = parseRecipeRow(row.values, row.lineNumber, issues);
+    const draft = parseServiceTemplateRow(row.values, row.lineNumber, issues);
     if (!draft) continue;
 
-    let parentId: string | null = null;
-    if (draft.parentType === 'menu_item') {
-      parentId = menuItemsByName.get(draft.parentName.toLowerCase())?.id ?? null;
-      if (!parentId) {
-        issues.push({
-          lineNumber: row.lineNumber,
-          field: 'parent_name',
-          message: `Menu item "${draft.parentName}" not found — import menu items first`,
-        });
-        continue;
-      }
-    } else {
-      const ing = ingredientsByName.get(draft.parentName.toLowerCase());
-      if (!ing) {
-        issues.push({
-          lineNumber: row.lineNumber,
-          field: 'parent_name',
-          message: `Ingredient "${draft.parentName}" not found`,
-        });
-        continue;
-      }
-      if (ing.type !== 'prepared') {
-        issues.push({
-          lineNumber: row.lineNumber,
-          field: 'parent_type',
-          message: `Ingredient "${draft.parentName}" is type=raw — recipes require type=prepared`,
-        });
-        continue;
-      }
-      parentId = ing.id;
-    }
-    const child = ingredientsByName.get(draft.childName.toLowerCase());
-    if (!child) {
+    const bikeType = bikeTypeByKey.get(bikeTypeKey(draft.engineCc, draft.bikeTypeName));
+    if (!bikeType) {
       issues.push({
         lineNumber: row.lineNumber,
-        field: 'child_ingredient_name',
-        message: `Ingredient "${draft.childName}" not found`,
+        field: 'bike_type',
+        message: `Bike type "${draft.engineCc}cc ${draft.bikeTypeName}" not found`,
       });
       continue;
     }
-    // Unit compatibility check.
+    const part = ingredientsByName.get(draft.partName.toLowerCase());
+    if (!part) {
+      issues.push({
+        lineNumber: row.lineNumber,
+        field: 'part_name',
+        message: `Part "${draft.partName}" not found — import parts first`,
+      });
+      continue;
+    }
     try {
-      toBase(draft.quantity, draft.unit, child.baseUnit, {
-        densityGPerMl: child.densityGPerMl ?? undefined,
+      toBase(draft.quantity, draft.unit, part.baseUnit, {
+        densityGPerMl: part.densityGPerMl ?? undefined,
       });
     } catch (err) {
       issues.push({
@@ -546,87 +566,120 @@ function importRecipes(
       continue;
     }
 
-    const key = `${draft.parentType}:${parentId}`;
+    const key = `${draft.templateName.toLowerCase()}::${bikeType.id}`;
     let group = groups.get(key);
     if (!group) {
       group = {
-        parentId,
-        parentType: draft.parentType,
-        parentName: draft.parentName,
+        templateName: draft.templateName,
+        bikeTypeId: bikeType.id,
         rows: [],
         firstLine: row.lineNumber,
       };
       groups.set(key, group);
     }
-    group.rows.push({ ...draft, lineNumber: row.lineNumber });
-    // Annotate the child id on the row for the writer.
-    (group.rows[group.rows.length - 1] as RecipeRow & { childId?: string }).childId = child.id;
+    group.rows.push({
+      childIngredientId: part.id,
+      quantity: draft.quantity,
+      unit: draft.unit,
+      notes: draft.notes,
+      displayOrder: draft.displayOrder ?? group.rows.length,
+    });
   }
 
-  // Plans: one per parent group → saveVersion call.
+  const existingTemplatesByKey = new Map<string, ServiceTemplateRow>();
+  for (const t of serviceTemplateRepository.list(db, tenantId, { includeInactive: true })) {
+    existingTemplatesByKey.set(
+      `${t.name.toLowerCase()}::${t.bikeTypeId}`,
+      t,
+    );
+  }
+
   const planGroups = [...groups.values()];
   const totalGroupedRows = planGroups.reduce((acc, g) => acc + g.rows.length, 0);
+  const toCreate = planGroups.filter(
+    (g) => !existingTemplatesByKey.has(`${g.templateName.toLowerCase()}::${g.bikeTypeId}`),
+  ).length;
+  const toUpdate = planGroups.length - toCreate;
   const summary = {
     totalRows: table.rows.length,
-    toCreate: 0,
-    toUpdate: planGroups.length, // one new RecipeVersion per parent
+    toCreate,
+    toUpdate,
     skipped: table.rows.length - totalGroupedRows,
   };
-  return finishImport('recipes', summary, issues, dryRun, () => {
-    for (const group of planGroups) {
-      RecipeService.saveVersion(
-        db,
-        tenantId,
-        {
-          parentId: group.parentId,
-          parentType: group.parentType,
-          targetYield: 1,
-          notes: null,
-          rows: group.rows.map((r, idx) => ({
-            childIngredientId: (r as RecipeRow & { childId: string }).childId,
-            quantity: r.quantity,
-            unit: r.unit,
-            notes: r.notes,
-            displayOrder: idx,
-          })),
-        },
-        actorId,
-      );
-    }
+  return finishImport('service_templates', summary, issues, dryRun, () => {
+    db.transaction((tx) => {
+      const now = Date.now();
+      for (const group of planGroups) {
+        const lookupKey = `${group.templateName.toLowerCase()}::${group.bikeTypeId}`;
+        let template = existingTemplatesByKey.get(lookupKey);
+        if (!template) {
+          template = serviceTemplateRepository.insert(tx, {
+            id: newId(),
+            tenantId,
+            name: group.templateName,
+            bikeTypeId: group.bikeTypeId,
+            displayOrder: 0,
+            isActive: true,
+            createdAt: now,
+            updatedAt: now,
+            createdBy: actorId,
+            updatedBy: actorId,
+          });
+        }
+        RecipeService.saveVersion(
+          tx,
+          tenantId,
+          {
+            parentId: template.id,
+            parentType: 'service_template',
+            targetYield: 1,
+            notes: null,
+            rows: group.rows,
+          },
+          actorId,
+        );
+      }
+    });
   });
 }
 
-function parseRecipeRow(
+function parseServiceTemplateRow(
   v: Record<string, string>,
   lineNumber: number,
   issues: Issue[],
-): Omit<RecipeRow, 'lineNumber'> | null {
-  const parentName = v.parent_name?.trim();
-  const parentType = v.parent_type?.trim() as 'menu_item' | 'ingredient';
-  const childName = v.child_ingredient_name?.trim();
+): ServiceTemplateRowDraft | null {
+  const templateName = v.template_name?.trim();
+  const engineCcStr = v.engine_cc?.trim() ?? '';
+  const bikeTypeName = v.bike_type?.trim();
+  const partName = v.part_name?.trim();
   const quantityStr = v.quantity?.trim() ?? '';
   const unit = v.unit?.trim();
+  const displayStr = v.display_order?.trim() ?? '';
   const notes = v.notes?.trim() || null;
 
   let ok = true;
-  if (!parentName) {
-    issues.push({ lineNumber, field: 'parent_name', message: 'parent_name is required' });
+  if (!templateName) {
+    issues.push({ lineNumber, field: 'template_name', message: 'template_name is required' });
     ok = false;
   }
-  if (parentType !== 'menu_item' && parentType !== 'ingredient') {
+  let engineCc = 0;
+  const ccN = Number.parseInt(engineCcStr, 10);
+  if (!Number.isFinite(ccN) || ccN <= 0) {
     issues.push({
       lineNumber,
-      field: 'parent_type',
-      message: 'parent_type must be menu_item or ingredient',
+      field: 'engine_cc',
+      message: 'engine_cc must be a positive integer',
     });
     ok = false;
+  } else {
+    engineCc = ccN;
   }
-  if (!childName) {
-    issues.push({
-      lineNumber,
-      field: 'child_ingredient_name',
-      message: 'child_ingredient_name is required',
-    });
+  if (!bikeTypeName) {
+    issues.push({ lineNumber, field: 'bike_type', message: 'bike_type is required' });
+    ok = false;
+  }
+  if (!partName) {
+    issues.push({ lineNumber, field: 'part_name', message: 'part_name is required' });
     ok = false;
   }
   let quantity = 0;
@@ -641,8 +694,32 @@ function parseRecipeRow(
     issues.push({ lineNumber, field: 'unit', message: 'unit is required' });
     ok = false;
   }
-  if (!ok || !parentName || !childName || !unit) return null;
-  return { parentName, parentType, childName, quantity, unit, notes };
+  let displayOrder: number | null = null;
+  if (displayStr) {
+    const n = Number.parseInt(displayStr, 10);
+    if (!Number.isFinite(n)) {
+      issues.push({
+        lineNumber,
+        field: 'display_order',
+        message: 'display_order must be an integer',
+      });
+      ok = false;
+    } else {
+      displayOrder = n;
+    }
+  }
+  if (!ok || !templateName || !bikeTypeName || !partName || !unit) return null;
+  return {
+    templateName,
+    engineCc,
+    bikeTypeName,
+    partName,
+    quantity,
+    unit,
+    displayOrder,
+    notes,
+    lineNumber,
+  };
 }
 
 /* ============================ Shared finishers ============================ */

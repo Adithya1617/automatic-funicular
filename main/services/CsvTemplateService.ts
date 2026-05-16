@@ -5,31 +5,40 @@ import type {
 } from '@shared/schemas/csvImport';
 
 const HEADERS: Record<CsvImportKind, string[]> = {
-  ingredients: ['name', 'category', 'type', 'base_unit', 'low_stock_threshold', 'density_g_per_ml'],
+  parts: ['name', 'category', 'base_unit', 'low_stock_threshold', 'density_g_per_ml'],
   suppliers: ['name', 'contact_info', 'notes'],
-  menu_items: ['name', 'category', 'selling_price', 'variant_group', 'display_order'],
-  recipes: ['parent_name', 'parent_type', 'child_ingredient_name', 'quantity', 'unit', 'notes'],
+  bikes: ['bike_number', 'engine_cc', 'bike_type', 'license_plate', 'odometer_km', 'notes'],
+  service_templates: [
+    'template_name',
+    'engine_cc',
+    'bike_type',
+    'part_name',
+    'quantity',
+    'unit',
+    'display_order',
+    'notes',
+  ],
 };
 
 const SAMPLE_ROWS: Record<CsvImportKind, Array<(string | number)[]>> = {
-  ingredients: [
-    ['Basmati Rice', 'Grains', 'raw', 'g', 5000, ''],
-    ['Sunflower Oil', 'Oils', 'raw', 'ml', 1000, 0.92],
-    ['Biryani Masala', 'Spices', 'prepared', 'g', 200, ''],
+  parts: [
+    ['Engine oil', 'Oil', 'ml', 500, 0.87],
+    ['Brake pad', 'Brake', 'each', 4, ''],
+    ['Air filter', 'Filter', 'each', 2, ''],
   ],
   suppliers: [
-    ['Hyderabad Spice Co.', 'orders@hsc.example', 'Calls Mon–Sat'],
-    ['Fresh Veggies Mart', '+91 90000 00000', ''],
+    ['Bosch Spares', 'orders@bosch-spares.example', 'Calls Mon–Sat'],
+    ['Castrol Distributor', '+91 90000 00000', ''],
   ],
-  menu_items: [
-    ['Chicken Biryani (Half)', 'Mains', 220, 'biryani', 0],
-    ['Chicken Biryani (Full)', 'Mains', 380, 'biryani', 1],
-    ['Veg Pulao', 'Mains', 160, '', 2],
+  bikes: [
+    [1, 125, 'Ntorq', 'TG08T0481', '', ''],
+    [2, 110, 'Activa', 'TS08UL8345', '', ''],
+    [3, 160, 'Apache', 'TG08X0014', '', ''],
   ],
-  recipes: [
-    ['Chicken Biryani (Half)', 'menu_item', 'Basmati Rice', 200, 'g', ''],
-    ['Chicken Biryani (Half)', 'menu_item', 'Biryani Masala', 15, 'g', ''],
-    ['Biryani Masala', 'ingredient', 'Cardamom', 5, 'g', 'Bruise before grinding'],
+  service_templates: [
+    ['Standard service', 125, 'Ntorq', 'Engine oil', 800, 'ml', 0, ''],
+    ['Standard service', 125, 'Ntorq', 'Air filter', 1, 'each', 1, ''],
+    ['Brake job', 125, 'Ntorq', 'Brake pad', 2, 'each', 0, 'Front + rear'],
   ],
 };
 

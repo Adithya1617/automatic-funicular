@@ -24,24 +24,24 @@ import {
 } from '@shared/schemas/csvImport';
 
 const TAB_LABELS: Record<CsvImportKind, string> = {
-  ingredients: 'Ingredients',
+  parts: 'Parts',
   suppliers: 'Suppliers',
-  menu_items: 'Menu items',
-  recipes: 'Recipes',
+  bikes: 'Bikes',
+  service_templates: 'Service templates',
 };
 
 const TAB_HELP: Record<CsvImportKind, string> = {
-  ingredients:
-    'Columns: name, category, type (raw|prepared), base_unit (g|ml|each), low_stock_threshold, density_g_per_ml. Existing names are updated; base_unit cannot change once movements exist.',
+  parts:
+    'Columns: name, category, base_unit (g|ml|each), low_stock_threshold, density_g_per_ml. Existing names are updated; base_unit cannot change once a part has stock movements.',
   suppliers: 'Columns: name, contact_info, notes.',
-  menu_items:
-    'Columns: name, category, selling_price, variant_group (label shared by sibling variants), display_order. Recipes import separately.',
-  recipes:
-    'Columns: parent_name, parent_type (menu_item|ingredient), child_ingredient_name, quantity, unit, notes. Each save creates a new recipe version (locked decision §3.3).',
+  bikes:
+    'Columns: bike_number, engine_cc, bike_type (model name like "Ntorq"), license_plate, odometer_km, notes. Resolves (engine_cc + bike_type) to the seeded bike type; unknown combos fail.',
+  service_templates:
+    'Columns: template_name, engine_cc, bike_type, part_name, quantity, unit, display_order, notes. One row per part — rows sharing (template_name, engine_cc, bike_type) define the template. Each commit creates a new recipe version (snapshot semantics).',
 };
 
 export function CsvImportPage() {
-  const [active, setActive] = useState<CsvImportKind>('ingredients');
+  const [active, setActive] = useState<CsvImportKind>('parts');
   return (
     <div className="flex flex-col gap-3">
       <div>
