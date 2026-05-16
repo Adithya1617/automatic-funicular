@@ -5,6 +5,7 @@ import { bikeTypeRepository } from '../repositories/bikeTypeRepository';
 import { ingredientRepository } from '../repositories/ingredientRepository';
 import { serviceEventLineRepository } from '../repositories/serviceEventLineRepository';
 import { serviceEventRepository } from '../repositories/serviceEventRepository';
+import { stockMovementRepository } from '../repositories/stockMovementRepository';
 import { supplierRepository } from '../repositories/supplierRepository';
 import { InventoryService } from './InventoryService';
 import { SYSTEM_USER_ID } from '@shared/constants/system';
@@ -102,6 +103,28 @@ const PURCHASE_SEEDS: Array<{
   { partName: 'Mobile holder', quantity: 20, unit: 'each', unitCost: 250, daysAgo: 50 },
 ];
 
+// Minimum stock the operator wants on hand after a (re)seed — the seed adds a
+// top-up `purchase` movement to fill whatever's missing so every part is
+// guaranteed non-zero and at a known floor. Quantities are in each part's
+// base unit (matches seed in `main/db/client.ts`).
+const TARGET_STOCK: Array<{
+  partName: string;
+  target: number;
+  unit: 'g' | 'ml' | 'each';
+  unitCost: number;
+}> = [
+  { partName: 'Brake pad', target: 60, unit: 'each', unitCost: 220 },
+  { partName: 'Brake shoe', target: 40, unit: 'each', unitCost: 150 },
+  { partName: 'Accelerator wire', target: 40, unit: 'each', unitCost: 80 },
+  { partName: 'Clutch wire', target: 40, unit: 'each', unitCost: 100 },
+  { partName: 'Engine oil', target: 20000, unit: 'ml', unitCost: 0.46 },
+  { partName: 'Gear oil', target: 8000, unit: 'ml', unitCost: 0.55 },
+  { partName: 'Air filter', target: 25, unit: 'each', unitCost: 350 },
+  { partName: 'Mobile holder', target: 15, unit: 'each', unitCost: 250 },
+];
+
+const TARGET_SERVICE_EVENTS = 30;
+
 // Service-event patterns — varied so dashboard rollups are interesting.
 type ServicePattern = {
   label: string;
@@ -148,55 +171,39 @@ const SERVICE_PATTERNS: ServicePattern[] = [
 export type DemoSeedSummary = {
   suppliersCreated: number;
   bikesCreated: number;
+  /** Initial historic-purchase movements added (only on the first seed run). */
   purchasesAdded: number;
+  /** End-of-seed top-ups that brought any depleted part back to its target. */
+  topUpsAdded: number;
   serviceEventsAdded: number;
+  /** True when every step was a no-op — nothing needed adding. */
   alreadyPopulated: boolean;
 };
 
 export const DemoSeedService = {
   /**
-   * Idempotent-ish demo seeder for prototyping/demo. Fills suppliers, the
-   * 34-bike fleet, purchase movements for the 8 seeded parts, and ~30
-   * completed service events spread across the last 60 days so every
-   * dashboard tile lights up.
-   *
-   * Skipped if more than two suppliers OR more than ten service events
-   * already exist (treated as "already populated" — we don't want to
-   * double-stock a working install).
+   * Re-runnable demo seeder for prototyping/demo. Each step is idempotent —
+   * suppliers/bikes only add what's missing, historic purchases only run on
+   * the very first seed, service events back-fill up to TARGET_SERVICE_EVENTS,
+   * and a final top-up `purchase` ensures every part ends with at least its
+   * TARGET_STOCK. Click the button as many times as you like — depleted parts
+   * get topped back up, missing services get back-filled.
    */
   run(
     db: AppDb,
     tenantId: number,
     actorId: string = SYSTEM_USER_ID,
   ): DemoSeedSummary {
-    const existingSuppliers = supplierRepository.list(db, tenantId, {
-      includeInactive: true,
-    });
-    const existingEvents = serviceEventRepository.list(db, tenantId, { limit: 50 });
-    if (existingSuppliers.length >= 3 && existingEvents.length >= 10) {
-      return {
-        suppliersCreated: 0,
-        bikesCreated: 0,
-        purchasesAdded: 0,
-        serviceEventsAdded: 0,
-        alreadyPopulated: true,
-      };
-    }
-
     const bikeTypes = bikeTypeRepository.list(db, tenantId, { includeInactive: true });
     const bikeTypeKey = (cc: number, name: string) => `${cc}::${name.toLowerCase()}`;
     const bikeTypeByKey = new Map<string, BikeTypeRow>();
     for (const t of bikeTypes) bikeTypeByKey.set(bikeTypeKey(t.engineCc, t.name), t);
 
-    const partsByName = new Map<string, IngredientRow>();
-    for (const p of ingredientRepository.list(db, tenantId, { includeInactive: true })) {
-      partsByName.set(p.name.toLowerCase(), p);
-    }
-
     const now = Date.now();
     let suppliersCreated = 0;
     let bikesCreated = 0;
     let purchasesAdded = 0;
+    let topUpsAdded = 0;
     let serviceEventsAdded = 0;
 
     // --- Suppliers (idempotent by name) ----------------------------------
@@ -241,27 +248,40 @@ export const DemoSeedService = {
       bikesCreated += 1;
     }
 
-    // --- Stock purchases -------------------------------------------------
-    for (const purchase of PURCHASE_SEEDS) {
-      const part = partsByName.get(purchase.partName.toLowerCase());
-      if (!part) continue;
-      InventoryService.applyMovement(
-        db,
-        tenantId,
-        {
-          ingredientId: part.id,
-          quantity: purchase.quantity,
-          unit: purchase.unit,
-          reason: 'purchase',
-          referenceType: 'manual',
-          direction: 1,
-          costPerUnitAtTime: purchase.unitCost,
-          occurredAt: now - purchase.daysAgo * DAY_MS,
-        },
-        actorId,
-        { skipAvailabilityRecompute: true },
-      );
-      purchasesAdded += 1;
+    // --- Historic stock purchases (first run only) -----------------------
+    // Skip if the install already has any purchase movements — we don't want
+    // to spam duplicate purchase rows on every reseed click. Top-up below
+    // handles the case where stock has been depleted since.
+    const existingPurchases = stockMovementRepository.list(db, tenantId, {
+      reason: 'purchase',
+      limit: 1,
+    });
+    const partsByName = new Map<string, IngredientRow>();
+    for (const p of ingredientRepository.list(db, tenantId, { includeInactive: true })) {
+      partsByName.set(p.name.toLowerCase(), p);
+    }
+    if (existingPurchases.length === 0) {
+      for (const purchase of PURCHASE_SEEDS) {
+        const part = partsByName.get(purchase.partName.toLowerCase());
+        if (!part) continue;
+        InventoryService.applyMovement(
+          db,
+          tenantId,
+          {
+            ingredientId: part.id,
+            quantity: purchase.quantity,
+            unit: purchase.unit,
+            reason: 'purchase',
+            referenceType: 'manual',
+            direction: 1,
+            costPerUnitAtTime: purchase.unitCost,
+            occurredAt: now - purchase.daysAgo * DAY_MS,
+          },
+          actorId,
+          { skipAvailabilityRecompute: true },
+        );
+        purchasesAdded += 1;
+      }
     }
 
     // Refresh part snapshots — applyMovement updated stock + avg cost.
@@ -271,31 +291,44 @@ export const DemoSeedService = {
     }
 
     // --- Service events --------------------------------------------------
+    // Back-fill up to TARGET_SERVICE_EVENTS — never grow beyond that on
+    // reseeds, so the demo timeline stays bounded.
     const activeBikes = bikeRepository.list(db, tenantId, { includeInactive: false });
-    if (activeBikes.length > 0) {
-      // 30 events over the last 60 days, deterministic schedule so dashboard
-      // numbers don't shift between reseeds within a day.
-      const EVENT_COUNT = 30;
-      for (let i = 0; i < EVENT_COUNT; i++) {
-        const bike = activeBikes[i % activeBikes.length]!;
-        const pattern = SERVICE_PATTERNS[i % SERVICE_PATTERNS.length]!;
-        const daysAgo = Math.floor((60 / EVENT_COUNT) * i) + 1; // 1..60
+    const existingEventsCount = serviceEventRepository.list(db, tenantId, {
+      limit: 500,
+    }).length;
+    const toAdd = Math.max(0, TARGET_SERVICE_EVENTS - existingEventsCount);
+    if (toAdd > 0 && activeBikes.length > 0) {
+      // Spread the new events across the last 60 days, starting from the
+      // most-recent end so the dashboard's "last 7 days" tile lights up.
+      for (let i = 0; i < toAdd; i++) {
+        const bike = activeBikes[(existingEventsCount + i) % activeBikes.length]!;
+        const pattern = SERVICE_PATTERNS[(existingEventsCount + i) % SERVICE_PATTERNS.length]!;
+        const daysAgo = Math.max(
+          1,
+          Math.floor((60 / TARGET_SERVICE_EVENTS) * (existingEventsCount + i)) + 1,
+        );
         const occurredAt = now - daysAgo * DAY_MS;
 
-        // Verify every part has enough stock — skip the line if not, the demo
-        // can tolerate a missed service rather than failing the whole seed.
         const usableLines = pattern.lines
           .map((l) => ({ part: refreshedParts.get(l.partName.toLowerCase()), line: l }))
           .filter(({ part, line }) => part && part.stockQuantity >= line.quantity);
         if (usableLines.length === 0) continue;
 
         try {
-          seedServiceEvent(db, tenantId, actorId, bike.id, occurredAt, pattern.label, usableLines.map(({ part, line }) => ({
-            ingredientId: part!.id,
-            quantity: line.quantity,
-            unit: line.unit,
-          })));
-          // Update local snapshot of part stock to mirror the deduction.
+          seedServiceEvent(
+            db,
+            tenantId,
+            actorId,
+            bike.id,
+            occurredAt,
+            pattern.label,
+            usableLines.map(({ part, line }) => ({
+              ingredientId: part!.id,
+              quantity: line.quantity,
+              unit: line.unit,
+            })),
+          );
           for (const { part, line } of usableLines) {
             const cur = refreshedParts.get(part!.name.toLowerCase())!;
             refreshedParts.set(part!.name.toLowerCase(), {
@@ -305,18 +338,53 @@ export const DemoSeedService = {
           }
           serviceEventsAdded += 1;
         } catch {
-          // Best-effort — if a particular event throws (e.g. unit conversion
-          // edge), just skip it and continue.
+          // Best-effort — skip events that throw and continue.
         }
       }
     }
+
+    // --- Stock top-up ----------------------------------------------------
+    // Final guarantee: every part ends at ≥ TARGET_STOCK. The top-up posts a
+    // single `purchase` movement at "yesterday" for the missing delta so the
+    // dashboard's recent-spending tiles light up too.
+    for (const target of TARGET_STOCK) {
+      const part = refreshedParts.get(target.partName.toLowerCase());
+      if (!part) continue;
+      const deficit = target.target - part.stockQuantity;
+      if (deficit <= 0) continue;
+      InventoryService.applyMovement(
+        db,
+        tenantId,
+        {
+          ingredientId: part.id,
+          quantity: deficit,
+          unit: target.unit,
+          reason: 'purchase',
+          referenceType: 'manual',
+          direction: 1,
+          costPerUnitAtTime: target.unitCost,
+          occurredAt: now - DAY_MS,
+        },
+        actorId,
+        { skipAvailabilityRecompute: true },
+      );
+      topUpsAdded += 1;
+    }
+
+    const alreadyPopulated =
+      suppliersCreated === 0 &&
+      bikesCreated === 0 &&
+      purchasesAdded === 0 &&
+      topUpsAdded === 0 &&
+      serviceEventsAdded === 0;
 
     return {
       suppliersCreated,
       bikesCreated,
       purchasesAdded,
+      topUpsAdded,
       serviceEventsAdded,
-      alreadyPopulated: false,
+      alreadyPopulated,
     };
   },
 };

@@ -30,11 +30,12 @@ export function DemoSeedPanel() {
         <div>
           <h2 className="text-[13px] font-medium text-text-primary">Demo data</h2>
           <p className="mt-1 max-w-prose text-[11px] text-text-tertiary">
-            One-click seed for prototyping/demo. Adds three suppliers, the 34-bike
-            fleet, stock-up purchase movements for every seeded part, and ~30
-            completed service events spread across the last 60 days so every
-            dashboard tile lights up. Idempotent — skipped if the app already has
-            three suppliers and ten service events.
+            Re-runnable seed for prototyping/demo. Click anytime — suppliers and
+            bikes only fill in what&apos;s missing, historic purchases run once
+            (so weighted-avg cost is meaningful), service events back-fill up
+            to 30 across the last 60 days, and every part is topped up to a
+            guaranteed non-zero floor (Brake pad 60 · Brake shoe 40 · Cables 40
+            · Engine oil 20 L · Gear oil 8 L · Air filter 25 · Mobile holder 15).
           </p>
         </div>
         <Button
@@ -58,15 +59,12 @@ export function DemoSeedPanel() {
       {result ? (
         <div className="mt-3 rounded-md border border-border-tertiary bg-background-secondary px-3 py-2 text-[11px] text-text-secondary">
           {result.alreadyPopulated ? (
-            <span>
-              Skipped — the app already has demo-level data. Reset the DB if you want
-              a fresh seed.
-            </span>
+            <span>Everything was already at target — nothing to add.</span>
           ) : (
             <span>
-              Added: {result.suppliersCreated} suppliers · {result.bikesCreated} bikes
-              · {result.purchasesAdded} purchase movements · {result.serviceEventsAdded}{' '}
-              completed service events.
+              Added: {result.suppliersCreated} supplier(s) · {result.bikesCreated} bike(s)
+              · {result.purchasesAdded} historic purchase(s) · {result.topUpsAdded}{' '}
+              stock top-up(s) · {result.serviceEventsAdded} completed service event(s).
             </span>
           )}
         </div>

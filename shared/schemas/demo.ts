@@ -7,6 +7,7 @@ export const demoSeedResultSchema = z.object({
   suppliersCreated: z.number().int().nonnegative(),
   bikesCreated: z.number().int().nonnegative(),
   purchasesAdded: z.number().int().nonnegative(),
+  topUpsAdded: z.number().int().nonnegative(),
   serviceEventsAdded: z.number().int().nonnegative(),
   alreadyPopulated: z.boolean(),
 });
