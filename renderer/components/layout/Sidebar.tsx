@@ -22,9 +22,9 @@ export function Sidebar() {
     <aside className="flex w-[138px] shrink-0 flex-col gap-0.5 border-r border-border-tertiary bg-background-secondary px-2.5 py-3.5">
       <div className="flex items-center gap-2 px-1.5 pb-3.5 pt-1">
         <div className="flex h-[22px] w-[22px] items-center justify-center rounded-[6px] bg-text-primary text-[12px] font-medium text-background-primary">
-          L
+          H
         </div>
-        <span className="text-[13px] font-medium text-text-primary">Laurans</span>
+        <span className="text-[13px] font-medium text-text-primary">Hyprride</span>
       </div>
 
       {groupOrder.map((group) => (

@@ -39,15 +39,15 @@ export const BackupService = {
     await ensureDirectory(targetDir);
 
     await copyFileWithDir(
-      join(opts.userDataDir, 'laurans.sqlite'),
-      join(targetDir, 'laurans.sqlite'),
+      join(opts.userDataDir, 'hyprride.sqlite'),
+      join(targetDir, 'hyprride.sqlite'),
     );
     await copyDirectoryRecursive(
       join(opts.userDataDir, 'files'),
       join(targetDir, 'files'),
     );
 
-    const dbSize = await pathSizeBytes(join(targetDir, 'laurans.sqlite'));
+    const dbSize = await pathSizeBytes(join(targetDir, 'hyprride.sqlite'));
     const entry: BackupEntry = {
       folderName,
       folderPath: targetDir,
@@ -69,7 +69,7 @@ export const BackupService = {
     for (const name of subdirs) {
       if (!FOLDER_PATTERN.test(name)) continue;
       const folderPath = join(rootPath, name);
-      const sizeBytes = await pathSizeBytes(join(folderPath, 'laurans.sqlite'));
+      const sizeBytes = await pathSizeBytes(join(folderPath, 'hyprride.sqlite'));
       entries.push({
         folderName: name,
         folderPath,
@@ -105,8 +105,8 @@ export const BackupService = {
     sourceFolder: string;
   }): Promise<void> {
     await copyFileWithDir(
-      join(opts.sourceFolder, 'laurans.sqlite'),
-      join(opts.userDataDir, 'laurans.sqlite'),
+      join(opts.sourceFolder, 'hyprride.sqlite'),
+      join(opts.userDataDir, 'hyprride.sqlite'),
     );
     await copyDirectoryRecursive(
       join(opts.sourceFolder, 'files'),

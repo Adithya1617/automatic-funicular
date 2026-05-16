@@ -1,6 +1,6 @@
-appId: com.laurans.inventory
-productName: Laurans Inventory
-copyright: Copyright (c) 2026 Laurans Food Court
+appId: com.hyprride.inventory
+productName: Hyprride Inventory
+copyright: Copyright (c) 2026 Hyprride Bike Rentals
 asar: true
 directories:
   output: dist
@@ -30,5 +30,5 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   createStartMenuShortcut: true
-  shortcutName: Laurans Inventory
+  shortcutName: Hyprride Inventory
 publish: null

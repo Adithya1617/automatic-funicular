@@ -69,7 +69,7 @@ async function runScheduledBackup(): Promise<void> {
     const settings = AppSettingsService.snapshot(getDb().db);
     if (!settings.backupFolderPath) return;
     // Force-flush WAL into the main DB file so the snapshot is hot-consistent.
-    // Without this, recent committed transactions sitting in laurans.sqlite-wal
+    // Without this, recent committed transactions sitting in hyprride.sqlite-wal
     // would be silently absent from the backup.
     getDb().raw.pragma('wal_checkpoint(TRUNCATE)');
     await BackupService.runBackup({

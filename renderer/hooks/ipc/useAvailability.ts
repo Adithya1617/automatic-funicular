@@ -5,6 +5,6 @@ import { unwrap } from '@renderer/lib/ipc';
 export function useAvailability(input: ListAvailabilityInput = {}) {
   return useQuery({
     queryKey: ['availability', input],
-    queryFn: () => unwrap(window.laurans.availability.list(input)),
+    queryFn: () => unwrap(window.hyprride.availability.list(input)),
   });
 }

@@ -14,7 +14,7 @@ const supplierKey = (id: string) => ['supplier', id] as const;
 export function useSuppliers(filter: ListSuppliersInput = { includeInactive: false }) {
   return useQuery({
     queryKey: suppliersKey(filter),
-    queryFn: () => unwrap(window.laurans.supplier.list(filter)),
+    queryFn: () => unwrap(window.hyprride.supplier.list(filter)),
   });
 }
 
@@ -22,7 +22,7 @@ export function useCreateSupplier() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateSupplierInput) =>
-      unwrap(window.laurans.supplier.create(input)),
+      unwrap(window.hyprride.supplier.create(input)),
     onSuccess: (created: Supplier) => {
       qc.invalidateQueries({ queryKey: ['suppliers'] });
       qc.setQueryData(supplierKey(created.id), created);
@@ -34,7 +34,7 @@ export function useUpdateSupplier() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: UpdateSupplierInput) =>
-      unwrap(window.laurans.supplier.update(input)),
+      unwrap(window.hyprride.supplier.update(input)),
     onSuccess: (updated: Supplier) => {
       qc.invalidateQueries({ queryKey: ['suppliers'] });
       qc.setQueryData(supplierKey(updated.id), updated);
@@ -45,7 +45,7 @@ export function useUpdateSupplier() {
 export function useDeactivateSupplier() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => unwrap(window.laurans.supplier.deactivate({ id })),
+    mutationFn: (id: string) => unwrap(window.hyprride.supplier.deactivate({ id })),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['suppliers'] });
     },

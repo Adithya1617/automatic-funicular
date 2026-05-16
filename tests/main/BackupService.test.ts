@@ -10,11 +10,11 @@ let userData: string;
 let backupRoot: string;
 
 beforeEach(async () => {
-  work = await mkdtemp(join(tmpdir(), 'laurans-backup-'));
+  work = await mkdtemp(join(tmpdir(), 'hyprride-backup-'));
   userData = join(work, 'user');
   backupRoot = join(work, 'backups');
   await mkdir(userData, { recursive: true });
-  await writeFile(join(userData, 'laurans.sqlite'), 'PRETEND-DB');
+  await writeFile(join(userData, 'hyprride.sqlite'), 'PRETEND-DB');
   await mkdir(join(userData, 'files', 'invoices'), { recursive: true });
   await writeFile(join(userData, 'files', 'invoices', 'a.pdf'), 'PDF-A');
 });
@@ -32,7 +32,7 @@ describe('BackupService.runBackup', () => {
       retainDailyCount: 30,
     });
     expect(existsSync(result.entry.folderPath)).toBe(true);
-    expect(existsSync(join(result.entry.folderPath, 'laurans.sqlite'))).toBe(true);
+    expect(existsSync(join(result.entry.folderPath, 'hyprride.sqlite'))).toBe(true);
     expect(
       existsSync(join(result.entry.folderPath, 'files', 'invoices', 'a.pdf')),
     ).toBe(true);
@@ -47,7 +47,7 @@ describe('BackupService.runBackup', () => {
       now: new Date('2026-05-05T03:00:00Z'),
       retainDailyCount: 30,
     });
-    expect(existsSync(join(result.entry.folderPath, 'laurans.sqlite'))).toBe(true);
+    expect(existsSync(join(result.entry.folderPath, 'hyprride.sqlite'))).toBe(true);
     expect(existsSync(join(result.entry.folderPath, 'files'))).toBe(false);
   });
 });
@@ -55,9 +55,9 @@ describe('BackupService.runBackup', () => {
 describe('BackupService.listBackups', () => {
   it('returns folders sorted newest-first with parsed timestamps', async () => {
     await mkdir(join(backupRoot, '2026-05-01_03-00-00'), { recursive: true });
-    await writeFile(join(backupRoot, '2026-05-01_03-00-00', 'laurans.sqlite'), 'x');
+    await writeFile(join(backupRoot, '2026-05-01_03-00-00', 'hyprride.sqlite'), 'x');
     await mkdir(join(backupRoot, '2026-05-03_03-00-00'), { recursive: true });
-    await writeFile(join(backupRoot, '2026-05-03_03-00-00', 'laurans.sqlite'), 'x');
+    await writeFile(join(backupRoot, '2026-05-03_03-00-00', 'hyprride.sqlite'), 'x');
     await mkdir(join(backupRoot, 'not-a-backup'), { recursive: true });
     const list = await BackupService.listBackups(backupRoot);
     expect(list.entries).toHaveLength(2);
@@ -71,7 +71,7 @@ describe('BackupService.applyRetention', () => {
     for (const day of ['01', '02', '03', '04', '05']) {
       const folder = join(backupRoot, `2026-05-${day}_03-00-00`);
       await mkdir(folder, { recursive: true });
-      await writeFile(join(folder, 'laurans.sqlite'), 'x');
+      await writeFile(join(folder, 'hyprride.sqlite'), 'x');
     }
     await BackupService.applyRetention(backupRoot, { retainDailyCount: 2 });
     const remaining = (await readdir(backupRoot)).sort();
@@ -88,12 +88,12 @@ describe('BackupService.restoreFromFolder', () => {
       now: new Date('2026-05-05T03:00:00Z'),
       retainDailyCount: 30,
     });
-    await writeFile(join(userData, 'laurans.sqlite'), 'MUTATED');
+    await writeFile(join(userData, 'hyprride.sqlite'), 'MUTATED');
     await BackupService.restoreFromFolder({
       userDataDir: userData,
       sourceFolder: result.entry.folderPath,
     });
-    const restored = (await stat(join(userData, 'laurans.sqlite'))).size;
+    const restored = (await stat(join(userData, 'hyprride.sqlite'))).size;
     expect(restored).toBe('PRETEND-DB'.length);
   });
 });

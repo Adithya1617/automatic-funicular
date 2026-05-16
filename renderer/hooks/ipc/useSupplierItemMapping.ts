@@ -9,7 +9,7 @@ export function useSupplierItemSuggestions(
     queryKey: input
       ? ['supplierItemMapping', 'suggest', input.supplierId, input.partial, input.limit]
       : ['supplierItemMapping', 'suggest', 'none'],
-    queryFn: () => unwrap(window.laurans.supplierItemMapping.suggest(input!)),
+    queryFn: () => unwrap(window.hyprride.supplierItemMapping.suggest(input!)),
     enabled: !!input?.supplierId,
   });
 }

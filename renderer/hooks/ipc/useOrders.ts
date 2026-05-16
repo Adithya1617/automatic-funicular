@@ -15,7 +15,7 @@ const baseFilter: ListOrdersInput = { limit: 200 };
 export function useOrders(filter: ListOrdersInput = baseFilter) {
   return useQuery({
     queryKey: ordersKey(filter),
-    queryFn: () => unwrap(window.laurans.order.list(filter)),
+    queryFn: () => unwrap(window.hyprride.order.list(filter)),
     refetchInterval: 5_000,
   });
 }
@@ -23,7 +23,7 @@ export function useOrders(filter: ListOrdersInput = baseFilter) {
 export function useOrder(id: string | undefined) {
   return useQuery({
     queryKey: id ? orderKey(id) : ['order', 'none'],
-    queryFn: () => unwrap(window.laurans.order.get({ id: id! })),
+    queryFn: () => unwrap(window.hyprride.order.get({ id: id! })),
     enabled: !!id,
   });
 }
@@ -43,24 +43,24 @@ function useOrderMutation<TIn, TOut>(fn: (input: TIn) => Promise<TOut>) {
 
 export function useSubmitManualOrder() {
   return useOrderMutation((input: SubmitManualOrderInput) =>
-    unwrap(window.laurans.order.submitManual(input)),
+    unwrap(window.hyprride.order.submitManual(input)),
   );
 }
 
 export function useMarkPreparing() {
   return useOrderMutation((id: string) =>
-    unwrap(window.laurans.order.markPreparing({ id })),
+    unwrap(window.hyprride.order.markPreparing({ id })),
   );
 }
 
 export function useMarkDelivered() {
   return useOrderMutation((id: string) =>
-    unwrap(window.laurans.order.markDelivered({ id })),
+    unwrap(window.hyprride.order.markDelivered({ id })),
   );
 }
 
 export function useCancelOrder() {
   return useOrderMutation((input: CancelOrderInput) =>
-    unwrap(window.laurans.order.cancel(input)),
+    unwrap(window.hyprride.order.cancel(input)),
   );
 }

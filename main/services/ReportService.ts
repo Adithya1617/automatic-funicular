@@ -138,5 +138,5 @@ function exportSpending(
 function filenameFor(kind: string, range: { startMs: number; endMs: number }): string {
   const start = new Date(range.startMs).toISOString().slice(0, 10);
   const end = new Date(range.endMs).toISOString().slice(0, 10);
-  return `laurans_${kind}_${start}_${end}.csv`;
+  return `hyprride_${kind}_${start}_${end}.csv`;
 }

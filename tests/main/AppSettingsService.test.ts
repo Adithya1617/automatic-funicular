@@ -17,14 +17,14 @@ describe('AppSettingsService.snapshot', () => {
 
   it('parses persisted JSON values', () => {
     const map = new Map<string, string>([
-      ['backup.folderPath', JSON.stringify('/tmp/laurans-backups')],
+      ['backup.folderPath', JSON.stringify('/tmp/hyprride-backups')],
       ['backup.dailyAtMinutes', JSON.stringify(135)],
       ['backup.lastRunAt', JSON.stringify(1_700_000_000_000)],
       ['firstRunCompleted', JSON.stringify(true)],
     ]);
     vi.spyOn(appSettingsRepository, 'get').mockImplementation((_db, key) => map.get(key));
     const snap = AppSettingsService.snapshot({} as never);
-    expect(snap.backupFolderPath).toBe('/tmp/laurans-backups');
+    expect(snap.backupFolderPath).toBe('/tmp/hyprride-backups');
     expect(snap.backupDailyAtMinutes).toBe(135);
     expect(snap.backupLastRunAt).toBe(1_700_000_000_000);
     expect(snap.firstRunCompleted).toBe(true);

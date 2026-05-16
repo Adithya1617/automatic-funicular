@@ -6,7 +6,7 @@ export function useApplyMovement() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: ManualAdjustmentInput) =>
-      unwrap(window.laurans.inventory.applyMovement(input)),
+      unwrap(window.hyprride.inventory.applyMovement(input)),
     onSuccess: (_data, input) => {
       qc.invalidateQueries({ queryKey: ['ingredients'] });
       qc.invalidateQueries({ queryKey: ['ingredient', input.ingredientId] });

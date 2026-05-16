@@ -16,14 +16,14 @@ const inProgressKey = ['stockTake', 'inProgress'] as const;
 export function useStockTakes(filter: ListStockTakesInput = { limit: 100 }) {
   return useQuery({
     queryKey: stockTakesKey(filter),
-    queryFn: () => unwrap(window.laurans.stockTake.list(filter)),
+    queryFn: () => unwrap(window.hyprride.stockTake.list(filter)),
   });
 }
 
 export function useStockTake(id: string | undefined) {
   return useQuery({
     queryKey: id ? stockTakeKey(id) : ['stockTake', 'none'],
-    queryFn: () => unwrap(window.laurans.stockTake.get({ id: id! })),
+    queryFn: () => unwrap(window.hyprride.stockTake.get({ id: id! })),
     enabled: !!id,
   });
 }
@@ -31,7 +31,7 @@ export function useStockTake(id: string | undefined) {
 export function useStockTakeInProgress() {
   return useQuery({
     queryKey: inProgressKey,
-    queryFn: () => unwrap(window.laurans.stockTake.getInProgress({})),
+    queryFn: () => unwrap(window.hyprride.stockTake.getInProgress({})),
     refetchOnWindowFocus: true,
   });
 }
@@ -52,7 +52,7 @@ function useStockTakeMutation<TIn, TOut>(fn: (input: TIn) => Promise<TOut>) {
 
 export function useStartStockTake() {
   return useStockTakeMutation((input: StartStockTakeInput) =>
-    unwrap(window.laurans.stockTake.start(input)),
+    unwrap(window.hyprride.stockTake.start(input)),
   );
 }
 
@@ -60,7 +60,7 @@ export function useSaveStockTakeCount() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: SaveStockTakeCountInput) =>
-      unwrap(window.laurans.stockTake.saveCount(input)),
+      unwrap(window.hyprride.stockTake.saveCount(input)),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['stockTake'] });
     },
@@ -69,12 +69,12 @@ export function useSaveStockTakeCount() {
 
 export function useCommitStockTake() {
   return useStockTakeMutation((input: CommitStockTakeInput) =>
-    unwrap(window.laurans.stockTake.commit(input)),
+    unwrap(window.hyprride.stockTake.commit(input)),
   );
 }
 
 export function useDiscardStockTake() {
   return useStockTakeMutation((input: DiscardStockTakeInput) =>
-    unwrap(window.laurans.stockTake.discard(input)),
+    unwrap(window.hyprride.stockTake.discard(input)),
   );
 }

@@ -39,9 +39,9 @@ function createMainWindow(): BrowserWindow {
   if (isDev && devServerUrl) {
     void win.loadURL(devServerUrl);
     // DevTools is opt-in: it slows interactions noticeably in dev. Set
-    // LAURANS_DEVTOOLS=1 to auto-open, or hit F12 / Ctrl+Shift+I in the
+    // HYPRRIDE_DEVTOOLS=1 to auto-open, or hit F12 / Ctrl+Shift+I in the
     // window when you actually need it.
-    if (process.env['LAURANS_DEVTOOLS'] === '1') {
+    if (process.env['HYPRRIDE_DEVTOOLS'] === '1') {
       win.webContents.openDevTools({ mode: 'detach' });
     }
   } else {
@@ -53,7 +53,7 @@ function createMainWindow(): BrowserWindow {
 
 function bootstrap(): void {
   const userData = app.getPath('userData');
-  const dbPath = join(userData, 'laurans.sqlite');
+  const dbPath = join(userData, 'hyprride.sqlite');
   const migrationsFolder = isDev
     ? join(app.getAppPath(), 'main/db/migrations')
     : join(process.resourcesPath, 'db/migrations');

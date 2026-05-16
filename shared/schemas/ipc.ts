@@ -3,7 +3,7 @@
  * (no zod) so this module — which also hosts the `IPC` channel registry —
  * doesn't pull zod into the Electron preload. Sandboxed preloads can only
  * `require()` Electron's allowlist; importing zod here would silently break
- * `window.laurans` exposure.
+ * `window.hyprride` exposure.
  */
 export type IpcErrorCode =
   | 'NOT_FOUND'

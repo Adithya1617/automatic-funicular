@@ -1,16 +1,24 @@
-# Laurans Inventory
+# Hyprride Inventory
 
-Restaurant inventory management for Laurans Food Court (Hyderabad). Single-tenant
-Windows desktop app, architected for future multi-tenant SaaS migration.
+Servicing & parts inventory management for **Hyprride Bike Rentals**
+(Madhapur, Hyderabad). Single-tenant Windows desktop app, architected for
+future multi-tenant SaaS migration.
 
-See [`SPECIFICATION.md`](./SPECIFICATION.md) for the full functional spec,
-[`CLAUDE_CODE_PROMPT.md`](./CLAUDE_CODE_PROMPT.md) for the engineering contract, and
-[`CLAUDE.md`](./CLAUDE.md) for the working agreement and locked decisions.
+> This branch (`hyprride`) is a fork of the **Laurans Food Court** restaurant
+> inventory codebase on `main`. Architectural decisions carry over verbatim;
+> the domain model is being retargeted to bikes, parts, and service events.
+> Laurans stays alive on `main`.
+
+See [`CLAUDE.md`](./CLAUDE.md) for the operating contract, locked decisions,
+and slice plan. The historical Laurans spec
+([`SPECIFICATION.md`](./SPECIFICATION.md),
+[`CLAUDE_CODE_PROMPT.md`](./CLAUDE_CODE_PROMPT.md)) remains for context.
 
 ## Status
 
-**Slice 1 (scaffolding only).** App shell + placeholder routes. No database, no real
-features yet.
+**Slice H1 (rebrand only).** Branding, DB filename, and IPC bridge swapped
+from Laurans → Hyprride. Underlying data model and routes are still the
+restaurant ones — they get retargeted in slices H2–H9.
 
 ## Requirements
 
@@ -25,22 +33,20 @@ npm install
 npm run dev
 ```
 
-The Electron window opens with the sidebar shell. The 8 routes (Dashboard,
-Live orders, Ingredients, Menu, Invoices, Stock take, CSV import, Settings) all
-render their placeholder. Dashboard is the landing route.
-
 ## Other scripts
 
 ```bash
 npm run typecheck   # tsc --noEmit on both renderer and main/preload/shared
-npm run build       # electron-vite build (no installer yet — slice 10)
+npm run build       # electron-vite build
+npm run test        # vitest
+npm run package:win # Windows installer (NSIS)
 ```
 
 ## Layout
 
 ```
-main/      Electron main process (backend, future home of services + DB)
-preload/   contextBridge surface — currently a ping stub
+main/      Electron main process (services, repos, DB, IPC, jobs)
+preload/   contextBridge surface — exposes window.hyprride
 renderer/  React UI (Vite-served in dev)
 shared/    Zod schemas, constants, utils consumed by both processes
 ```

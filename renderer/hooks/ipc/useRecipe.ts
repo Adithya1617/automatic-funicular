@@ -10,7 +10,7 @@ export function useActiveRecipe(parentId: string | undefined, parentType: Recipe
   return useQuery({
     queryKey: parentId ? activeKey(parentId, parentType) : ['recipe', 'active', 'none'],
     queryFn: () =>
-      unwrap(window.laurans.recipe.getActive({ parentId: parentId!, parentType })),
+      unwrap(window.hyprride.recipe.getActive({ parentId: parentId!, parentType })),
     enabled: !!parentId,
   });
 }
@@ -19,7 +19,7 @@ export function useSaveRecipeVersion() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: SaveRecipeVersionInput) =>
-      unwrap(window.laurans.recipe.saveVersion(input)),
+      unwrap(window.hyprride.recipe.saveVersion(input)),
     onSuccess: (_data, input) => {
       qc.invalidateQueries({ queryKey: activeKey(input.parentId, input.parentType) });
       qc.invalidateQueries({ queryKey: ['recipe', 'versions', input.parentType, input.parentId] });

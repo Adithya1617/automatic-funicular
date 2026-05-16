@@ -9,14 +9,14 @@ import { unwrap } from '@renderer/lib/ipc';
 
 export function useCsvTemplate() {
   return useMutation<CsvTemplateResponse, Error, CsvTemplateInput>({
-    mutationFn: (input) => unwrap(window.laurans.csvImport.template(input)),
+    mutationFn: (input) => unwrap(window.hyprride.csvImport.template(input)),
   });
 }
 
 export function useCsvImport() {
   const qc = useQueryClient();
   return useMutation<CsvImportResult, Error, CsvImportInput>({
-    mutationFn: (input) => unwrap(window.laurans.csvImport.run(input)),
+    mutationFn: (input) => unwrap(window.hyprride.csvImport.run(input)),
     onSuccess: (result) => {
       if (!result.committed) return;
       // Touch the caches the import could have affected.

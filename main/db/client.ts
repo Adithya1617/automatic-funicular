@@ -76,7 +76,7 @@ function ensureBootstrapRows(db: ConcreteDb): void {
     .all();
   if (existing.length === 0) {
     db.insert(schema.tenants)
-      .values({ id: DEFAULT_TENANT_ID, name: 'Laurans Food Court', createdAt: now })
+      .values({ id: DEFAULT_TENANT_ID, name: 'Hyprride Bike Rentals', createdAt: now })
       .run();
   }
 

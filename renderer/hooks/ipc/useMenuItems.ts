@@ -15,14 +15,14 @@ const menuItemKey = (id: string) => ['menuItem', id] as const;
 export function useMenuItems(filter: ListMenuItemsInput = { includeInactive: false }) {
   return useQuery({
     queryKey: menuItemsKey(filter),
-    queryFn: () => unwrap(window.laurans.menuItem.list(filter)),
+    queryFn: () => unwrap(window.hyprride.menuItem.list(filter)),
   });
 }
 
 export function useMenuItem(id: string | undefined) {
   return useQuery({
     queryKey: id ? menuItemKey(id) : ['menuItem', 'none'],
-    queryFn: () => unwrap(window.laurans.menuItem.get({ id: id! })),
+    queryFn: () => unwrap(window.hyprride.menuItem.get({ id: id! })),
     enabled: !!id,
   });
 }
@@ -31,7 +31,7 @@ export function useCreateMenuItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateMenuItemInput) =>
-      unwrap(window.laurans.menuItem.create(input)),
+      unwrap(window.hyprride.menuItem.create(input)),
     onSuccess: (created: MenuItem) => {
       qc.invalidateQueries({ queryKey: ['menuItems'] });
       qc.invalidateQueries({ queryKey: ['availability'] });
@@ -44,7 +44,7 @@ export function useUpdateMenuItem() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: UpdateMenuItemInput) =>
-      unwrap(window.laurans.menuItem.update(input)),
+      unwrap(window.hyprride.menuItem.update(input)),
     onSuccess: (updated: MenuItem) => {
       qc.invalidateQueries({ queryKey: ['menuItems'] });
       qc.setQueryData(menuItemKey(updated.id), updated);
@@ -55,7 +55,7 @@ export function useUpdateMenuItem() {
 export function useDeactivateMenuItem() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => unwrap(window.laurans.menuItem.deactivate({ id })),
+    mutationFn: (id: string) => unwrap(window.hyprride.menuItem.deactivate({ id })),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['menuItems'] });
     },
@@ -66,7 +66,7 @@ export function useCreateVariant() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateVariantInput) =>
-      unwrap(window.laurans.menuItem.createVariant(input)),
+      unwrap(window.hyprride.menuItem.createVariant(input)),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['menuItems'] });
       qc.invalidateQueries({ queryKey: ['availability'] });

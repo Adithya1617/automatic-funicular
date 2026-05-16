@@ -7,6 +7,6 @@ import { unwrap } from '@renderer/lib/ipc';
 
 export function useExportReport() {
   return useMutation<ExportReportResponse, Error, ExportReportInput>({
-    mutationFn: (input) => unwrap(window.laurans.report.exportCsv(input)),
+    mutationFn: (input) => unwrap(window.hyprride.report.exportCsv(input)),
   });
 }

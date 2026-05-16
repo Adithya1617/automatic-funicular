@@ -21,7 +21,7 @@ async function reopenDb(): Promise<void> {
     ? join(process.resourcesPath, 'db/migrations')
     : join(app.getAppPath(), 'main/db/migrations');
   openDb({
-    filePath: join(userData, 'laurans.sqlite'),
+    filePath: join(userData, 'hyprride.sqlite'),
     migrationsFolder,
   });
 }
@@ -46,7 +46,7 @@ export function registerBackupHandlers(): void {
         );
       }
       // Force-flush WAL into the main DB file so the snapshot is hot-consistent.
-      // Without this, recent committed transactions sitting in laurans.sqlite-wal
+      // Without this, recent committed transactions sitting in hyprride.sqlite-wal
       // would be silently absent from the backup.
       getDb().raw.pragma('wal_checkpoint(TRUNCATE)');
       const result = await BackupService.runBackup({

@@ -1,8 +1,8 @@
 {
-  "name": "laurans",
+  "name": "hyprride",
   "version": "0.1.0",
   "private": true,
-  "description": "Laurans Food Court — Restaurant Inventory Management (Electron desktop app)",
+  "description": "Hyprride Bike Rentals — Servicing & Parts Inventory Management (Electron desktop app)",
   "main": "out/main/index.js",
   "scripts": {
     "postinstall": "electron-rebuild -f -w better-sqlite3",

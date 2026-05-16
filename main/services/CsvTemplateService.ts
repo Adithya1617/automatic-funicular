@@ -38,7 +38,7 @@ export const CsvTemplateService = {
     const rows = [HEADERS[kind], ...SAMPLE_ROWS[kind]];
     return {
       kind,
-      filename: `laurans_${kind}_template.csv`,
+      filename: `hyprride_${kind}_template.csv`,
       content: toCsv(rows),
     };
   },

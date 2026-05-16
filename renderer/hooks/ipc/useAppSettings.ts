@@ -13,7 +13,7 @@ const KEY = ['appSettings'] as const;
 export function useAppSettings() {
   return useQuery({
     queryKey: KEY,
-    queryFn: () => unwrap(window.laurans.appSettings.snapshot({})),
+    queryFn: () => unwrap(window.hyprride.appSettings.snapshot({})),
   });
 }
 
@@ -29,25 +29,25 @@ function useMut<TIn>(
 
 export function useSetBackupFolder() {
   return useMut<SetBackupFolderInput>((input) =>
-    unwrap(window.laurans.appSettings.setBackupFolder(input)),
+    unwrap(window.hyprride.appSettings.setBackupFolder(input)),
   );
 }
 
 export function useSetBackupTime() {
   return useMut<SetBackupTimeInput>((input) =>
-    unwrap(window.laurans.appSettings.setBackupTime(input)),
+    unwrap(window.hyprride.appSettings.setBackupTime(input)),
   );
 }
 
 export function useSetFirstRunCompleted() {
   return useMut<SetFirstRunInput>((input) =>
-    unwrap(window.laurans.appSettings.setFirstRunCompleted(input)),
+    unwrap(window.hyprride.appSettings.setFirstRunCompleted(input)),
   );
 }
 
 export function useChooseDirectory() {
   return useMutation({
     mutationFn: (input: ChooseDirectoryInput) =>
-      unwrap(window.laurans.appSettings.chooseDirectory(input)),
+      unwrap(window.hyprride.appSettings.chooseDirectory(input)),
   });
 }

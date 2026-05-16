@@ -282,6 +282,6 @@ const api = {
   },
 } as const;
 
-export type LauransBridge = typeof api;
+export type HyprrideBridge = typeof api;
 
-contextBridge.exposeInMainWorld('laurans', api);
+contextBridge.exposeInMainWorld('hyprride', api);

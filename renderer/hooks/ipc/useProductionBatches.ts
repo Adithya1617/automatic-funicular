@@ -5,7 +5,7 @@ import { unwrap } from '@renderer/lib/ipc';
 export function useProductionBatches(filter: ListBatchesInput) {
   return useQuery({
     queryKey: ['productionBatches', filter],
-    queryFn: () => unwrap(window.laurans.production.list(filter)),
+    queryFn: () => unwrap(window.hyprride.production.list(filter)),
   });
 }
 
@@ -13,7 +13,7 @@ export function useRecordBatch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: RecordBatchInput) =>
-      unwrap(window.laurans.production.recordBatch(input)),
+      unwrap(window.hyprride.production.recordBatch(input)),
     onSuccess: (_data, input) => {
       qc.invalidateQueries({ queryKey: ['productionBatches'] });
       qc.invalidateQueries({ queryKey: ['ingredients'] });
