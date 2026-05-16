@@ -289,7 +289,7 @@ function bikeType(overrides: Partial<BikeTypeRow> = {}): BikeTypeRow {
   return {
     id: TYPE_110,
     tenantId: DEFAULT_TENANT_ID,
-    name: '110cc Activa',
+    name: 'Activa',
     engineCc: 110,
     displayOrder: 1,
     isActive: true,
@@ -408,8 +408,8 @@ describe('DashboardService.costPerBike', () => {
       return undefined;
     });
     vi.spyOn(bikeTypeRepository, 'list').mockReturnValue([
-      bikeType({ id: TYPE_110, name: '110cc Activa' }),
-      bikeType({ id: TYPE_125, name: '125cc Ntorq', engineCc: 125 }),
+      bikeType({ id: TYPE_110, name: 'Activa' }),
+      bikeType({ id: TYPE_125, name: 'Ntorq', engineCc: 125 }),
     ]);
 
     const result = DashboardService.costPerBike(db as never, DEFAULT_TENANT_ID, RANGE);
@@ -495,8 +495,8 @@ describe('DashboardService.costPerBikeType', () => {
       bike({ id: 'b-d', bikeTypeId: TYPE_125 }),
     ]);
     vi.spyOn(bikeTypeRepository, 'list').mockReturnValue([
-      bikeType({ id: TYPE_110, name: '110cc Activa' }),
-      bikeType({ id: TYPE_125, name: '125cc Ntorq', engineCc: 125 }),
+      bikeType({ id: TYPE_110, name: 'Activa' }),
+      bikeType({ id: TYPE_125, name: 'Ntorq', engineCc: 125 }),
     ]);
 
     const result = DashboardService.costPerBikeType(db as never, DEFAULT_TENANT_ID, RANGE);
@@ -563,8 +563,8 @@ describe('DashboardService.serviceVolumeByBikeType', () => {
       bike({ id: BIKE_2, bikeTypeId: TYPE_125 }),
     ]);
     vi.spyOn(bikeTypeRepository, 'list').mockReturnValue([
-      bikeType({ id: TYPE_110, name: '110cc Activa' }),
-      bikeType({ id: TYPE_125, name: '125cc Ntorq', engineCc: 125 }),
+      bikeType({ id: TYPE_110, name: 'Activa' }),
+      bikeType({ id: TYPE_125, name: 'Ntorq', engineCc: 125 }),
     ]);
 
     const result = DashboardService.serviceVolumeByBikeType(db as never, DEFAULT_TENANT_ID, RANGE);

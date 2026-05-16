@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import type { ServiceTemplate } from '@shared/schemas/serviceTemplate';
+import { formatBikeTypeLabel } from '@shared/utils/bikeType';
 import { Button } from '@renderer/components/ui/button';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
@@ -159,7 +160,7 @@ export function ServiceTemplateEditorPage() {
               <SelectContent>
                 {bikeTypes.map((t) => (
                   <SelectItem key={t.id} value={t.id}>
-                    {t.name}
+                    {formatBikeTypeLabel(t)}
                   </SelectItem>
                 ))}
               </SelectContent>

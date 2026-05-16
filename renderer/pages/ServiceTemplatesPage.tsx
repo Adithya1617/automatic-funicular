@@ -20,6 +20,7 @@ import {
 } from '@renderer/components/ui/table';
 import { useBikeTypes } from '@renderer/hooks/ipc/useBikes';
 import { useServiceTemplates } from '@renderer/hooks/ipc/useServiceTemplates';
+import { formatBikeTypeLabel } from '@shared/utils/bikeType';
 
 export function ServiceTemplatesPage() {
   const navigate = useNavigate();
@@ -36,7 +37,7 @@ export function ServiceTemplatesPage() {
   const { data: templates = [], isLoading } = useServiceTemplates(filter);
   const { data: bikeTypes = [] } = useBikeTypes();
   const typeNameById = useMemo(
-    () => new Map(bikeTypes.map((t) => [t.id, t.name])),
+    () => new Map(bikeTypes.map((t) => [t.id, formatBikeTypeLabel(t)])),
     [bikeTypes],
   );
 
@@ -58,7 +59,7 @@ export function ServiceTemplatesPage() {
               <SelectItem value="all">All models</SelectItem>
               {bikeTypes.map((t) => (
                 <SelectItem key={t.id} value={t.id}>
-                  {t.name}
+                  {formatBikeTypeLabel(t)}
                 </SelectItem>
               ))}
             </SelectContent>

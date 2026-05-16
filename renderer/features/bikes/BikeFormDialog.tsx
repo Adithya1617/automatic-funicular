@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { Bike, BikeType } from '@shared/schemas/bike';
+import { formatBikeTypeLabel } from '@shared/utils/bikeType';
 import { Button } from '@renderer/components/ui/button';
 import {
   Dialog,
@@ -163,7 +164,7 @@ export function BikeFormDialog({ open, onOpenChange, bikeTypes, bike }: Props) {
                 <SelectContent>
                   {bikeTypes.map((t) => (
                     <SelectItem key={t.id} value={t.id}>
-                      {t.name}
+                      {formatBikeTypeLabel(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>

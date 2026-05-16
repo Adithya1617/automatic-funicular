@@ -32,6 +32,7 @@ import type {
 import type { StockMovementReason } from '@shared/constants/enums';
 import { REORDER_LEAD_TIME_DAYS } from '@shared/constants/system';
 import { toBase } from '@shared/utils/unitConverter';
+import { formatBikeTypeLabel } from '@shared/utils/bikeType';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1_000;
 
@@ -348,7 +349,7 @@ export const DashboardService = {
         bikeId: bike.id,
         bikeNumber: bike.bikeNumber,
         bikeTypeId: bike.bikeTypeId,
-        bikeTypeName: bikeType?.name ?? '(unknown)',
+        bikeTypeName: bikeType ? formatBikeTypeLabel(bikeType) : '(unknown)',
         partsCost: round2(Math.max(0, agg.partsCost)),
         servicesCount: agg.services.size,
         lastServiceAt: agg.lastServiceAt,
@@ -388,7 +389,7 @@ export const DashboardService = {
     for (const t of bikeTypes) {
       byType.set(t.id, {
         bikeTypeId: t.id,
-        bikeTypeName: t.name,
+        bikeTypeName: formatBikeTypeLabel(t),
         bikeCount: activeCountByType.get(t.id) ?? 0,
         partsCost: 0,
         servicesCount: 0,
@@ -478,7 +479,7 @@ export const DashboardService = {
     const rows = bikeTypes
       .map((t) => ({
         bikeTypeId: t.id,
-        bikeTypeName: t.name,
+        bikeTypeName: formatBikeTypeLabel(t),
         servicesCount: countByType.get(t.id) ?? 0,
       }))
       .sort((a, b) => b.servicesCount - a.servicesCount);
@@ -525,11 +526,12 @@ export const DashboardService = {
           totalCost += baseQty * ing.currentAvgCostPerUnit;
         }
       }
+      const bt = bikeTypeById.get(tpl.bikeTypeId);
       return {
         serviceTemplateId: tpl.id,
         serviceTemplateName: tpl.name,
         bikeTypeId: tpl.bikeTypeId,
-        bikeTypeName: bikeTypeById.get(tpl.bikeTypeId)?.name ?? '(unknown)',
+        bikeTypeName: bt ? formatBikeTypeLabel(bt) : '(unknown)',
         totalCost: round2(totalCost),
         hasActiveRecipe,
       };

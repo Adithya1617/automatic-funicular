@@ -119,12 +119,18 @@ function readSeedsAppliedFlag(db: ConcreteDb): boolean {
 }
 
 function ensureBikeTypes(db: ConcreteDb, now: number): void {
-  // Hyprride fleet has three bike models. Service templates and individual
-  // bikes both reference these rows, so seed them on first boot.
+  // Hyprride fleet — `name` is just the model. `engineCc` lives in its own
+  // column; UI renders combined as `${engineCc}cc ${name}` via
+  // shared/utils/bikeType.ts. Service templates and individual bikes both
+  // reference these rows, so seed them on first boot.
   const seeds: Array<{ name: string; engineCc: number; displayOrder: number }> = [
-    { name: '110cc Activa', engineCc: 110, displayOrder: 1 },
-    { name: '125cc Ntorq', engineCc: 125, displayOrder: 2 },
-    { name: '160cc Apache RTR', engineCc: 160, displayOrder: 3 },
+    { name: 'Activa', engineCc: 110, displayOrder: 1 },
+    { name: 'Ntorq', engineCc: 125, displayOrder: 2 },
+    { name: 'Jupiter', engineCc: 125, displayOrder: 3 },
+    { name: 'Raider', engineCc: 125, displayOrder: 4 },
+    { name: 'RayZR', engineCc: 125, displayOrder: 5 },
+    { name: 'Destiny', engineCc: 125, displayOrder: 6 },
+    { name: 'Apache', engineCc: 160, displayOrder: 7 },
   ];
   for (const seed of seeds) {
     const existing = db

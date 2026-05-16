@@ -6,6 +6,7 @@ import {
   createColumnHelper,
 } from '@tanstack/react-table';
 import type { Bike, BikeType } from '@shared/schemas/bike';
+import { formatBikeTypeLabel } from '@shared/utils/bikeType';
 import {
   Table,
   TableBody,
@@ -25,7 +26,7 @@ const columnHelper = createColumnHelper<Bike>();
 
 export function BikesTable({ rows, bikeTypes, onSelect }: Props) {
   const typeNameById = useMemo(
-    () => new Map(bikeTypes.map((t) => [t.id, t.name])),
+    () => new Map(bikeTypes.map((t) => [t.id, formatBikeTypeLabel(t)])),
     [bikeTypes],
   );
 

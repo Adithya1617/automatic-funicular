@@ -12,6 +12,7 @@ import {
 import { useBikes, useBikeTypes } from '@renderer/hooks/ipc/useBikes';
 import { BikesTable } from '@renderer/features/bikes/BikesTable';
 import { BikeFormDialog } from '@renderer/features/bikes/BikeFormDialog';
+import { formatBikeTypeLabel } from '@shared/utils/bikeType';
 
 export function BikesPage() {
   const [search, setSearch] = useState('');
@@ -62,7 +63,7 @@ export function BikesPage() {
               <SelectItem value="all">All models</SelectItem>
               {bikeTypes.map((t) => (
                 <SelectItem key={t.id} value={t.id}>
-                  {t.name}
+                  {formatBikeTypeLabel(t)}
                 </SelectItem>
               ))}
             </SelectContent>
