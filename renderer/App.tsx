@@ -4,6 +4,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { LiveOrdersPage } from './pages/LiveOrdersPage';
 import { ManualOrderPage } from './pages/ManualOrderPage';
 import { IngredientsPage } from './pages/IngredientsPage';
+import { BikesPage } from './pages/BikesPage';
 import { MenuPage } from './pages/MenuPage';
 import { MenuEditorPage } from './pages/MenuEditorPage';
 import { InvoicesPage } from './pages/InvoicesPage';
@@ -20,6 +21,7 @@ export function App() {
         <Route path="orders/live" element={<LiveOrdersPage />} />
         <Route path="orders/new" element={<ManualOrderPage />} />
         <Route path="ingredients" element={<IngredientsPage />} />
+        <Route path="bikes" element={<BikesPage />} />
         <Route path="menu" element={<MenuPage />} />
         <Route path="menu/new" element={<MenuEditorPage />} />
         <Route path="menu/:id/edit" element={<MenuEditorPage />} />

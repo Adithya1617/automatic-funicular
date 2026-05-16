@@ -35,6 +35,14 @@ export const IPC = {
     update: 'supplier:update',
     deactivate: 'supplier:deactivate',
   },
+  bike: {
+    list: 'bike:list',
+    get: 'bike:get',
+    create: 'bike:create',
+    update: 'bike:update',
+    deactivate: 'bike:deactivate',
+    listTypes: 'bike:listTypes',
+  },
   stockMovement: {
     list: 'stockMovement:list',
   },

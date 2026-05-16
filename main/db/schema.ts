@@ -456,3 +456,51 @@ export type StockTakeRow = typeof stockTakes.$inferSelect;
 export type StockTakeInsert = typeof stockTakes.$inferInsert;
 export type StockTakeLineRow = typeof stockTakeLines.$inferSelect;
 export type StockTakeLineInsert = typeof stockTakeLines.$inferInsert;
+
+// -- Hyprride: bike types + bikes ------------------------------------------
+// `bike_types` is a small fixed catalog (110cc Activa, 125cc Ntorq, 160cc
+// Apache RTR). Seeded on bootstrap; new types can be added later but the
+// initial three are required for service templates to attach to.
+// `bikes` is the fleet — ~40 instances keyed by `bike_number`.
+export const bikeTypes = sqliteTable(
+  'bike_types',
+  {
+    id: text('id').primaryKey(),
+    tenantId: integer('tenant_id').notNull(),
+    name: text('name').notNull(),
+    engineCc: integer('engine_cc').notNull(),
+    displayOrder: integer('display_order').notNull().default(0),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    ...audit,
+  },
+  (t) => ({
+    tenantNameIdx: index('idx_bike_types_tenant_name').on(t.tenantId, t.name),
+  }),
+);
+
+export const bikes = sqliteTable(
+  'bikes',
+  {
+    id: text('id').primaryKey(),
+    tenantId: integer('tenant_id').notNull(),
+    bikeNumber: text('bike_number').notNull(),
+    bikeTypeId: text('bike_type_id')
+      .notNull()
+      .references(() => bikeTypes.id),
+    licensePlate: text('license_plate'),
+    odometerKm: real('odometer_km'),
+    notes: text('notes'),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    ...audit,
+  },
+  (t) => ({
+    tenantNumberIdx: index('idx_bikes_tenant_number').on(t.tenantId, t.bikeNumber),
+    tenantTypeIdx: index('idx_bikes_tenant_type').on(t.tenantId, t.bikeTypeId),
+    tenantActiveIdx: index('idx_bikes_tenant_active').on(t.tenantId, t.isActive),
+  }),
+);
+
+export type BikeTypeRow = typeof bikeTypes.$inferSelect;
+export type BikeTypeInsert = typeof bikeTypes.$inferInsert;
+export type BikeRow = typeof bikes.$inferSelect;
+export type BikeInsert = typeof bikes.$inferInsert;

@@ -1,6 +1,7 @@
 import { registerAppSettingsHandlers } from './handlers/appSettings';
 import { registerAvailabilityHandlers } from './handlers/availability';
 import { registerBackupHandlers } from './handlers/backup';
+import { registerBikeHandlers } from './handlers/bike';
 import { registerCsvImportHandlers } from './handlers/csvImport';
 import { registerDashboardHandlers } from './handlers/dashboard';
 import { registerIngredientHandlers } from './handlers/ingredient';
@@ -21,6 +22,7 @@ import { registerSupplierItemMappingHandlers } from './handlers/supplierItemMapp
 export function registerIpcHandlers(): void {
   registerIngredientHandlers();
   registerSupplierHandlers();
+  registerBikeHandlers();
   registerStockMovementHandlers();
   registerInventoryHandlers();
   registerRecipeHandlers();

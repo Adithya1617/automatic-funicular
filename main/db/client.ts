@@ -88,6 +88,39 @@ function ensureBootstrapRows(db: ConcreteDb): void {
     .run();
 
   ensureMockOrderingChannels(db, now);
+  ensureBikeTypes(db, now);
+}
+
+function ensureBikeTypes(db: ConcreteDb, now: number): void {
+  // Hyprride fleet has three bike models. Service templates and individual
+  // bikes both reference these rows, so seed them on first boot.
+  const seeds: Array<{ name: string; engineCc: number; displayOrder: number }> = [
+    { name: '110cc Activa', engineCc: 110, displayOrder: 1 },
+    { name: '125cc Ntorq', engineCc: 125, displayOrder: 2 },
+    { name: '160cc Apache RTR', engineCc: 160, displayOrder: 3 },
+  ];
+  for (const seed of seeds) {
+    const existing = db
+      .select()
+      .from(schema.bikeTypes)
+      .where(eq(schema.bikeTypes.name, seed.name))
+      .all();
+    if (existing.length > 0) continue;
+    db.insert(schema.bikeTypes)
+      .values({
+        id: newId(),
+        tenantId: DEFAULT_TENANT_ID,
+        name: seed.name,
+        engineCc: seed.engineCc,
+        displayOrder: seed.displayOrder,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
+      })
+      .run();
+  }
 }
 
 function ensureMockOrderingChannels(db: ConcreteDb, now: number): void {

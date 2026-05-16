@@ -17,6 +17,16 @@ import type {
   UpdateSupplierInput,
 } from '@shared/schemas/supplier';
 import type {
+  Bike,
+  BikeType,
+  CreateBikeInput,
+  DeactivateBikeInput,
+  GetBikeInput,
+  ListBikeTypesInput,
+  ListBikesInput,
+  UpdateBikeInput,
+} from '@shared/schemas/bike';
+import type {
   ListStockMovementsInput,
   StockMovement,
 } from '@shared/schemas/stockMovement';
@@ -161,6 +171,14 @@ const api = {
     create: invoke<CreateSupplierInput, Supplier>(IPC.supplier.create),
     update: invoke<UpdateSupplierInput, Supplier>(IPC.supplier.update),
     deactivate: invoke<DeactivateSupplierInput, Supplier>(IPC.supplier.deactivate),
+  },
+  bike: {
+    list: invoke<ListBikesInput, Bike[]>(IPC.bike.list),
+    get: invoke<GetBikeInput, Bike>(IPC.bike.get),
+    create: invoke<CreateBikeInput, Bike>(IPC.bike.create),
+    update: invoke<UpdateBikeInput, Bike>(IPC.bike.update),
+    deactivate: invoke<DeactivateBikeInput, Bike>(IPC.bike.deactivate),
+    listTypes: invoke<ListBikeTypesInput, BikeType[]>(IPC.bike.listTypes),
   },
   stockMovement: {
     list: invoke<ListStockMovementsInput, StockMovement[]>(IPC.stockMovement.list),
