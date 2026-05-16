@@ -128,8 +128,8 @@ function ensureBikeTypes(db: ConcreteDb, now: number): void {
     { name: 'Ntorq', engineCc: 125, displayOrder: 2 },
     { name: 'Jupiter', engineCc: 125, displayOrder: 3 },
     { name: 'Raider', engineCc: 125, displayOrder: 4 },
-    { name: 'RayZR', engineCc: 125, displayOrder: 5 },
-    { name: 'Destiny', engineCc: 125, displayOrder: 6 },
+    { name: 'Yamaha RayZR', engineCc: 125, displayOrder: 5 },
+    { name: 'Hero Destiny', engineCc: 125, displayOrder: 6 },
     { name: 'Apache', engineCc: 160, displayOrder: 7 },
   ];
   for (const seed of seeds) {

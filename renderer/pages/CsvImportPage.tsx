@@ -17,6 +17,7 @@ import {
   TableRow,
 } from '@renderer/components/ui/table';
 import { useCsvImport, useCsvTemplate } from '@renderer/hooks/ipc/useCsvImport';
+import { BikesEditableImport } from '@renderer/features/csvImport/BikesEditableImport';
 import {
   CSV_IMPORT_KINDS,
   type CsvImportKind,
@@ -61,7 +62,7 @@ export function CsvImportPage() {
         </TabsList>
         {CSV_IMPORT_KINDS.map((kind) => (
           <TabsContent key={kind} value={kind}>
-            <ImportPanel kind={kind} />
+            {kind === 'bikes' ? <BikesEditableImport /> : <ImportPanel kind={kind} />}
           </TabsContent>
         ))}
       </Tabs>
