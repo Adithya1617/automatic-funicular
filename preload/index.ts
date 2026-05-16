@@ -125,7 +125,12 @@ import type {
   RunBackupInput,
   RunBackupResponse,
 } from '@shared/schemas/backup';
-import type { DemoSeedInput, DemoSeedResult } from '@shared/schemas/demo';
+import type {
+  DemoResetInput,
+  DemoResetResult,
+  DemoSeedInput,
+  DemoSeedResult,
+} from '@shared/schemas/demo';
 
 type ReconciliationSnapshotApi = {
   ranAtMs: number;
@@ -286,6 +291,7 @@ const api = {
   },
   demo: {
     seed: invoke<DemoSeedInput, DemoSeedResult>(IPC.demo.seed),
+    reset: invoke<DemoResetInput, DemoResetResult>(IPC.demo.reset),
   },
 } as const;
 

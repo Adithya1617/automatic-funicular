@@ -12,3 +12,11 @@ export const demoSeedResultSchema = z.object({
   alreadyPopulated: z.boolean(),
 });
 export type DemoSeedResult = z.infer<typeof demoSeedResultSchema>;
+
+export const demoResetInputSchema = z.object({}).default({});
+export type DemoResetInput = z.infer<typeof demoResetInputSchema>;
+
+export const demoResetResultSchema = z.object({
+  tablesCleared: z.number().int().nonnegative(),
+});
+export type DemoResetResult = z.infer<typeof demoResetResultSchema>;

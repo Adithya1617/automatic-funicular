@@ -1,3 +1,4 @@
+import { eq, inArray } from 'drizzle-orm';
 import type { AppDb } from '../db/client';
 import { newId } from '../lib/ids';
 import { bikeRepository } from '../repositories/bikeRepository';
@@ -9,7 +10,23 @@ import { stockMovementRepository } from '../repositories/stockMovementRepository
 import { supplierRepository } from '../repositories/supplierRepository';
 import { InventoryService } from './InventoryService';
 import { SYSTEM_USER_ID } from '@shared/constants/system';
-import type { BikeTypeRow, IngredientRow } from '../db/schema';
+import {
+  bikes,
+  ingredients,
+  invoiceLines,
+  invoices,
+  recipeIngredients,
+  recipeVersions,
+  serviceEventLines,
+  serviceEvents,
+  serviceTemplates,
+  stockMovements,
+  stockTakeLines,
+  stockTakes,
+  suppliers,
+  type BikeTypeRow,
+  type IngredientRow,
+} from '../db/schema';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -386,6 +403,98 @@ export const DemoSeedService = {
       serviceEventsAdded,
       alreadyPopulated,
     };
+  },
+
+  /**
+   * Wipe all demo-adjacent data so the next `run()` rebuilds from scratch.
+   * Deletes service events, invoices, recipes, service templates, stock
+   * movements, bikes, suppliers, stock takes — then resets the 8 seeded
+   * parts to zero stock and zero avg cost. Bike types, tenants, and the
+   * parts rows themselves stay (they're baseline data).
+   */
+  reset(db: AppDb, tenantId: number): { tablesCleared: number } {
+    let cleared = 0;
+    db.transaction((tx) => {
+      // Child rows first so FKs don't block the parent deletes. service_event_lines
+      // and invoice_lines have no tenant_id of their own; their parents do, so
+      // we filter on the parent's tenancy where needed.
+      tx.delete(serviceEventLines)
+        .where(
+          inArray(
+            serviceEventLines.serviceEventId,
+            db
+              .select({ id: serviceEvents.id })
+              .from(serviceEvents)
+              .where(eq(serviceEvents.tenantId, tenantId)),
+          ),
+        )
+        .run();
+      cleared += 1;
+      tx.delete(serviceEvents).where(eq(serviceEvents.tenantId, tenantId)).run();
+      cleared += 1;
+      tx.delete(invoiceLines)
+        .where(
+          inArray(
+            invoiceLines.invoiceId,
+            db
+              .select({ id: invoices.id })
+              .from(invoices)
+              .where(eq(invoices.tenantId, tenantId)),
+          ),
+        )
+        .run();
+      cleared += 1;
+      tx.delete(invoices).where(eq(invoices.tenantId, tenantId)).run();
+      cleared += 1;
+      tx.delete(stockTakeLines)
+        .where(
+          inArray(
+            stockTakeLines.stockTakeId,
+            db
+              .select({ id: stockTakes.id })
+              .from(stockTakes)
+              .where(eq(stockTakes.tenantId, tenantId)),
+          ),
+        )
+        .run();
+      cleared += 1;
+      tx.delete(stockTakes).where(eq(stockTakes.tenantId, tenantId)).run();
+      cleared += 1;
+      tx.delete(recipeIngredients)
+        .where(
+          inArray(
+            recipeIngredients.recipeVersionId,
+            db
+              .select({ id: recipeVersions.id })
+              .from(recipeVersions)
+              .where(eq(recipeVersions.tenantId, tenantId)),
+          ),
+        )
+        .run();
+      cleared += 1;
+      tx.delete(recipeVersions).where(eq(recipeVersions.tenantId, tenantId)).run();
+      cleared += 1;
+      tx.delete(serviceTemplates).where(eq(serviceTemplates.tenantId, tenantId)).run();
+      cleared += 1;
+      tx.delete(stockMovements).where(eq(stockMovements.tenantId, tenantId)).run();
+      cleared += 1;
+      tx.delete(bikes).where(eq(bikes.tenantId, tenantId)).run();
+      cleared += 1;
+      tx.delete(suppliers).where(eq(suppliers.tenantId, tenantId)).run();
+      cleared += 1;
+      // Reset the seeded parts catalog back to zero stock + zero avg cost.
+      const now = Date.now();
+      tx.update(ingredients)
+        .set({
+          stockQuantity: 0,
+          reservedQuantity: 0,
+          currentAvgCostPerUnit: 0,
+          updatedAt: now,
+        })
+        .where(eq(ingredients.tenantId, tenantId))
+        .run();
+    });
+    return { tablesCleared: cleared };
   },
 };
 
