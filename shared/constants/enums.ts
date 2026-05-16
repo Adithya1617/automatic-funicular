@@ -3,12 +3,15 @@ export type IngredientType = (typeof INGREDIENT_TYPES)[number];
 
 // Hyprride: presets shown in the "New part" / "Edit part" dialogs. Free-text
 // remains in the underlying ingredients.category column, but the editor
-// offers these to keep dashboards groupable.
+// offers these to keep dashboards groupable. Tuned to the actual Hyprride
+// part inventory — oils (engine / gear), brakes (pad / shoe), filters,
+// cables (accelerator / clutch), and accessories (mobile holder etc.).
 export const PART_CATEGORIES = [
   'Oil',
   'Brake',
   'Filter',
-  'Tyre',
+  'Cable',
+  'Accessory',
   'Misc',
 ] as const;
 export type PartCategory = (typeof PART_CATEGORIES)[number];

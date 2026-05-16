@@ -88,6 +88,7 @@ function ensureBootstrapRows(db: ConcreteDb): void {
     .run();
 
   ensureBikeTypes(db, now);
+  ensureSeedParts(db, now);
 }
 
 function ensureBikeTypes(db: ConcreteDb, now: number): void {
@@ -112,6 +113,56 @@ function ensureBikeTypes(db: ConcreteDb, now: number): void {
         name: seed.name,
         engineCc: seed.engineCc,
         displayOrder: seed.displayOrder,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+        createdBy: SYSTEM_USER_ID,
+        updatedBy: SYSTEM_USER_ID,
+      })
+      .run();
+  }
+}
+
+function ensureSeedParts(db: ConcreteDb, now: number): void {
+  // First-boot seed of the eight Hyprride parts the operator told us about.
+  // Skipped per row if a part with the same name already exists, so a
+  // re-launched app does not re-create what the operator may have renamed
+  // or deleted. Stock and cost start at 0 — they grow via purchase invoices.
+  type PartSeed = {
+    name: string;
+    category: string;
+    baseUnit: 'g' | 'ml' | 'each';
+  };
+  const seeds: PartSeed[] = [
+    { name: 'Brake pad', category: 'Brake', baseUnit: 'each' },
+    { name: 'Brake shoe', category: 'Brake', baseUnit: 'each' },
+    { name: 'Accelerator wire', category: 'Cable', baseUnit: 'each' },
+    { name: 'Clutch wire', category: 'Cable', baseUnit: 'each' },
+    { name: 'Engine oil', category: 'Oil', baseUnit: 'ml' },
+    { name: 'Gear oil', category: 'Oil', baseUnit: 'ml' },
+    { name: 'Air filter', category: 'Filter', baseUnit: 'each' },
+    { name: 'Mobile holder', category: 'Accessory', baseUnit: 'each' },
+  ];
+  for (const seed of seeds) {
+    const existing = db
+      .select()
+      .from(schema.ingredients)
+      .where(eq(schema.ingredients.name, seed.name))
+      .all();
+    if (existing.length > 0) continue;
+    db.insert(schema.ingredients)
+      .values({
+        id: newId(),
+        tenantId: DEFAULT_TENANT_ID,
+        name: seed.name,
+        category: seed.category,
+        type: 'raw',
+        baseUnit: seed.baseUnit,
+        stockQuantity: 0,
+        reservedQuantity: 0,
+        lowStockThreshold: 0,
+        currentAvgCostPerUnit: 0,
+        densityGPerMl: null,
         isActive: true,
         createdAt: now,
         updatedAt: now,
