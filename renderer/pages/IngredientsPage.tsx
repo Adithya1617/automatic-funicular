@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Sliders, Users } from 'lucide-react';
+import { Plus, Sliders } from 'lucide-react';
 import { Button } from '@renderer/components/ui/button';
 import { Input } from '@renderer/components/ui/input';
 import {
@@ -15,7 +15,6 @@ import { IngredientsTable } from '@renderer/features/ingredients/IngredientsTabl
 import { IngredientDetailPanel } from '@renderer/features/ingredients/IngredientDetailPanel';
 import { ManualAdjustmentDialog } from '@renderer/features/ingredients/ManualAdjustmentDialog';
 import { NewIngredientDialog } from '@renderer/features/ingredients/NewIngredientDialog';
-import { ManageSuppliersDialog } from '@renderer/features/suppliers/ManageSuppliersDialog';
 import { PART_CATEGORIES } from '@shared/constants/enums';
 
 const CATEGORY_FILTER_VALUES = ['all', ...PART_CATEGORIES] as const;
@@ -44,7 +43,6 @@ export function IngredientsPage() {
 
   const [adjustOpen, setAdjustOpen] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
-  const [suppliersOpen, setSuppliersOpen] = useState(false);
 
   function handleSelect(id: string) {
     const next = new URLSearchParams(params);
@@ -77,14 +75,6 @@ export function IngredientsPage() {
           </Select>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="md"
-            onClick={() => setSuppliersOpen(true)}
-          >
-            <Users className="h-3.5 w-3.5" /> Manage suppliers
-          </Button>
           <Button
             type="button"
             variant="secondary"
@@ -123,7 +113,6 @@ export function IngredientsPage() {
         ingredient={selectedPart ?? null}
       />
       <NewIngredientDialog open={newOpen} onOpenChange={setNewOpen} />
-      <ManageSuppliersDialog open={suppliersOpen} onOpenChange={setSuppliersOpen} />
     </div>
   );
 }

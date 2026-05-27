@@ -11,7 +11,6 @@ function pathMatchesNav(navPath: string, currentPath: string): boolean {
   if (currentPath.startsWith('/services/templates'))
     normalized = '/services/templates';
   else if (currentPath.startsWith('/services/')) normalized = '/services';
-  else if (currentPath.startsWith('/invoices/')) normalized = '/invoices';
   return normalized === navPath || normalized.startsWith(`${navPath}/`);
 }
 
