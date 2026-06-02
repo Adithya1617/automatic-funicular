@@ -4,6 +4,8 @@ import { DashboardPage } from './pages/DashboardPage';
 import { IngredientsPage } from './pages/IngredientsPage';
 import { BikesPage } from './pages/BikesPage';
 import { ServicesPage } from './pages/ServicesPage';
+import { RepairsPage } from './pages/RepairsPage';
+import { WashPage } from './pages/WashPage';
 import { ServiceEventEditorPage } from './pages/ServiceEventEditorPage';
 import { BuyPartsPage } from './pages/BuyPartsPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -17,6 +19,8 @@ export function App() {
         <Route path="bikes" element={<BikesPage />} />
         <Route path="services" element={<ServicesPage />} />
         <Route path="services/:id/edit" element={<ServiceEventEditorPage />} />
+        <Route path="repairs" element={<RepairsPage />} />
+        <Route path="wash" element={<WashPage />} />
         <Route path="buy-parts" element={<BuyPartsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

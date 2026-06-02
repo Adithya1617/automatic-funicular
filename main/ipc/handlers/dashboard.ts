@@ -84,6 +84,20 @@ export function registerDashboardHandlers(): void {
   );
 
   ipcMain.handle(
+    IPC.dashboard.serviceVolumeByBike,
+    makeHandler(rangedQuerySchema, (input) =>
+      DashboardService.serviceVolumeByBike(getDb().db, DEFAULT_TENANT_ID, input.range),
+    ),
+  );
+
+  ipcMain.handle(
+    IPC.dashboard.maintenanceSchedule,
+    makeHandler(z.object({}).default({}), () =>
+      DashboardService.maintenanceSchedule(getDb().db, DEFAULT_TENANT_ID),
+    ),
+  );
+
+  ipcMain.handle(
     IPC.dashboard.theoreticalServiceCost,
     makeHandler(z.object({}).default({}), () =>
       DashboardService.theoreticalServiceCost(getDb().db, DEFAULT_TENANT_ID),

@@ -10,6 +10,7 @@ import {
   createServiceEventInputSchema,
   getServiceEventInputSchema,
   listServiceEventsInputSchema,
+  setServiceEventStatusInputSchema,
   updateServiceEventLinesInputSchema,
 } from '@shared/schemas/serviceEvent';
 import { makeHandler } from './wrap';
@@ -19,6 +20,13 @@ export function registerServiceEventHandlers(): void {
     IPC.serviceEvent.list,
     makeHandler(listServiceEventsInputSchema, (input) =>
       ServiceService.list(getDb().db, DEFAULT_TENANT_ID, input),
+    ),
+  );
+
+  ipcMain.handle(
+    IPC.serviceEvent.listWithLines,
+    makeHandler(listServiceEventsInputSchema, (input) =>
+      ServiceService.listWithLines(getDb().db, DEFAULT_TENANT_ID, input),
     ),
   );
 
@@ -54,6 +62,13 @@ export function registerServiceEventHandlers(): void {
     IPC.serviceEvent.complete,
     makeHandler(completeServiceEventInputSchema, (input) =>
       ServiceService.complete(getDb().db, DEFAULT_TENANT_ID, input.id),
+    ),
+  );
+
+  ipcMain.handle(
+    IPC.serviceEvent.setStatus,
+    makeHandler(setServiceEventStatusInputSchema, (input) =>
+      ServiceService.setStatus(getDb().db, DEFAULT_TENANT_ID, input),
     ),
   );
 

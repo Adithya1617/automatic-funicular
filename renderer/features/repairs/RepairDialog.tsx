@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Button } from '@renderer/components/ui/button';
 import {
   Dialog,
@@ -30,42 +29,53 @@ import {
 import { useBikes, useBikeTypes } from '@renderer/hooks/ipc/useBikes';
 import { useIngredients } from '@renderer/hooks/ipc/useIngredients';
 import { useCreateAdHocServiceEvent } from '@renderer/hooks/ipc/useServiceEvents';
+import { StatusPicker } from '@renderer/features/maintenance/StatusPicker';
+import type { SettableServiceEventStatus } from '@shared/schemas/serviceEvent';
 import { formatBikeTypeLabel } from '@shared/utils/bikeType';
 
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Pre-select this bike (used by quick-actions elsewhere). */
+  initialBikeId?: string;
 };
 
 type PartSelection = {
   /** Empty string until user types a quantity; positive number means ticked. */
   quantity: string;
-  /** True if the operator ticked this part for this service. */
+  /** True if the operator ticked this part for this repair. */
   checked: boolean;
 };
 
-export function QuickServiceDialog({ open, onOpenChange }: Props) {
-  const navigate = useNavigate();
+/**
+ * Ad-hoc repair = tick whichever parts the fix consumed and enter quantities.
+ * Submitting creates a completed `kind='repair'` event and deducts every ticked
+ * part's stock in one transaction; if any part is short the whole thing rolls
+ * back.
+ */
+export function RepairDialog({ open, onOpenChange, initialBikeId }: Props) {
   const { data: bikes = [] } = useBikes({ includeInactive: false });
   const { data: bikeTypes = [] } = useBikeTypes();
   const { data: parts = [] } = useIngredients({ includeInactive: false });
   const create = useCreateAdHocServiceEvent();
 
-  const [bikeId, setBikeId] = useState<string>('');
+  const [bikeId, setBikeId] = useState('');
   const [selections, setSelections] = useState<Record<string, PartSelection>>({});
-  const [odometer, setOdometer] = useState<string>('');
-  const [notes, setNotes] = useState<string>('');
+  const [odometer, setOdometer] = useState('');
+  const [notes, setNotes] = useState('');
+  const [status, setStatus] = useState<SettableServiceEventStatus>('requested');
   const [serverError, setServerError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
-      setBikeId('');
+      setBikeId(initialBikeId ?? '');
       setSelections({});
       setOdometer('');
       setNotes('');
+      setStatus('requested');
       setServerError(null);
     }
-  }, [open]);
+  }, [open, initialBikeId]);
 
   const bikeTypeById = useMemo(
     () => new Map(bikeTypes.map((t) => [t.id, t])),
@@ -105,9 +115,7 @@ export function QuickServiceDialog({ open, onOpenChange }: Props) {
       if (!sel || !sel.checked) continue;
       const qty = Number.parseFloat(sel.quantity);
       if (!Number.isFinite(qty) || qty <= 0) {
-        setServerError(
-          `Enter a positive quantity for "${part.name}" (or untick it)`,
-        );
+        setServerError(`Enter a positive quantity for "${part.name}" (or untick it)`);
         return;
       }
       lines.push({
@@ -118,23 +126,24 @@ export function QuickServiceDialog({ open, onOpenChange }: Props) {
       });
     }
     if (lines.length === 0) {
-      setServerError('Tick at least one part the bike consumed');
+      setServerError('Tick at least one part the repair used');
       return;
     }
     const odo = odometer.trim() === '' ? null : Number.parseFloat(odometer);
     const odoFinal = odo != null && Number.isFinite(odo) && odo >= 0 ? odo : null;
     const trimmedNotes = notes.trim();
     try {
-      const created = await create.mutateAsync({
+      await create.mutateAsync({
         bikeId,
+        kind: 'repair',
+        status,
         lines,
         odometerKm: odoFinal,
         notes: trimmedNotes === '' ? null : trimmedNotes,
       });
       onOpenChange(false);
-      navigate(`/services/${created.id}/edit`);
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : 'Could not start service');
+      setServerError(err instanceof Error ? err.message : 'Could not record repair');
     }
   }
 
@@ -142,11 +151,11 @@ export function QuickServiceDialog({ open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[820px]">
         <DialogHeader>
-          <DialogTitle>Start servicing</DialogTitle>
+          <DialogTitle>Request repair</DialogTitle>
           <DialogDescription>
-            Pick a bike, tick the parts you used, and enter quantities. Stock is
-            deducted in one transaction — if any part is short, the whole service
-            rolls back.
+            Pick a bike, tick the parts the repair will use, and enter
+            quantities. Stock isn't deducted until you mark the repair
+            completed.
           </DialogDescription>
         </DialogHeader>
 
@@ -173,9 +182,9 @@ export function QuickServiceDialog({ open, onOpenChange }: Props) {
               </Select>
             </div>
             <div className="grid gap-1">
-              <Label htmlFor="quick-odo">Odometer (km)</Label>
+              <Label htmlFor="rep-odo">Odometer (km)</Label>
               <Input
-                id="quick-odo"
+                id="rep-odo"
                 type="number"
                 min={0}
                 step="any"
@@ -188,9 +197,7 @@ export function QuickServiceDialog({ open, onOpenChange }: Props) {
 
           <div className="flex items-center justify-between">
             <Label>Parts used</Label>
-            <span className="text-[11px] text-text-tertiary">
-              {checkedCount} ticked
-            </span>
+            <span className="text-[11px] text-text-tertiary">{checkedCount} ticked</span>
           </div>
           <div className="max-h-[320px] overflow-y-auto rounded-lg border border-border-tertiary">
             <Table>
@@ -229,9 +236,7 @@ export function QuickServiceDialog({ open, onOpenChange }: Props) {
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col">
-                            <span className="font-medium text-text-primary">
-                              {p.name}
-                            </span>
+                            <span className="font-medium text-text-primary">{p.name}</span>
                             <span className="text-[10px] text-text-tertiary">
                               {p.category}
                             </span>
@@ -264,15 +269,26 @@ export function QuickServiceDialog({ open, onOpenChange }: Props) {
             </Table>
           </div>
 
-          <div className="grid gap-1">
-            <Label htmlFor="quick-notes">Notes</Label>
-            <Input
-              id="quick-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="optional — e.g. customer name, service notes"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-1">
+              <Label>Status</Label>
+              <StatusPicker value={status} onChange={setStatus} />
+            </div>
+            <div className="grid gap-1">
+              <Label htmlFor="rep-notes">Notes</Label>
+              <Input
+                id="rep-notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="optional — e.g. what was repaired"
+              />
+            </div>
           </div>
+          {status !== 'completed' ? (
+            <span className="text-[11px] text-text-tertiary">
+              Parts are recorded but not deducted until you mark the repair completed.
+            </span>
+          ) : null}
         </div>
 
         {serverError ? (
@@ -294,7 +310,11 @@ export function QuickServiceDialog({ open, onOpenChange }: Props) {
             onClick={onSubmit}
             disabled={create.isPending}
           >
-            Start servicing
+            {status === 'completed'
+              ? 'Complete repair'
+              : status === 'in_progress'
+                ? 'Mark under service'
+                : 'Request repair'}
           </Button>
         </DialogFooter>
       </DialogContent>

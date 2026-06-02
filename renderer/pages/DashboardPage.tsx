@@ -17,6 +17,14 @@ import {
   TheoreticalServiceCostTile,
   TopConsumedPartsTile,
 } from '@renderer/features/dashboard/BikeTiles';
+import {
+  ServiceDueTile,
+  ServicesByBikeTile,
+  WashDueTile,
+} from '@renderer/features/dashboard/MaintenanceTiles';
+import { PendingJobsTile } from '@renderer/features/dashboard/PendingJobsTile';
+import { ServiceDialog } from '@renderer/features/services/ServiceDialog';
+import { WashDialog } from '@renderer/features/wash/WashDialog';
 import { ExportButtons } from '@renderer/features/dashboard/ExportButtons';
 import type { DateRange } from '@shared/schemas/dashboard';
 
@@ -26,6 +34,11 @@ export function DashboardPage() {
   const [preset, setPreset] = useState<PresetKey>(DEFAULT_PRESET);
   const [range, setRange] = useState<DateRange>(() => rangeFromPreset(DEFAULT_PRESET));
   const [compareYoY, setCompareYoY] = useState(false);
+
+  // Maintenance alert "Start" actions open the relevant dialog with the bike
+  // pre-selected.
+  const [serviceBikeId, setServiceBikeId] = useState<string | null>(null);
+  const [washBikeId, setWashBikeId] = useState<string | null>(null);
 
   const compareRange = useMemo(
     () => (compareYoY ? compareRangeYoY(range) : null),
@@ -56,10 +69,20 @@ export function DashboardPage() {
         </div>
       ) : null}
 
+      {/* Open workflow — requested / under-service jobs, editable until done. */}
+      <PendingJobsTile />
+
+      {/* Maintenance alert panels — bikes due for a service / wash. */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <ServiceDueTile onStart={setServiceBikeId} />
+        <WashDueTile onStart={setWashBikeId} />
+      </div>
+
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         <StockValueTile range={range} />
         <CostPerBikeTile range={range} />
         <CostPerBikeTypeTile range={range} />
+        <ServicesByBikeTile range={range} />
         <TopConsumedPartsTile range={range} />
         <ServiceVolumeTile range={range} />
         <TheoreticalServiceCostTile />
@@ -68,6 +91,21 @@ export function DashboardPage() {
       </div>
 
       {compareRange ? <CompareSection range={compareRange} /> : null}
+
+      <ServiceDialog
+        open={serviceBikeId !== null}
+        onOpenChange={(open) => {
+          if (!open) setServiceBikeId(null);
+        }}
+        initialBikeId={serviceBikeId ?? undefined}
+      />
+      <WashDialog
+        open={washBikeId !== null}
+        onOpenChange={(open) => {
+          if (!open) setWashBikeId(null);
+        }}
+        initialBikeId={washBikeId ?? undefined}
+      />
     </div>
   );
 }

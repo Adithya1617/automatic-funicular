@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@renderer/components/ui/select';
 import { useBikes, useBikeTypes } from '@renderer/hooks/ipc/useBikes';
+import { useMaintenanceSchedule } from '@renderer/hooks/ipc/useDashboard';
 import { BikesTable } from '@renderer/features/bikes/BikesTable';
 import { BikeFormDialog } from '@renderer/features/bikes/BikeFormDialog';
 import { formatBikeTypeLabel } from '@shared/utils/bikeType';
@@ -29,6 +30,12 @@ export function BikesPage() {
 
   const { data: bikes = [], isLoading } = useBikes(filter);
   const { data: bikeTypes = [] } = useBikeTypes();
+  const { data: schedule } = useMaintenanceSchedule();
+
+  const scheduleByBike = useMemo(
+    () => new Map((schedule?.rows ?? []).map((r) => [r.bikeId, r])),
+    [schedule],
+  );
 
   const editingBike = useMemo(
     () => bikes.find((b) => b.id === editingId) ?? null,
@@ -85,7 +92,12 @@ export function BikesPage() {
           Loading bikes…
         </div>
       ) : (
-        <BikesTable rows={bikes} bikeTypes={bikeTypes} onSelect={openEdit} />
+        <BikesTable
+          rows={bikes}
+          bikeTypes={bikeTypes}
+          onSelect={openEdit}
+          scheduleByBike={scheduleByBike}
+        />
       )}
 
       <BikeFormDialog

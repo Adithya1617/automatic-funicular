@@ -5,7 +5,10 @@ import {
   type StockMovementRow,
   type StockMovementInsert,
 } from '../db/schema';
-import type { StockMovementReason } from '@shared/constants/enums';
+import type {
+  StockMovementReason,
+  StockMovementReferenceType,
+} from '@shared/constants/enums';
 
 export type ListMovementsFilter = {
   ingredientId?: string;
@@ -80,6 +83,31 @@ export const stockMovementRepository = {
       .from(stockMovements)
       .where(and(...conditions))
       .orderBy(asc(stockMovements.occurredAt))
+      .all();
+  },
+
+  /**
+   * Movements pointing at any of the given reference rows (e.g. service event
+   * lines). Used to value a service / repair from its immutable cost snapshots.
+   * Hits the (reference_type, reference_id) index.
+   */
+  listByReferenceIds(
+    db: AppDb,
+    tenantId: number,
+    referenceType: StockMovementReferenceType,
+    referenceIds: string[],
+  ): StockMovementRow[] {
+    if (referenceIds.length === 0) return [];
+    return db
+      .select()
+      .from(stockMovements)
+      .where(
+        and(
+          eq(stockMovements.tenantId, tenantId),
+          eq(stockMovements.referenceType, referenceType),
+          inArray(stockMovements.referenceId, referenceIds),
+        ),
+      )
       .all();
   },
 

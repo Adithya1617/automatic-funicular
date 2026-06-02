@@ -171,6 +171,49 @@ export const serviceVolumeResponseSchema = z.object({
 });
 export type ServiceVolumeResponse = z.infer<typeof serviceVolumeResponseSchema>;
 
+// Maintenance schedule — per active bike, the last service / wash and the
+// resulting countdown to the next one. `daysRemaining` is null when the bike
+// has never had that activity (treated as "due now" / urgent by the UI).
+export const maintenanceRowSchema = z.object({
+  bikeId: idSchema,
+  bikeNumber: z.string(),
+  bikeTypeName: z.string(),
+  lastServiceAt: z.number().int().nullable(),
+  serviceDueAt: z.number().int().nullable(),
+  serviceDaysRemaining: z.number().int().nullable(),
+  lastWashAt: z.number().int().nullable(),
+  washDueAt: z.number().int().nullable(),
+  washDaysRemaining: z.number().int().nullable(),
+});
+export type MaintenanceRow = z.infer<typeof maintenanceRowSchema>;
+
+export const maintenanceScheduleResponseSchema = z.object({
+  rows: z.array(maintenanceRowSchema),
+});
+export type MaintenanceScheduleResponse = z.infer<
+  typeof maintenanceScheduleResponseSchema
+>;
+
+// Services by bike — completed-event counts per individual bike in the range,
+// split by kind. Pairs with serviceVolumeByBikeType ("by bike type").
+export const serviceVolumeByBikeRowSchema = z.object({
+  bikeId: idSchema,
+  bikeNumber: z.string(),
+  bikeTypeName: z.string(),
+  serviceCount: z.number().int().nonnegative(),
+  repairCount: z.number().int().nonnegative(),
+  washCount: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+});
+export type ServiceVolumeByBikeRow = z.infer<typeof serviceVolumeByBikeRowSchema>;
+
+export const serviceVolumeByBikeResponseSchema = z.object({
+  rows: z.array(serviceVolumeByBikeRowSchema),
+});
+export type ServiceVolumeByBikeResponse = z.infer<
+  typeof serviceVolumeByBikeResponseSchema
+>;
+
 // Theoretical service cost per template — sum of (qty × current avg cost)
 // over the active recipe version. Independent of the date range.
 export const theoreticalServiceCostRowSchema = z.object({

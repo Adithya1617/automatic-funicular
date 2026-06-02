@@ -52,11 +52,13 @@ export const IPC = {
   },
   serviceEvent: {
     list: 'serviceEvent:list',
+    listWithLines: 'serviceEvent:listWithLines',
     get: 'serviceEvent:get',
     create: 'serviceEvent:create',
     createAdHoc: 'serviceEvent:createAdHoc',
     updateLines: 'serviceEvent:updateLines',
     complete: 'serviceEvent:complete',
+    setStatus: 'serviceEvent:setStatus',
     cancel: 'serviceEvent:cancel',
   },
   stockMovement: {
@@ -104,6 +106,8 @@ export const IPC = {
     costPerBikeType: 'dashboard:costPerBikeType',
     topConsumedParts: 'dashboard:topConsumedParts',
     serviceVolumeByBikeType: 'dashboard:serviceVolumeByBikeType',
+    serviceVolumeByBike: 'dashboard:serviceVolumeByBike',
+    maintenanceSchedule: 'dashboard:maintenanceSchedule',
     theoreticalServiceCost: 'dashboard:theoreticalServiceCost',
   },
   report: {

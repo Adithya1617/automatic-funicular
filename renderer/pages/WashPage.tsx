@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { History, Plus } from 'lucide-react';
 import { Button } from '@renderer/components/ui/button';
 import {
@@ -11,36 +10,30 @@ import {
   TableRow,
 } from '@renderer/components/ui/table';
 import {
-  useServiceEventsWithCost,
+  useServiceEvents,
   useSetServiceEventStatus,
 } from '@renderer/hooks/ipc/useServiceEvents';
 import { useBikes } from '@renderer/hooks/ipc/useBikes';
-import { useIngredients } from '@renderer/hooks/ipc/useIngredients';
 import { formatRelativeTime } from '@renderer/lib/format';
-import { serviceOilLines } from '@renderer/lib/parts';
-import { formatINR } from '@shared/utils/currency';
 import type { SettableServiceEventStatus } from '@shared/schemas/serviceEvent';
-import { ServiceDialog } from '@renderer/features/services/ServiceDialog';
+import { WashDialog } from '@renderer/features/wash/WashDialog';
 import { BikeHistoryDialog } from '@renderer/features/maintenance/BikeHistoryDialog';
 import { StatusSelect } from '@renderer/features/maintenance/StatusSelect';
 
-export function ServicesPage() {
-  const navigate = useNavigate();
+export function WashPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
 
-  const { data: events = [], isLoading } = useServiceEventsWithCost({
-    kind: 'service',
+  const { data: events = [], isLoading } = useServiceEvents({
+    kind: 'wash',
     limit: 200,
   });
   const { data: bikes = [] } = useBikes({ includeInactive: true });
-  const { data: parts = [] } = useIngredients({ includeInactive: true });
   const setStatus = useSetServiceEventStatus();
 
   const bikeById = useMemo(() => new Map(bikes.map((b) => [b.id, b])), [bikes]);
-  const partById = useMemo(() => new Map(parts.map((p) => [p.id, p])), [parts]);
-  const canStart = bikes.some((b) => b.isActive) && parts.some((p) => p.isActive);
+  const canStart = bikes.some((b) => b.isActive);
 
   async function changeStatus(id: string, status: SettableServiceEventStatus) {
     setStatusError(null);
@@ -55,7 +48,7 @@ export function ServicesPage() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-[12px] text-text-tertiary">
-          Scheduled oil changes — due every 45 days per bike.
+          Cleaning log — each bike is due for a wash every 15 days.
         </p>
         <div className="flex items-center gap-2">
           <Button
@@ -73,14 +66,14 @@ export function ServicesPage() {
             onClick={() => setDialogOpen(true)}
             disabled={!canStart}
           >
-            <Plus className="h-3.5 w-3.5" /> Request service
+            <Plus className="h-3.5 w-3.5" /> Request wash
           </Button>
         </div>
       </div>
 
       {!canStart ? (
         <div className="rounded-lg border border-dashed border-border-tertiary bg-background-secondary px-4 py-3 text-[12px] text-text-tertiary">
-          Add at least one active bike and an Engine oil part before requesting a service.
+          Add at least one active bike before recording a wash.
         </div>
       ) : null}
 
@@ -92,7 +85,7 @@ export function ServicesPage() {
 
       {isLoading ? (
         <div className="rounded-lg border border-border-tertiary bg-background-primary px-4 py-6 text-text-tertiary">
-          Loading services…
+          Loading washes…
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-border-tertiary bg-background-primary">
@@ -102,63 +95,53 @@ export function ServicesPage() {
                 <TableHead>Bike</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Oil cost</TableHead>
                 <TableHead className="text-right">Odometer</TableHead>
+                <TableHead>Notes</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {events.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-text-tertiary">
-                    No services yet — click <span className="font-medium">+ Request service</span> to add one.
+                    No washes yet — click <span className="font-medium">+ Request wash</span> to add one.
                   </TableCell>
                 </TableRow>
               ) : (
-                events.map((e) => {
-                  const oilCost = serviceOilLines(e.lines, partById).reduce(
-                    (acc, l) => acc + l.cost,
-                    0,
-                  );
-                  return (
-                    <TableRow
-                      key={e.id}
-                      onClick={() => navigate(`/services/${e.id}/edit`)}
-                      className="cursor-pointer"
-                    >
-                      <TableCell>
-                        <span className="font-medium text-text-primary">
-                          {bikeById.get(e.bikeId)?.bikeNumber ?? e.bikeId.slice(0, 8)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-text-tertiary">
-                          {formatRelativeTime(e.completedAt ?? e.startedAt)}
-                        </span>
-                      </TableCell>
-                      <TableCell onClick={(ev) => ev.stopPropagation()}>
-                        <StatusSelect
-                          status={e.status}
-                          onChange={(s) => changeStatus(e.id, s)}
-                          disabled={setStatus.isPending}
-                        />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums font-medium text-text-primary">
-                        {e.status === 'completed' ? formatINR(oilCost) : '—'}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-text-secondary">
-                        {e.odometerKm != null ? `${e.odometerKm.toLocaleString('en-IN')} km` : '—'}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+                events.map((e) => (
+                  <TableRow key={e.id}>
+                    <TableCell>
+                      <span className="font-medium text-text-primary">
+                        {bikeById.get(e.bikeId)?.bikeNumber ?? e.bikeId.slice(0, 8)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-text-tertiary">
+                        {formatRelativeTime(e.completedAt ?? e.startedAt)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <StatusSelect
+                        status={e.status}
+                        onChange={(s) => changeStatus(e.id, s)}
+                        disabled={setStatus.isPending}
+                      />
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-text-secondary">
+                      {e.odometerKm != null ? `${e.odometerKm.toLocaleString('en-IN')} km` : '—'}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-text-secondary">{e.notes ?? '—'}</span>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
         </div>
       )}
 
-      <ServiceDialog open={dialogOpen} onOpenChange={setDialogOpen} />
-      <BikeHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} kind="service" />
+      <WashDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <BikeHistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} kind="wash" />
     </div>
   );
 }

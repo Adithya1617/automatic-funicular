@@ -559,6 +559,14 @@ export const serviceEvents = sqliteTable(
     bikeId: text('bike_id')
       .notNull()
       .references(() => bikes.id),
+    // Discriminates the three maintenance activities that share this table:
+    //   service — scheduled oil change (Engine oil only), due every 45 days.
+    //   repair  — ad-hoc fix consuming any parts.
+    //   wash    — cleaning, no parts / no stock movements, due every 15 days.
+    // Defaults to 'service' so pre-split rows backfill sensibly.
+    kind: text('kind', { enum: ['service', 'repair', 'wash'] })
+      .notNull()
+      .default('service'),
     // Nullable since the ad-hoc flow (operator picks a bike + ticks parts)
     // doesn't go through a template. Template-driven events still capture the
     // active recipe version at create time for snapshot semantics.
@@ -568,8 +576,12 @@ export const serviceEvents = sqliteTable(
     serviceTemplateVersionId: text('service_template_version_id').references(
       () => recipeVersions.id,
     ),
+    // 'requested' (booked, no stock yet) → 'in_progress' (under service, no
+    // stock yet) → 'completed' (stock deducted). 'cancelled' is terminal.
+    // The enum is type-level only (no DB CHECK), so adding 'requested' needs
+    // no migration.
     status: text('status', {
-      enum: ['in_progress', 'completed', 'cancelled'],
+      enum: ['requested', 'in_progress', 'completed', 'cancelled'],
     })
       .notNull()
       .default('in_progress'),
@@ -586,6 +598,11 @@ export const serviceEvents = sqliteTable(
     tenantStatusIdx: index('idx_service_events_tenant_status_started').on(
       t.tenantId,
       t.status,
+      t.startedAt,
+    ),
+    tenantKindIdx: index('idx_service_events_tenant_kind_started').on(
+      t.tenantId,
+      t.kind,
       t.startedAt,
     ),
     tenantBikeIdx: index('idx_service_events_tenant_bike_started').on(

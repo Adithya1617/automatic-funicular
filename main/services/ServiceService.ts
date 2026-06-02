@@ -6,6 +6,7 @@ import { recipeRepository } from '../repositories/recipeRepository';
 import { serviceEventLineRepository } from '../repositories/serviceEventLineRepository';
 import { serviceEventRepository } from '../repositories/serviceEventRepository';
 import { serviceTemplateRepository } from '../repositories/serviceTemplateRepository';
+import { stockMovementRepository } from '../repositories/stockMovementRepository';
 import { InventoryService } from './InventoryService';
 import type {
   CancelServiceEventInput,
@@ -14,7 +15,10 @@ import type {
   ListServiceEventsInput,
   ServiceEvent,
   ServiceEventLine,
+  ServiceEventLineWithCost,
+  ServiceEventWithCost,
   ServiceEventWithLines,
+  SetServiceEventStatusInput,
   UpdateServiceEventLinesInput,
 } from '@shared/schemas/serviceEvent';
 import {
@@ -32,6 +36,10 @@ function toEvent(
   return row as unknown as ServiceEvent;
 }
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 export const ServiceService = {
   list(db: AppDb, tenantId: number, filter: ListServiceEventsInput): ServiceEvent[] {
     return serviceEventRepository
@@ -47,6 +55,64 @@ export const ServiceService = {
       ...(row as unknown as ServiceEvent),
       lines: lines as unknown as ServiceEventLine[],
     };
+  },
+
+  /**
+   * Like `list`, but each event carries its parts lines and the actual parts
+   * cost — used by the section list pages and per-bike history. Cost comes from
+   * the immutable `cost_per_unit_at_time` snapshot on each consumption movement
+   * (service_consumed minus any service_reversal, clamped at 0), so it reflects
+   * what was really spent rather than today's average cost.
+   */
+  listWithLines(
+    db: AppDb,
+    tenantId: number,
+    filter: ListServiceEventsInput,
+  ): ServiceEventWithCost[] {
+    const events = serviceEventRepository.list(db, tenantId, filter);
+    const lineRows = serviceEventLineRepository.listForEvents(
+      db,
+      events.map((e) => e.id),
+    );
+
+    // Net snapshot cost per line id, from its consumption / reversal movements.
+    const movements = stockMovementRepository.listByReferenceIds(
+      db,
+      tenantId,
+      'service_event_line',
+      lineRows.map((l) => l.id),
+    );
+    const costByLine = new Map<string, number>();
+    for (const m of movements) {
+      if (!m.referenceId) continue;
+      if (m.reason !== 'service_consumed' && m.reason !== 'service_reversal') continue;
+      const cost = (m.costPerUnitAtTime ?? 0) * Math.abs(m.changeQuantity);
+      const signed = m.reason === 'service_consumed' ? cost : -cost;
+      costByLine.set(m.referenceId, (costByLine.get(m.referenceId) ?? 0) + signed);
+    }
+
+    const byEvent = new Map<string, ServiceEventLineWithCost[]>();
+    for (const l of lineRows) {
+      const arr = byEvent.get(l.serviceEventId) ?? [];
+      arr.push({
+        ...(l as unknown as ServiceEventLine),
+        cost: round2(Math.max(0, costByLine.get(l.id) ?? 0)),
+      });
+      byEvent.set(l.serviceEventId, arr);
+    }
+    for (const arr of byEvent.values()) {
+      arr.sort((a, b) => a.displayOrder - b.displayOrder);
+    }
+
+    return events.map((e) => {
+      const lines = byEvent.get(e.id) ?? [];
+      const partsCost = round2(lines.reduce((acc, l) => acc + l.cost, 0));
+      return {
+        ...(e as unknown as ServiceEvent),
+        lines,
+        partsCost,
+      };
+    });
   },
 
   /**
@@ -101,6 +167,7 @@ export const ServiceService = {
         id: newId(),
         tenantId,
         bikeId: input.bikeId,
+        kind: 'service',
         serviceTemplateId: template.id,
         serviceTemplateVersionId: recipe.id,
         status: 'in_progress',
@@ -137,11 +204,15 @@ export const ServiceService = {
   },
 
   /**
-   * One-shot "Start servicing" flow — create + complete in the same
-   * transaction. No template captured; lines come straight from the operator's
-   * checkbox selection. Stock is deducted via InventoryService.applyMovement
-   * per line; if any line fails (insufficient stock, bad unit) the whole
-   * thing rolls back and nothing is recorded.
+   * One-shot maintenance create. Drives the three section pages:
+   *   service / repair → lines come from the operator's selection.
+   *   wash             → no parts: zero lines, no stock movements.
+   * `status` (default 'completed') sets the workflow state at creation:
+   *   'requested' / 'in_progress' record the (planned) parts but DO NOT touch
+   *     stock — deduction is deferred until the event is marked completed.
+   *   'completed' deducts every line's stock via InventoryService.applyMovement
+   *     in the same transaction; if any line fails the whole thing rolls back.
+   * `kind` defaults to 'service' when omitted so legacy callers keep working.
    */
   createAdHoc(
     db: AppDb,
@@ -152,9 +223,23 @@ export const ServiceService = {
     const bike = bikeRepository.findById(db, tenantId, input.bikeId);
     if (!bike) throw new NotFoundError('Bike', input.bikeId);
 
+    const kind = input.kind ?? 'service';
+    const status = input.status ?? 'completed';
+    const inputLines = input.lines ?? [];
+
+    if (kind === 'wash') {
+      if (inputLines.length > 0) {
+        throw new ValidationError('A wash event cannot consume parts');
+      }
+    } else if (inputLines.length === 0) {
+      throw new ValidationError(
+        `Tick at least one part for this ${kind}`,
+      );
+    }
+
     // Validate every line up-front so we don't half-write an event then fail
     // on the third applyMovement call.
-    for (const line of input.lines) {
+    for (const line of inputLines) {
       const ing = ingredientRepository.findById(db, tenantId, line.ingredientId);
       if (!ing) throw new NotFoundError('Ingredient', line.ingredientId);
       toBase(line.quantity, line.unit, ing.baseUnit, {
@@ -168,11 +253,12 @@ export const ServiceService = {
         id: newId(),
         tenantId,
         bikeId: input.bikeId,
+        kind,
         serviceTemplateId: null,
         serviceTemplateVersionId: null,
-        status: 'completed',
+        status,
         startedAt: now,
-        completedAt: now,
+        completedAt: status === 'completed' ? now : null,
         cancelledAt: null,
         cancelledPartsUsed: null,
         odometerKm: input.odometerKm ?? null,
@@ -183,35 +269,41 @@ export const ServiceService = {
         updatedBy: actorId,
       });
 
-      const lines = serviceEventLineRepository.insertMany(
-        tx,
-        input.lines.map((line, idx) => ({
-          id: newId(),
-          serviceEventId: event.id,
-          ingredientId: line.ingredientId,
-          quantity: line.quantity,
-          unit: line.unit,
-          notes: line.notes ?? null,
-          displayOrder: idx,
-        })),
-      );
+      const lines =
+        inputLines.length === 0
+          ? []
+          : serviceEventLineRepository.insertMany(
+              tx,
+              inputLines.map((line, idx) => ({
+                id: newId(),
+                serviceEventId: event.id,
+                ingredientId: line.ingredientId,
+                quantity: line.quantity,
+                unit: line.unit,
+                notes: line.notes ?? null,
+                displayOrder: idx,
+              })),
+            );
 
-      for (const line of lines) {
-        InventoryService.applyMovement(
-          tx,
-          tenantId,
-          {
-            ingredientId: line.ingredientId,
-            quantity: line.quantity,
-            unit: line.unit,
-            reason: 'service_consumed',
-            referenceType: 'service_event_line',
-            referenceId: line.id,
-            direction: -1,
-          },
-          actorId,
-          { skipAvailabilityRecompute: true },
-        );
+      // Stock only moves when the event is created already completed.
+      if (status === 'completed') {
+        for (const line of lines) {
+          InventoryService.applyMovement(
+            tx,
+            tenantId,
+            {
+              ingredientId: line.ingredientId,
+              quantity: line.quantity,
+              unit: line.unit,
+              reason: 'service_consumed',
+              referenceType: 'service_event_line',
+              referenceId: line.id,
+              direction: -1,
+            },
+            actorId,
+            { skipAvailabilityRecompute: true },
+          );
+        }
       }
 
       return {
@@ -219,6 +311,79 @@ export const ServiceService = {
         lines: lines as unknown as ServiceEventLine[],
       };
     });
+  },
+
+  /**
+   * Move an event through the workflow (requested → in_progress → completed).
+   * Reaching 'completed' deducts every line's stock (service/repair); a wash
+   * just flips to completed with no movements. Moving a completed event back is
+   * refused — cancel it instead. Cancelled events are terminal.
+   */
+  setStatus(
+    db: AppDb,
+    tenantId: number,
+    input: SetServiceEventStatusInput,
+    actorId: string = SYSTEM_USER_ID,
+  ): ServiceEventWithLines {
+    const existing = serviceEventRepository.findById(db, tenantId, input.id);
+    if (!existing) throw new NotFoundError('ServiceEvent', input.id);
+    if (existing.status === input.status) {
+      return ServiceService.get(db, tenantId, input.id);
+    }
+    if (existing.status === 'cancelled') {
+      throw new ConflictError('A cancelled event is terminal — its status cannot change');
+    }
+
+    if (input.status === 'completed') {
+      const lines = serviceEventLineRepository.listForEvent(db, input.id);
+      if (existing.kind !== 'wash' && lines.length === 0) {
+        throw new ValidationError(
+          'Add at least one part before completing this event',
+        );
+      }
+      db.transaction((tx) => {
+        for (const line of lines) {
+          InventoryService.applyMovement(
+            tx,
+            tenantId,
+            {
+              ingredientId: line.ingredientId,
+              quantity: line.quantity,
+              unit: line.unit,
+              reason: 'service_consumed',
+              referenceType: 'service_event_line',
+              referenceId: line.id,
+              direction: -1,
+            },
+            actorId,
+            { skipAvailabilityRecompute: true },
+          );
+        }
+        const now = Date.now();
+        serviceEventRepository.update(tx, tenantId, input.id, {
+          status: 'completed',
+          completedAt: now,
+          updatedAt: now,
+          updatedBy: actorId,
+        });
+      });
+    } else {
+      // requested / in_progress — only from a not-yet-completed state.
+      if (existing.status === 'completed') {
+        throw new ConflictError(
+          'Cannot move a completed event back — cancel it instead',
+        );
+      }
+      const now = Date.now();
+      serviceEventRepository.update(db, tenantId, input.id, {
+        status: input.status,
+        completedAt: null,
+        updatedAt: now,
+        updatedBy: actorId,
+      });
+    }
+
+    return ServiceService.get(db, tenantId, input.id);
   },
 
   /**

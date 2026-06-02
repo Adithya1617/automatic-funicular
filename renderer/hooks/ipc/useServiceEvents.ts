@@ -5,7 +5,9 @@ import type {
   CreateServiceEventInput,
   ListServiceEventsInput,
   ServiceEvent,
+  ServiceEventKind,
   ServiceEventWithLines,
+  SetServiceEventStatusInput,
   UpdateServiceEventLinesInput,
 } from '@shared/schemas/serviceEvent';
 import { unwrap } from '@renderer/lib/ipc';
@@ -30,11 +32,48 @@ export function useServiceEvents(
   });
 }
 
+/**
+ * Like useServiceEvents but each row carries its parts lines + actual cost
+ * (`partsCost`). Used by the section list pages to show a Cost column.
+ */
+export function useServiceEventsWithCost(
+  filter: ListServiceEventsInput = { limit: 200 },
+  options: { refreshIntervalMs?: number } = {},
+) {
+  return useQuery({
+    queryKey: ['serviceEvents', 'withCost', filter] as const,
+    queryFn: () => unwrap(window.hyprride.serviceEvent.listWithLines(filter)),
+    refetchInterval: options.refreshIntervalMs ?? REFRESH_MS,
+  });
+}
+
 export function useServiceEvent(id: string | null | undefined) {
   return useQuery({
     queryKey: itemKey(id ?? ''),
     queryFn: () => unwrap(window.hyprride.serviceEvent.get({ id: id! })),
     enabled: Boolean(id),
+  });
+}
+
+/**
+ * Per-bike history for one section (kind), each event with its parts lines.
+ * Disabled until a bike is picked.
+ */
+export function useServiceEventHistory(
+  bikeId: string | null | undefined,
+  kind: ServiceEventKind,
+) {
+  return useQuery({
+    queryKey: ['serviceEvents', 'history', kind, bikeId ?? ''] as const,
+    queryFn: () =>
+      unwrap(
+        window.hyprride.serviceEvent.listWithLines({
+          bikeId: bikeId!,
+          kind,
+          limit: 200,
+        }),
+      ),
+    enabled: Boolean(bikeId),
   });
 }
 
@@ -88,6 +127,22 @@ export function useCompleteServiceEvent() {
       qc.invalidateQueries({ queryKey: ['serviceEvents'] });
       qc.invalidateQueries({ queryKey: ['ingredients'] });
       qc.invalidateQueries({ queryKey: ['stockMovements'] });
+      qc.setQueryData(itemKey(updated.id), updated);
+    },
+  });
+}
+
+export function useSetServiceEventStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SetServiceEventStatusInput) =>
+      unwrap(window.hyprride.serviceEvent.setStatus(input)),
+    onSuccess: (updated: ServiceEventWithLines) => {
+      qc.invalidateQueries({ queryKey: ['serviceEvents'] });
+      // Completing deducts stock; refresh part counts, movements, dashboard.
+      qc.invalidateQueries({ queryKey: ['ingredients'] });
+      qc.invalidateQueries({ queryKey: ['stockMovements'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
       qc.setQueryData(itemKey(updated.id), updated);
     },
   });

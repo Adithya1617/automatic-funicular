@@ -47,3 +47,16 @@ export function formatRelativeTime(when: number, now: number = Date.now()): stri
 export function formatDateTime(when: number): string {
   return dateTimeFormatter.format(when);
 }
+
+const dateTimeLongFormatter = new Intl.DateTimeFormat('en-GB', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+/** "28 Apr 2026, 14:22" — full timestamp for history detail views. */
+export function formatDateTimeLong(when: number): string {
+  return dateTimeLongFormatter.format(when);
+}

@@ -1,8 +1,43 @@
 import { z } from 'zod';
 import { idSchema } from './id';
 
-export const SERVICE_EVENT_STATUSES = ['in_progress', 'completed', 'cancelled'] as const;
+export const SERVICE_EVENT_STATUSES = [
+  'requested',
+  'in_progress',
+  'completed',
+  'cancelled',
+] as const;
 export type ServiceEventStatus = (typeof SERVICE_EVENT_STATUSES)[number];
+
+/** UI labels for each status (in_progress reads as "Under service"). */
+export const SERVICE_EVENT_STATUS_LABELS: Record<ServiceEventStatus, string> = {
+  requested: 'Requested',
+  in_progress: 'Under service',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+};
+
+/**
+ * Statuses an operator can set directly (the workflow). `cancelled` is reached
+ * only through the cancel flow, so it's excluded here. Stock is deducted only
+ * when an event reaches `completed`.
+ */
+export const SETTABLE_SERVICE_EVENT_STATUSES = [
+  'requested',
+  'in_progress',
+  'completed',
+] as const;
+export type SettableServiceEventStatus =
+  (typeof SETTABLE_SERVICE_EVENT_STATUSES)[number];
+
+/**
+ * The three maintenance activities sharing the service_events table:
+ *   service — scheduled oil change (Engine oil only), due every 45 days.
+ *   repair  — ad-hoc fix consuming any parts.
+ *   wash    — cleaning, no parts / no stock, due every 15 days.
+ */
+export const SERVICE_EVENT_KINDS = ['service', 'repair', 'wash'] as const;
+export type ServiceEventKind = (typeof SERVICE_EVENT_KINDS)[number];
 
 export const serviceEventLineSchema = z.object({
   id: idSchema,
@@ -19,6 +54,7 @@ export const serviceEventSchema = z.object({
   id: idSchema,
   tenantId: z.number().int(),
   bikeId: idSchema,
+  kind: z.enum(SERVICE_EVENT_KINDS),
   // Null on ad-hoc events (operator-driven quick service); set on
   // template-driven events with the captured version id.
   serviceTemplateId: idSchema.nullable(),
@@ -42,6 +78,23 @@ export const serviceEventWithLinesSchema = serviceEventSchema.extend({
 });
 export type ServiceEventWithLines = z.infer<typeof serviceEventWithLinesSchema>;
 
+/**
+ * Event + lines annotated with the actual parts cost, derived from the
+ * immutable `cost_per_unit_at_time` snapshot on each consumption movement
+ * (service_consumed minus any service_reversal, clamped at 0). Used by the
+ * section list pages and per-bike history. Wash events have no lines → cost 0.
+ */
+export const serviceEventLineWithCostSchema = serviceEventLineSchema.extend({
+  cost: z.number().nonnegative(),
+});
+export type ServiceEventLineWithCost = z.infer<typeof serviceEventLineWithCostSchema>;
+
+export const serviceEventWithCostSchema = serviceEventSchema.extend({
+  lines: z.array(serviceEventLineWithCostSchema),
+  partsCost: z.number().nonnegative(),
+});
+export type ServiceEventWithCost = z.infer<typeof serviceEventWithCostSchema>;
+
 export const createServiceEventInputSchema = z.object({
   bikeId: idSchema,
   serviceTemplateId: idSchema,
@@ -58,6 +111,14 @@ export type CreateServiceEventInput = z.infer<typeof createServiceEventInputSche
  */
 export const createAdHocServiceEventInputSchema = z.object({
   bikeId: idSchema,
+  // Defaulted to 'service' in ServiceService.createAdHoc when omitted so legacy
+  // callers keep working. 'wash' events carry zero lines; 'service'/'repair'
+  // require at least one (enforced in the service, not the schema).
+  kind: z.enum(SERVICE_EVENT_KINDS).optional(),
+  // Target status the event is created at. 'completed' deducts stock now;
+  // 'requested' / 'in_progress' record the (planned) parts without touching
+  // stock until the event is later marked completed.
+  status: z.enum(SETTABLE_SERVICE_EVENT_STATUSES).optional(),
   lines: z
     .array(
       z.object({
@@ -67,7 +128,7 @@ export const createAdHocServiceEventInputSchema = z.object({
         notes: z.string().max(500).nullable().default(null),
       }),
     )
-    .min(1),
+    .default([]),
   odometerKm: z.number().nonnegative().nullable().default(null),
   notes: z.string().max(2000).nullable().default(null),
 });
@@ -93,6 +154,14 @@ export type UpdateServiceEventLinesInput = z.infer<typeof updateServiceEventLine
 export const completeServiceEventInputSchema = z.object({ id: idSchema });
 export type CompleteServiceEventInput = z.infer<typeof completeServiceEventInputSchema>;
 
+export const setServiceEventStatusInputSchema = z.object({
+  id: idSchema,
+  status: z.enum(SETTABLE_SERVICE_EVENT_STATUSES),
+});
+export type SetServiceEventStatusInput = z.infer<
+  typeof setServiceEventStatusInputSchema
+>;
+
 export const cancelServiceEventInputSchema = z.object({
   id: idSchema,
   /** Required when the event is `completed`; ignored otherwise. */
@@ -102,6 +171,7 @@ export type CancelServiceEventInput = z.infer<typeof cancelServiceEventInputSche
 
 export const listServiceEventsInputSchema = z.object({
   status: z.enum(SERVICE_EVENT_STATUSES).optional(),
+  kind: z.enum(SERVICE_EVENT_KINDS).optional(),
   bikeId: idSchema.optional(),
   serviceTemplateId: idSchema.optional(),
   limit: z.number().int().min(1).max(500).default(200),

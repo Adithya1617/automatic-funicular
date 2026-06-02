@@ -6,7 +6,6 @@ import type { Ingredient } from '@shared/schemas/ingredient';
 import { Button } from '@renderer/components/ui/button';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
-import { Badge } from '@renderer/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -43,6 +42,13 @@ import {
 import { unitsCompatibleWithBase } from '@shared/constants/unitConversions';
 import { formatINR } from '@shared/utils/currency';
 import { formatStock } from '@renderer/lib/format';
+import { ServiceStatusBadge } from '@renderer/features/maintenance/ServiceStatusBadge';
+
+const KIND_LABELS: Record<'service' | 'repair' | 'wash', string> = {
+  service: 'Service (oil change)',
+  repair: 'Repair',
+  wash: 'Wash',
+};
 
 type DraftLine = {
   key: string;
@@ -112,9 +118,14 @@ export function ServiceEventEditorPage() {
     return <div className="px-1 py-4 text-text-tertiary">Loading…</div>;
   }
 
-  const isInProgress = event.status === 'in_progress';
+  // 'requested' and 'in_progress' are both pre-completion, editable states.
+  const isOpen = event.status === 'in_progress' || event.status === 'requested';
   const isCompleted = event.status === 'completed';
   const isCancelled = event.status === 'cancelled';
+
+  const kindLabel = event.serviceTemplateId
+    ? template?.name ?? 'Template service'
+    : KIND_LABELS[event.kind];
 
   const allValid = draft.every(
     (r) => r.ingredientId && r.quantity > 0 && r.unit,
@@ -216,13 +227,12 @@ export function ServiceEventEditorPage() {
           </Link>
           <span className="text-text-tertiary">/</span>
           <span className="text-text-primary">
-            {bike?.bikeNumber ?? '…'} ·{' '}
-            {event.serviceTemplateId ? template?.name ?? '…' : 'Quick service'}
+            {bike?.bikeNumber ?? '…'} · {kindLabel}
           </span>
-          <StatusBadge status={event.status} />
+          <ServiceStatusBadge status={event.status} />
         </div>
         <div className="flex items-center gap-2">
-          {isInProgress ? (
+          {isOpen ? (
             <>
               <Button
                 type="button"
@@ -270,14 +280,7 @@ export function ServiceEventEditorPage() {
         <h2 className="mb-3 text-[13px] font-medium text-text-primary">Details</h2>
         <div className="grid grid-cols-4 gap-3 text-[12px]">
           <Detail label="Bike" value={bike?.bikeNumber ?? '—'} />
-          <Detail
-            label="Template"
-            value={
-              event.serviceTemplateId
-                ? template?.name ?? '—'
-                : 'Quick service (ad-hoc)'
-            }
-          />
+          <Detail label="Type" value={kindLabel} />
           <Detail
             label="Odometer"
             value={event.odometerKm != null ? `${event.odometerKm.toLocaleString('en-IN')} km` : '—'}
@@ -297,9 +300,9 @@ export function ServiceEventEditorPage() {
       <section className="rounded-lg border border-border-tertiary bg-background-primary p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-[13px] font-medium text-text-primary">
-            Parts {isInProgress ? '· editable until you complete' : ''}
+            Parts {isOpen ? '· editable until you complete' : ''}
           </h2>
-          {isInProgress ? (
+          {isOpen ? (
             <Button type="button" variant="ghost" size="sm" onClick={addRow}>
               + Add row
             </Button>
@@ -313,13 +316,13 @@ export function ServiceEventEditorPage() {
               <TableHead className="w-[120px]">Quantity</TableHead>
               <TableHead className="w-[100px]">Unit</TableHead>
               <TableHead className="text-right">Stock</TableHead>
-              {isInProgress ? <TableHead className="w-[40px]" /> : null}
+              {isOpen ? <TableHead className="w-[40px]" /> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
             {draft.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isInProgress ? 5 : 4} className="text-center text-text-tertiary">
+                <TableCell colSpan={isOpen ? 5 : 4} className="text-center text-text-tertiary">
                   No parts on this service yet.
                 </TableCell>
               </TableRow>
@@ -330,7 +333,7 @@ export function ServiceEventEditorPage() {
                 return (
                   <TableRow key={row.key}>
                     <TableCell>
-                      {isInProgress ? (
+                      {isOpen ? (
                         <Select
                           value={row.ingredientId}
                           onValueChange={(v) => patchRow(row.key, { ingredientId: v })}
@@ -351,7 +354,7 @@ export function ServiceEventEditorPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {isInProgress ? (
+                      {isOpen ? (
                         <Input
                           type="number"
                           min={0}
@@ -366,7 +369,7 @@ export function ServiceEventEditorPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {isInProgress && compatibleUnits.length > 0 ? (
+                      {isOpen && compatibleUnits.length > 0 ? (
                         <Select
                           value={row.unit}
                           onValueChange={(v) => patchRow(row.key, { unit: v })}
@@ -389,7 +392,7 @@ export function ServiceEventEditorPage() {
                     <TableCell className="text-right tabular-nums text-text-tertiary">
                       {ing ? formatStock(ing.stockQuantity, ing.baseUnit) : '—'}
                     </TableCell>
-                    {isInProgress ? (
+                    {isOpen ? (
                       <TableCell>
                         <Button
                           type="button"
@@ -496,10 +499,4 @@ function Detail({ label, value }: { label: string; value: string }) {
       <span className="font-medium text-text-primary">{value}</span>
     </div>
   );
-}
-
-function StatusBadge({ status }: { status: 'in_progress' | 'completed' | 'cancelled' }) {
-  if (status === 'in_progress') return <Badge variant="info">in progress</Badge>;
-  if (status === 'completed') return <Badge variant="success">completed</Badge>;
-  return <Badge variant="neutral">cancelled</Badge>;
 }

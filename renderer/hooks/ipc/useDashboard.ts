@@ -76,6 +76,20 @@ export function useServiceVolumeByBikeType(range: DateRange) {
   });
 }
 
+export function useServiceVolumeByBike(range: DateRange) {
+  return useQuery({
+    queryKey: ['dashboard', 'serviceVolumeByBike', ...rangeKey(range)],
+    queryFn: () => unwrap(window.hyprride.dashboard.serviceVolumeByBike({ range })),
+  });
+}
+
+export function useMaintenanceSchedule() {
+  return useQuery({
+    queryKey: ['dashboard', 'maintenanceSchedule'],
+    queryFn: () => unwrap(window.hyprride.dashboard.maintenanceSchedule({})),
+  });
+}
+
 export function useTheoreticalServiceCost() {
   return useQuery({
     queryKey: ['dashboard', 'theoreticalServiceCost'],

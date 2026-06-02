@@ -82,6 +82,7 @@ beforeEach(() => {
   vi.spyOn(bikeRepository, 'findById').mockReturnValue(undefined);
   vi.spyOn(bikeTypeRepository, 'list').mockReturnValue([]);
   vi.spyOn(serviceEventRepository, 'listInRange').mockReturnValue([]);
+  vi.spyOn(serviceEventRepository, 'lastCompletedAtByBike').mockReturnValue(new Map());
   vi.spyOn(serviceEventLineRepository, 'listForEvents').mockReturnValue([]);
   vi.spyOn(serviceTemplateRepository, 'list').mockReturnValue([]);
 });
@@ -324,6 +325,7 @@ function evt(overrides: Partial<ServiceEventRow> = {}): ServiceEventRow {
     id: EVT_1,
     tenantId: DEFAULT_TENANT_ID,
     bikeId: BIKE_1,
+    kind: 'service',
     serviceTemplateId: TPL_STD,
     serviceTemplateVersionId: 'rv-1',
     status: 'completed',
@@ -719,5 +721,69 @@ describe('DashboardService.theoreticalServiceCost', () => {
     const result = DashboardService.theoreticalServiceCost(db as never, DEFAULT_TENANT_ID);
     expect(result.rows[0]!.hasActiveRecipe).toBe(true);
     expect(result.rows[0]!.totalCost).toBe(0);
+  });
+});
+
+describe('DashboardService.maintenanceSchedule', () => {
+  it('computes service/wash countdowns and treats never-done as urgent (null)', () => {
+    const db = makeFakeDb();
+    const now = Date.now();
+    vi.spyOn(bikeRepository, 'list').mockReturnValue([
+      bike({ id: BIKE_1, bikeNumber: 'HYP-001', bikeTypeId: TYPE_110 }),
+      bike({ id: BIKE_2, bikeNumber: 'HYP-002', bikeTypeId: TYPE_110 }),
+    ]);
+    vi.spyOn(bikeTypeRepository, 'list').mockReturnValue([bikeType({ id: TYPE_110 })]);
+    vi.spyOn(serviceEventRepository, 'lastCompletedAtByBike').mockImplementation(
+      (_db, _t, kind) => {
+        if (kind === 'service') return new Map([[BIKE_1, now - 10 * MS_PER_DAY]]);
+        if (kind === 'wash') return new Map([[BIKE_1, now - 1 * MS_PER_DAY]]);
+        return new Map();
+      },
+    );
+
+    const result = DashboardService.maintenanceSchedule(db as never, DEFAULT_TENANT_ID);
+    const byBike = Object.fromEntries(result.rows.map((r) => [r.bikeNumber, r]));
+
+    // serviced 10 days ago, interval 45 → 35 days remaining.
+    expect(byBike['HYP-001']!.serviceDaysRemaining).toBe(35);
+    expect(byBike['HYP-001']!.lastServiceAt).toBe(now - 10 * MS_PER_DAY);
+    // washed 1 day ago, interval 15 → 14 days remaining.
+    expect(byBike['HYP-001']!.washDaysRemaining).toBe(14);
+    // BIKE_2 never serviced or washed → urgent (null countdowns).
+    expect(byBike['HYP-002']!.serviceDaysRemaining).toBeNull();
+    expect(byBike['HYP-002']!.lastServiceAt).toBeNull();
+    expect(byBike['HYP-002']!.washDaysRemaining).toBeNull();
+  });
+});
+
+describe('DashboardService.serviceVolumeByBike', () => {
+  it('counts completed events per bike split by kind', () => {
+    const db = makeFakeDb();
+    vi.spyOn(serviceEventRepository, 'listInRange').mockReturnValue([
+      evt({ id: EVT_1, bikeId: BIKE_1, kind: 'service' }),
+      evt({ id: EVT_2, bikeId: BIKE_1, kind: 'repair' }),
+      evt({ id: 'e-3', bikeId: BIKE_1, kind: 'wash' }),
+      evt({ id: 'e-4', bikeId: BIKE_2, kind: 'service' }),
+    ]);
+    vi.spyOn(bikeRepository, 'list').mockReturnValue([
+      bike({ id: BIKE_1, bikeNumber: 'HYP-001', bikeTypeId: TYPE_110 }),
+      bike({ id: BIKE_2, bikeNumber: 'HYP-002', bikeTypeId: TYPE_125 }),
+    ]);
+    vi.spyOn(bikeTypeRepository, 'list').mockReturnValue([
+      bikeType({ id: TYPE_110, name: 'Activa' }),
+      bikeType({ id: TYPE_125, name: 'Ntorq', engineCc: 125 }),
+    ]);
+
+    const result = DashboardService.serviceVolumeByBike(db as never, DEFAULT_TENANT_ID, RANGE);
+    const byBike = Object.fromEntries(result.rows.map((r) => [r.bikeNumber, r]));
+    expect(byBike['HYP-001']).toMatchObject({
+      serviceCount: 1,
+      repairCount: 1,
+      washCount: 1,
+      total: 3,
+    });
+    expect(byBike['HYP-002']).toMatchObject({ serviceCount: 1, total: 1 });
+    // sorted by total desc → HYP-001 first.
+    expect(result.rows[0]!.bikeNumber).toBe('HYP-001');
   });
 });

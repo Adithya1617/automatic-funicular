@@ -6,7 +6,10 @@ import {
   createColumnHelper,
 } from '@tanstack/react-table';
 import type { Bike, BikeType } from '@shared/schemas/bike';
+import type { MaintenanceRow } from '@shared/schemas/dashboard';
 import { formatBikeTypeLabel } from '@shared/utils/bikeType';
+import { dueLabel } from '@renderer/lib/maintenance';
+import { cn } from '@renderer/lib/cn';
 import {
   Table,
   TableBody,
@@ -20,11 +23,13 @@ type Props = {
   rows: Bike[];
   bikeTypes: BikeType[];
   onSelect: (id: string) => void;
+  /** Per-bike maintenance countdowns, keyed by bike id (optional). */
+  scheduleByBike?: Map<string, MaintenanceRow>;
 };
 
 const columnHelper = createColumnHelper<Bike>();
 
-export function BikesTable({ rows, bikeTypes, onSelect }: Props) {
+export function BikesTable({ rows, bikeTypes, onSelect, scheduleByBike }: Props) {
   const typeNameById = useMemo(
     () => new Map(bikeTypes.map((t) => [t.id, formatBikeTypeLabel(t)])),
     [bikeTypes],
@@ -65,8 +70,22 @@ export function BikesTable({ rows, bikeTypes, onSelect }: Props) {
           );
         },
       }),
+      columnHelper.display({
+        id: 'serviceDue',
+        header: 'Service due',
+        cell: (cell) => (
+          <DueCell days={scheduleByBike?.get(cell.row.original.id)?.serviceDaysRemaining} />
+        ),
+      }),
+      columnHelper.display({
+        id: 'washDue',
+        header: 'Wash due',
+        cell: (cell) => (
+          <DueCell days={scheduleByBike?.get(cell.row.original.id)?.washDaysRemaining} />
+        ),
+      }),
     ],
-    [typeNameById],
+    [typeNameById, scheduleByBike],
   );
 
   const table = useReactTable({
@@ -116,5 +135,24 @@ export function BikesTable({ rows, bikeTypes, onSelect }: Props) {
         </TableBody>
       </Table>
     </div>
+  );
+}
+
+/** Renders a maintenance countdown. `undefined` days = schedule not loaded
+ *  (shows "—"); `null` = never done (shows "never", urgent). */
+function DueCell({ days }: { days: number | null | undefined }) {
+  if (days === undefined) {
+    return <span className="text-text-tertiary">—</span>;
+  }
+  const label = dueLabel(days);
+  return (
+    <span
+      className={cn(
+        'text-[12px] tabular-nums',
+        label.urgent ? 'font-medium text-text-danger' : 'text-text-secondary',
+      )}
+    >
+      {label.text}
+    </span>
   );
 }

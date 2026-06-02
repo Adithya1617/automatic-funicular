@@ -42,7 +42,9 @@ import type {
   GetServiceEventInput,
   ListServiceEventsInput,
   ServiceEvent,
+  ServiceEventWithCost,
   ServiceEventWithLines,
+  SetServiceEventStatusInput,
   UpdateServiceEventLinesInput,
 } from '@shared/schemas/serviceEvent';
 import type {
@@ -91,8 +93,10 @@ import type {
   CostPerBikeResponse,
   CostPerBikeTypeResponse,
   LowStockResponse,
+  MaintenanceScheduleResponse,
   RangedQuery,
   ReorderResponse,
+  ServiceVolumeByBikeResponse,
   ServiceVolumeResponse,
   SpendingResponse,
   StockValueResponse,
@@ -184,6 +188,9 @@ const api = {
   },
   serviceEvent: {
     list: invoke<ListServiceEventsInput, ServiceEvent[]>(IPC.serviceEvent.list),
+    listWithLines: invoke<ListServiceEventsInput, ServiceEventWithCost[]>(
+      IPC.serviceEvent.listWithLines,
+    ),
     get: invoke<GetServiceEventInput, ServiceEventWithLines>(IPC.serviceEvent.get),
     create: invoke<CreateServiceEventInput, ServiceEventWithLines>(IPC.serviceEvent.create),
     createAdHoc: invoke<CreateAdHocServiceEventInput, ServiceEventWithLines>(
@@ -194,6 +201,9 @@ const api = {
     ),
     complete: invoke<CompleteServiceEventInput, ServiceEventWithLines>(
       IPC.serviceEvent.complete,
+    ),
+    setStatus: invoke<SetServiceEventStatusInput, ServiceEventWithLines>(
+      IPC.serviceEvent.setStatus,
     ),
     cancel: invoke<CancelServiceEventInput, ServiceEventWithLines>(IPC.serviceEvent.cancel),
   },
@@ -257,6 +267,12 @@ const api = {
     ),
     serviceVolumeByBikeType: invoke<RangedQuery, ServiceVolumeResponse>(
       IPC.dashboard.serviceVolumeByBikeType,
+    ),
+    serviceVolumeByBike: invoke<RangedQuery, ServiceVolumeByBikeResponse>(
+      IPC.dashboard.serviceVolumeByBike,
+    ),
+    maintenanceSchedule: invoke<Record<string, never>, MaintenanceScheduleResponse>(
+      IPC.dashboard.maintenanceSchedule,
     ),
     theoreticalServiceCost: invoke<Record<string, never>, TheoreticalServiceCostResponse>(
       IPC.dashboard.theoreticalServiceCost,

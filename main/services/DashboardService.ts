@@ -16,7 +16,11 @@ import type {
   CostPerBikeTypeRow,
   DateRange,
   LowStockResponse,
+  MaintenanceRow,
+  MaintenanceScheduleResponse,
   ReorderResponse,
+  ServiceVolumeByBikeResponse,
+  ServiceVolumeByBikeRow,
   ServiceVolumeResponse,
   SpendingByCategory,
   SpendingByIngredient,
@@ -30,7 +34,11 @@ import type {
   WastageResponse,
 } from '@shared/schemas/dashboard';
 import type { StockMovementReason } from '@shared/constants/enums';
-import { REORDER_LEAD_TIME_DAYS } from '@shared/constants/system';
+import {
+  REORDER_LEAD_TIME_DAYS,
+  SERVICE_INTERVAL_DAYS,
+  WASH_INTERVAL_DAYS,
+} from '@shared/constants/system';
 import { toBase } from '@shared/utils/unitConverter';
 import { formatBikeTypeLabel } from '@shared/utils/bikeType';
 
@@ -542,6 +550,104 @@ export const DashboardService = {
       if (t !== 0) return t;
       return a.serviceTemplateName.localeCompare(b.serviceTemplateName);
     });
+    return { rows };
+  },
+
+  /* --------------- Hyprride Tile F — Maintenance schedule ----------------- */
+  /**
+   * Per active bike, the last completed service / wash and the countdown to
+   * the next one (last + interval). Feeds the dashboard "Service due" and
+   * "Wash due" alert panels and the per-bike columns on the Bikes page.
+   * `daysRemaining` is null when the bike has never had that activity — the UI
+   * treats null as urgent (overdue / due now).
+   */
+  maintenanceSchedule(
+    db: AppDb,
+    tenantId: number,
+  ): MaintenanceScheduleResponse {
+    const bikes = bikeRepository.list(db, tenantId, { includeInactive: false });
+    const bikeTypes = bikeTypeRepository.list(db, tenantId, { includeInactive: true });
+    const bikeTypeById = new Map(bikeTypes.map((t) => [t.id, t]));
+    const lastService = serviceEventRepository.lastCompletedAtByBike(db, tenantId, 'service');
+    const lastWash = serviceEventRepository.lastCompletedAtByBike(db, tenantId, 'wash');
+    const now = Date.now();
+
+    const due = (lastAt: number | undefined, intervalDays: number) => {
+      if (lastAt === undefined) {
+        return { lastAt: null, dueAt: null, daysRemaining: null };
+      }
+      const dueAt = lastAt + intervalDays * MS_PER_DAY;
+      return {
+        lastAt,
+        dueAt,
+        daysRemaining: Math.ceil((dueAt - now) / MS_PER_DAY),
+      };
+    };
+
+    const rows: MaintenanceRow[] = bikes.map((b) => {
+      const svc = due(lastService.get(b.id), SERVICE_INTERVAL_DAYS);
+      const wash = due(lastWash.get(b.id), WASH_INTERVAL_DAYS);
+      const bt = bikeTypeById.get(b.bikeTypeId);
+      return {
+        bikeId: b.id,
+        bikeNumber: b.bikeNumber,
+        bikeTypeName: bt ? formatBikeTypeLabel(bt) : '(unknown)',
+        lastServiceAt: svc.lastAt,
+        serviceDueAt: svc.dueAt,
+        serviceDaysRemaining: svc.daysRemaining,
+        lastWashAt: wash.lastAt,
+        washDueAt: wash.dueAt,
+        washDaysRemaining: wash.daysRemaining,
+      };
+    });
+    rows.sort((a, b) => a.bikeNumber.localeCompare(b.bikeNumber, undefined, { numeric: true }));
+    return { rows };
+  },
+
+  /* --------------- Hyprride Tile G — Services by bike --------------------- */
+  /**
+   * Completed-event counts per individual bike in the range, split by kind.
+   * Pairs with serviceVolumeByBikeType so the operator can drill from "by
+   * model" to "by bike".
+   */
+  serviceVolumeByBike(
+    db: AppDb,
+    tenantId: number,
+    range: DateRange,
+  ): ServiceVolumeByBikeResponse {
+    const events = serviceEventRepository.listInRange(db, tenantId, range, {
+      status: 'completed',
+    });
+    const bikes = bikeRepository.list(db, tenantId, { includeInactive: true });
+    const bikeById = new Map(bikes.map((b) => [b.id, b]));
+    const bikeTypes = bikeTypeRepository.list(db, tenantId, { includeInactive: true });
+    const bikeTypeById = new Map(bikeTypes.map((t) => [t.id, t]));
+
+    const byBike = new Map<string, ServiceVolumeByBikeRow>();
+    for (const e of events) {
+      const bike = bikeById.get(e.bikeId);
+      if (!bike) continue;
+      let row = byBike.get(e.bikeId);
+      if (!row) {
+        const bt = bikeTypeById.get(bike.bikeTypeId);
+        row = {
+          bikeId: bike.id,
+          bikeNumber: bike.bikeNumber,
+          bikeTypeName: bt ? formatBikeTypeLabel(bt) : '(unknown)',
+          serviceCount: 0,
+          repairCount: 0,
+          washCount: 0,
+          total: 0,
+        };
+        byBike.set(e.bikeId, row);
+      }
+      if (e.kind === 'service') row.serviceCount += 1;
+      else if (e.kind === 'repair') row.repairCount += 1;
+      else if (e.kind === 'wash') row.washCount += 1;
+      row.total += 1;
+    }
+
+    const rows = [...byBike.values()].sort((a, b) => b.total - a.total);
     return { rows };
   },
 };

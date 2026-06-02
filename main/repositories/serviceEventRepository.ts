@@ -5,10 +5,14 @@ import {
   type ServiceEventRow,
   type ServiceEventInsert,
 } from '../db/schema';
-import type { ServiceEventStatus } from '@shared/schemas/serviceEvent';
+import type {
+  ServiceEventKind,
+  ServiceEventStatus,
+} from '@shared/schemas/serviceEvent';
 
 export type ServiceEventFilter = {
   status?: ServiceEventStatus;
+  kind?: ServiceEventKind;
   bikeId?: string;
   serviceTemplateId?: string;
   limit?: number;
@@ -22,6 +26,7 @@ export const serviceEventRepository = {
   ): ServiceEventRow[] {
     const conditions: SQL[] = [eq(serviceEvents.tenantId, tenantId)];
     if (filter.status) conditions.push(eq(serviceEvents.status, filter.status));
+    if (filter.kind) conditions.push(eq(serviceEvents.kind, filter.kind));
     if (filter.bikeId) conditions.push(eq(serviceEvents.bikeId, filter.bikeId));
     if (filter.serviceTemplateId)
       conditions.push(eq(serviceEvents.serviceTemplateId, filter.serviceTemplateId));
@@ -76,7 +81,7 @@ export const serviceEventRepository = {
     db: AppDb,
     tenantId: number,
     range: { startMs: number; endMs: number },
-    opts: { status?: ServiceEventStatus; bikeId?: string } = {},
+    opts: { status?: ServiceEventStatus; kind?: ServiceEventKind; bikeId?: string } = {},
   ): ServiceEventRow[] {
     const conditions: SQL[] = [
       eq(serviceEvents.tenantId, tenantId),
@@ -84,6 +89,7 @@ export const serviceEventRepository = {
       lt(serviceEvents.startedAt, range.endMs),
     ];
     if (opts.status) conditions.push(eq(serviceEvents.status, opts.status));
+    if (opts.kind) conditions.push(eq(serviceEvents.kind, opts.kind));
     if (opts.bikeId) conditions.push(eq(serviceEvents.bikeId, opts.bikeId));
     return db
       .select()
@@ -91,5 +97,35 @@ export const serviceEventRepository = {
       .where(and(...conditions))
       .orderBy(asc(serviceEvents.startedAt))
       .all();
+  },
+
+  /**
+   * Most recent completed event per bike for a given kind, keyed by bikeId →
+   * latest `startedAt`. Drives the maintenance-countdown dashboard tiles
+   * (service due / wash due) and the per-bike schedule columns. Returns one
+   * entry only for bikes that have at least one completed event of that kind.
+   */
+  lastCompletedAtByBike(
+    db: AppDb,
+    tenantId: number,
+    kind: ServiceEventKind,
+  ): Map<string, number> {
+    const rows = db
+      .select({ bikeId: serviceEvents.bikeId, startedAt: serviceEvents.startedAt })
+      .from(serviceEvents)
+      .where(
+        and(
+          eq(serviceEvents.tenantId, tenantId),
+          eq(serviceEvents.kind, kind),
+          eq(serviceEvents.status, 'completed'),
+        ),
+      )
+      .all();
+    const byBike = new Map<string, number>();
+    for (const r of rows) {
+      const prev = byBike.get(r.bikeId);
+      if (prev === undefined || r.startedAt > prev) byBike.set(r.bikeId, r.startedAt);
+    }
+    return byBike;
   },
 };

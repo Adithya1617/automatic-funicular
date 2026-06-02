@@ -7,6 +7,7 @@ import { recipeRepository } from '../../main/repositories/recipeRepository';
 import { serviceEventLineRepository } from '../../main/repositories/serviceEventLineRepository';
 import { serviceEventRepository } from '../../main/repositories/serviceEventRepository';
 import { serviceTemplateRepository } from '../../main/repositories/serviceTemplateRepository';
+import { stockMovementRepository } from '../../main/repositories/stockMovementRepository';
 import { DEFAULT_TENANT_ID, SYSTEM_USER_ID } from '@shared/constants/system';
 import {
   ConflictError,
@@ -22,6 +23,7 @@ import type {
   ServiceEventLineRow,
   ServiceEventRow,
   ServiceTemplateRow,
+  StockMovementRow,
 } from '../../main/db/schema';
 
 const TYPE_110 = '01900000-0000-7000-8000-0000000000a1';
@@ -127,6 +129,7 @@ function evt(overrides: Partial<ServiceEventRow> = {}): ServiceEventRow {
     id: EVT_ID,
     tenantId: DEFAULT_TENANT_ID,
     bikeId: BIKE_ID,
+    kind: 'service',
     serviceTemplateId: TPL_ID,
     serviceTemplateVersionId: RECIPE_V1,
     status: 'in_progress',
@@ -420,6 +423,109 @@ describe('ServiceService.createAdHoc — quick "Start servicing" flow', () => {
     expect(callInput.referenceType).toBe('service_event_line');
     expect(callInput.ingredientId).toBe(PART_OIL);
     expect(callInput.quantity).toBe(800);
+  });
+
+  it('wash event: inserts kind=wash with zero lines and no stock movements', () => {
+    const db = makeFakeDb();
+    vi.spyOn(bikeRepository, 'findById').mockReturnValue(bike());
+    const insertEvent = vi
+      .spyOn(serviceEventRepository, 'insert')
+      .mockImplementation((_db, row) => row as ServiceEventRow);
+    const insertLines = vi.spyOn(serviceEventLineRepository, 'insertMany');
+
+    const result = ServiceService.createAdHoc(db as never, DEFAULT_TENANT_ID, {
+      bikeId: BIKE_ID,
+      kind: 'wash',
+      lines: [],
+      odometerKm: null,
+      notes: 'rinsed and dried',
+    });
+
+    const inserted = insertEvent.mock.calls[0]![1] as ServiceEventRow;
+    expect(inserted.kind).toBe('wash');
+    expect(inserted.status).toBe('completed');
+    expect(insertLines).not.toHaveBeenCalled();
+    expect(InventoryService.applyMovement).not.toHaveBeenCalled();
+    expect(result.lines).toHaveLength(0);
+  });
+
+  it('throws ValidationError when a wash event is given parts', () => {
+    vi.spyOn(bikeRepository, 'findById').mockReturnValue(bike());
+    expect(() =>
+      ServiceService.createAdHoc(makeFakeDb() as never, DEFAULT_TENANT_ID, {
+        bikeId: BIKE_ID,
+        kind: 'wash',
+        lines: [{ ingredientId: PART_OIL, quantity: 800, unit: 'ml', notes: null }],
+        odometerKm: null,
+        notes: null,
+      }),
+    ).toThrow(ValidationError);
+  });
+
+  it('throws ValidationError when a service/repair event has no parts', () => {
+    vi.spyOn(bikeRepository, 'findById').mockReturnValue(bike());
+    expect(() =>
+      ServiceService.createAdHoc(makeFakeDb() as never, DEFAULT_TENANT_ID, {
+        bikeId: BIKE_ID,
+        kind: 'repair',
+        lines: [],
+        odometerKm: null,
+        notes: null,
+      }),
+    ).toThrow(ValidationError);
+  });
+
+  it('defaults kind to "service" when omitted and stamps it on the event', () => {
+    const db = makeFakeDb();
+    vi.spyOn(bikeRepository, 'findById').mockReturnValue(bike());
+    vi.spyOn(ingredientRepository, 'findById').mockReturnValue(
+      ingredient({ id: PART_OIL, baseUnit: 'ml' }),
+    );
+    const insertEvent = vi
+      .spyOn(serviceEventRepository, 'insert')
+      .mockImplementation((_db, row) => row as ServiceEventRow);
+    vi.spyOn(serviceEventLineRepository, 'insertMany').mockImplementation(
+      (_db, rows) => rows as ServiceEventLineRow[],
+    );
+
+    ServiceService.createAdHoc(db as never, DEFAULT_TENANT_ID, {
+      bikeId: BIKE_ID,
+      lines: [{ ingredientId: PART_OIL, quantity: 800, unit: 'ml', notes: null }],
+      odometerKm: null,
+      notes: null,
+    });
+
+    const inserted = insertEvent.mock.calls[0]![1] as ServiceEventRow;
+    expect(inserted.kind).toBe('service');
+  });
+
+  it('status=requested records lines but deducts no stock (completedAt null)', () => {
+    const db = makeFakeDb();
+    vi.spyOn(bikeRepository, 'findById').mockReturnValue(bike());
+    vi.spyOn(ingredientRepository, 'findById').mockReturnValue(
+      ingredient({ id: PART_OIL, baseUnit: 'ml' }),
+    );
+    const insertEvent = vi
+      .spyOn(serviceEventRepository, 'insert')
+      .mockImplementation((_db, row) => row as ServiceEventRow);
+    vi.spyOn(serviceEventLineRepository, 'insertMany').mockImplementation(
+      (_db, rows) => rows as ServiceEventLineRow[],
+    );
+
+    const result = ServiceService.createAdHoc(db as never, DEFAULT_TENANT_ID, {
+      bikeId: BIKE_ID,
+      kind: 'repair',
+      status: 'requested',
+      lines: [{ ingredientId: PART_OIL, quantity: 800, unit: 'ml', notes: null }],
+      odometerKm: null,
+      notes: null,
+    });
+
+    const inserted = insertEvent.mock.calls[0]![1] as ServiceEventRow;
+    expect(inserted.status).toBe('requested');
+    expect(inserted.completedAt).toBeNull();
+    expect(InventoryService.applyMovement).not.toHaveBeenCalled();
+    expect(result.lines).toHaveLength(1);
   });
 
   it('rolls back the whole create when applyMovement throws on a later line (atomic)', () => {
@@ -805,6 +911,192 @@ describe('ServiceService Path A — captured version survives template edits', (
     };
     expect(call.quantity).toBe(800);
     expect(call.unit).toBe('ml');
+  });
+});
+
+// --- setStatus (workflow) -------------------------------------------------
+
+describe('ServiceService.setStatus — requested → under service → completed', () => {
+  it('requested → in_progress updates status with no movements and completedAt null', () => {
+    const db = makeFakeDb();
+    vi.spyOn(serviceEventRepository, 'findById')
+      .mockReturnValueOnce(evt({ status: 'requested' }))
+      .mockReturnValueOnce(evt({ status: 'in_progress' }));
+    vi.spyOn(serviceEventLineRepository, 'listForEvent').mockReturnValue([evtLine()]);
+    const updateSpy = vi.spyOn(serviceEventRepository, 'update').mockReturnValue(evt());
+
+    ServiceService.setStatus(db as never, DEFAULT_TENANT_ID, {
+      id: EVT_ID,
+      status: 'in_progress',
+    });
+
+    expect(InventoryService.applyMovement).not.toHaveBeenCalled();
+    expect(updateSpy.mock.calls[0]![3]).toMatchObject({
+      status: 'in_progress',
+      completedAt: null,
+    });
+  });
+
+  it('in_progress → completed deducts one movement per line and stamps completedAt', () => {
+    const db = makeFakeDb();
+    vi.spyOn(serviceEventRepository, 'findById')
+      .mockReturnValueOnce(evt({ status: 'in_progress' }))
+      .mockReturnValueOnce(evt({ status: 'completed' }));
+    vi.spyOn(serviceEventLineRepository, 'listForEvent').mockReturnValue([
+      evtLine({ id: LINE_OIL, ingredientId: PART_OIL, quantity: 800, unit: 'ml' }),
+      evtLine({ id: LINE_BRAKE, ingredientId: PART_BRAKE_PAD, quantity: 2, unit: 'each' }),
+    ]);
+    const updateSpy = vi.spyOn(serviceEventRepository, 'update').mockReturnValue(evt());
+
+    ServiceService.setStatus(db as never, DEFAULT_TENANT_ID, {
+      id: EVT_ID,
+      status: 'completed',
+    });
+
+    expect(InventoryService.applyMovement).toHaveBeenCalledTimes(2);
+    expect(updateSpy.mock.calls[0]![3]).toMatchObject({ status: 'completed' });
+  });
+
+  it('wash → completed flips status with no movements (no parts required)', () => {
+    const db = makeFakeDb();
+    vi.spyOn(serviceEventRepository, 'findById')
+      .mockReturnValueOnce(evt({ status: 'requested', kind: 'wash' }))
+      .mockReturnValueOnce(evt({ status: 'completed', kind: 'wash' }));
+    vi.spyOn(serviceEventLineRepository, 'listForEvent').mockReturnValue([]);
+    const updateSpy = vi.spyOn(serviceEventRepository, 'update').mockReturnValue(evt());
+
+    ServiceService.setStatus(db as never, DEFAULT_TENANT_ID, {
+      id: EVT_ID,
+      status: 'completed',
+    });
+
+    expect(InventoryService.applyMovement).not.toHaveBeenCalled();
+    expect(updateSpy.mock.calls[0]![3]).toMatchObject({ status: 'completed' });
+  });
+
+  it('refuses to complete a service/repair that has no parts', () => {
+    vi.spyOn(serviceEventRepository, 'findById').mockReturnValue(
+      evt({ status: 'in_progress', kind: 'repair' }),
+    );
+    vi.spyOn(serviceEventLineRepository, 'listForEvent').mockReturnValue([]);
+
+    expect(() =>
+      ServiceService.setStatus(makeFakeDb() as never, DEFAULT_TENANT_ID, {
+        id: EVT_ID,
+        status: 'completed',
+      }),
+    ).toThrow(ValidationError);
+  });
+
+  it('refuses to move a completed event back to requested', () => {
+    vi.spyOn(serviceEventRepository, 'findById').mockReturnValue(
+      evt({ status: 'completed' }),
+    );
+
+    expect(() =>
+      ServiceService.setStatus(makeFakeDb() as never, DEFAULT_TENANT_ID, {
+        id: EVT_ID,
+        status: 'requested',
+      }),
+    ).toThrow(ConflictError);
+  });
+
+  it('refuses to change the status of a cancelled event', () => {
+    vi.spyOn(serviceEventRepository, 'findById').mockReturnValue(
+      evt({ status: 'cancelled' }),
+    );
+
+    expect(() =>
+      ServiceService.setStatus(makeFakeDb() as never, DEFAULT_TENANT_ID, {
+        id: EVT_ID,
+        status: 'in_progress',
+      }),
+    ).toThrow(ConflictError);
+  });
+
+  it('is idempotent when the target status equals the current status', () => {
+    vi.spyOn(serviceEventRepository, 'findById').mockReturnValue(
+      evt({ status: 'requested' }),
+    );
+    vi.spyOn(serviceEventLineRepository, 'listForEvent').mockReturnValue([evtLine()]);
+    const updateSpy = vi.spyOn(serviceEventRepository, 'update');
+
+    ServiceService.setStatus(makeFakeDb() as never, DEFAULT_TENANT_ID, {
+      id: EVT_ID,
+      status: 'requested',
+    });
+
+    expect(updateSpy).not.toHaveBeenCalled();
+    expect(InventoryService.applyMovement).not.toHaveBeenCalled();
+  });
+});
+
+// --- listWithLines (cost) -------------------------------------------------
+
+describe('ServiceService.listWithLines — per-event parts cost from snapshots', () => {
+  function mvt(overrides: Partial<StockMovementRow>): StockMovementRow {
+    return {
+      id: 'm',
+      tenantId: DEFAULT_TENANT_ID,
+      ingredientId: PART_OIL,
+      changeQuantity: -800,
+      costPerUnitAtTime: 0.42,
+      reason: 'service_consumed',
+      referenceType: 'service_event_line',
+      referenceId: LINE_OIL,
+      notes: null,
+      occurredAt: 0,
+      createdAt: 0,
+      createdBy: SYSTEM_USER_ID,
+      ...overrides,
+    };
+  }
+
+  it('sums snapshot cost per line + event, and a reversal zeroes its line', () => {
+    const db = makeFakeDb();
+    vi.spyOn(serviceEventRepository, 'list').mockReturnValue([
+      evt({ id: EVT_ID, kind: 'repair', status: 'completed' }),
+    ]);
+    vi.spyOn(serviceEventLineRepository, 'listForEvents').mockReturnValue([
+      evtLine({ id: LINE_OIL, serviceEventId: EVT_ID, ingredientId: PART_OIL, quantity: 800, unit: 'ml', displayOrder: 0 }),
+      evtLine({ id: LINE_BRAKE, serviceEventId: EVT_ID, ingredientId: PART_BRAKE_PAD, quantity: 2, unit: 'each', displayOrder: 1 }),
+    ]);
+    vi.spyOn(stockMovementRepository, 'listByReferenceIds').mockReturnValue([
+      mvt({ id: 'm1', referenceId: LINE_OIL, changeQuantity: -800, costPerUnitAtTime: 0.42 }), // 336
+      mvt({ id: 'm2', referenceId: LINE_BRAKE, changeQuantity: -2, costPerUnitAtTime: 350 }), // 700
+      // reversal on the brake line offsets it fully → that line costs 0.
+      mvt({ id: 'm3', referenceId: LINE_BRAKE, changeQuantity: 2, costPerUnitAtTime: 350, reason: 'service_reversal' }),
+    ]);
+
+    const result = ServiceService.listWithLines(db as never, DEFAULT_TENANT_ID, {
+      kind: 'repair',
+      limit: 200,
+    });
+    const event = result[0]!;
+    const costByLine = Object.fromEntries(event.lines.map((l) => [l.id, l.cost]));
+    expect(costByLine[LINE_OIL]).toBeCloseTo(336, 2);
+    expect(costByLine[LINE_BRAKE]).toBe(0);
+    expect(event.partsCost).toBeCloseTo(336, 2);
+  });
+
+  it('reports zero cost for a wash event (no lines, no movements)', () => {
+    const db = makeFakeDb();
+    vi.spyOn(serviceEventRepository, 'list').mockReturnValue([
+      evt({ id: EVT_ID, kind: 'wash', status: 'completed' }),
+    ]);
+    vi.spyOn(serviceEventLineRepository, 'listForEvents').mockReturnValue([]);
+    const refSpy = vi
+      .spyOn(stockMovementRepository, 'listByReferenceIds')
+      .mockReturnValue([]);
+
+    const result = ServiceService.listWithLines(db as never, DEFAULT_TENANT_ID, {
+      kind: 'wash',
+      limit: 200,
+    });
+    expect(result[0]!.partsCost).toBe(0);
+    expect(result[0]!.lines).toHaveLength(0);
+    // Still safe to call with an empty id list.
+    expect(refSpy).toHaveBeenCalledWith(expect.anything(), DEFAULT_TENANT_ID, 'service_event_line', []);
   });
 });
 
