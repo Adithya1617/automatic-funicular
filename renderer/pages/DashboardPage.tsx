@@ -9,8 +9,6 @@ import { StockValueTile } from '@renderer/features/dashboard/StockValueTile';
 import {
   LowStockTile,
   ReorderTile,
-  SpendingTile,
-  WastageTile,
 } from '@renderer/features/dashboard/SimpleTiles';
 import {
   CostPerBikeTile,
@@ -60,8 +58,6 @@ export function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         <StockValueTile range={range} />
-        <SpendingTile range={range} />
-        <WastageTile range={range} />
         <CostPerBikeTile range={range} />
         <CostPerBikeTypeTile range={range} />
         <TopConsumedPartsTile range={range} />
@@ -85,7 +81,6 @@ function CompareSection({ range }: { range: DateRange }) {
         Same range, last year
       </h2>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        <SpendingTile range={range} />
         <CostPerBikeTile range={range} />
         <ServiceVolumeTile range={range} />
       </div>

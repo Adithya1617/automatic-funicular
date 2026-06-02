@@ -6,6 +6,7 @@ import { AvailabilityService } from './AvailabilityService';
 import type {
   ApplyMovementInput,
   ManualAdjustmentInput,
+  RecordPurchaseInput,
 } from '@shared/schemas/inventory';
 import type { StockMovement } from '@shared/schemas/stockMovement';
 import { toBase } from '@shared/utils/unitConverter';
@@ -206,6 +207,36 @@ export const InventoryService = {
         reason: input.reason,
         referenceType: 'manual',
         direction: input.direction,
+        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+      },
+      actorId,
+    );
+  },
+
+  /**
+   * Records a parts purchase (Buy Parts page). A `purchase` movement always
+   * increases stock; when a cost is supplied it lifts the part's weighted-avg
+   * cost. Direction is forced +1 inside applyMovement.
+   */
+  recordPurchase(
+    db: AppDb,
+    tenantId: number,
+    input: RecordPurchaseInput,
+    actorId: string = SYSTEM_USER_ID,
+  ): ApplyMovementResult {
+    return InventoryService.applyMovement(
+      db,
+      tenantId,
+      {
+        ingredientId: input.ingredientId,
+        quantity: input.quantity,
+        unit: input.unit,
+        reason: 'purchase',
+        referenceType: 'manual',
+        direction: 1,
+        ...(input.costPerUnit !== undefined
+          ? { costPerUnitAtTime: input.costPerUnit }
+          : {}),
         ...(input.notes !== undefined ? { notes: input.notes } : {}),
       },
       actorId,

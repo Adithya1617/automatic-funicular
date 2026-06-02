@@ -64,6 +64,7 @@ export const IPC = {
   },
   inventory: {
     applyMovement: 'inventory:applyMovement',
+    recordPurchase: 'inventory:recordPurchase',
   },
   recipe: {
     getActive: 'recipe:getActive',

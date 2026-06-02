@@ -4,13 +4,10 @@ import { NAV_ITEMS, type NavItem } from './navItems';
 
 function pathMatchesNav(navPath: string, currentPath: string): boolean {
   if (navPath === '/') return currentPath === '/';
-  // Treat sub-routes as members of the same nav family. Service templates
-  // live under /services/templates/*, which is itself a child of /services/*,
-  // so we test the more-specific service-templates prefix first.
+  // Treat sub-routes as members of the same nav family — e.g. the service
+  // event editor at /services/:id/edit highlights the Services nav entry.
   let normalized = currentPath;
-  if (currentPath.startsWith('/services/templates'))
-    normalized = '/services/templates';
-  else if (currentPath.startsWith('/services/')) normalized = '/services';
+  if (currentPath.startsWith('/services/')) normalized = '/services';
   return normalized === navPath || normalized.startsWith(`${navPath}/`);
 }
 

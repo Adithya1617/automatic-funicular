@@ -38,3 +38,19 @@ export const manualAdjustmentInputSchema = z.object({
   notes: z.string().max(500).optional(),
 });
 export type ManualAdjustmentInput = z.infer<typeof manualAdjustmentInputSchema>;
+
+/**
+ * Convenience input for the "Buy Parts" page. Records a stock purchase for an
+ * existing part: always increases stock (direction is forced +1 by the
+ * service) and, when a `costPerUnit` is supplied, feeds the weighted-average
+ * cost recompute. `costPerUnit` is in `unit` (e.g. ₹ per L); the service
+ * normalizes it to ₹ per base unit.
+ */
+export const recordPurchaseInputSchema = z.object({
+  ingredientId: idSchema,
+  quantity: z.number().positive(),
+  unit: z.string().min(1),
+  costPerUnit: z.number().nonnegative().optional(),
+  notes: z.string().max(500).optional(),
+});
+export type RecordPurchaseInput = z.infer<typeof recordPurchaseInputSchema>;

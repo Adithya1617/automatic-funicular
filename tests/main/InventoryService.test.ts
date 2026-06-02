@@ -256,6 +256,63 @@ describe('InventoryService.applyMovement — weighted-avg cost recompute', () =>
     vi.restoreAllMocks();
   });
 
+  it('recordPurchase writes a +stock purchase movement and lifts avg cost', () => {
+    const db = makeFakeDb();
+    // 100 g @ ₹0.08/g, buy 50 g @ ₹0.12/g → avg (100*0.08 + 50*0.12)/150.
+    vi.spyOn(ingredientRepository, 'findById').mockReturnValue({
+      ...baseRow,
+      stockQuantity: 100,
+      currentAvgCostPerUnit: 0.08,
+    });
+    const insert = vi
+      .spyOn(stockMovementRepository, 'insert')
+      .mockImplementation((_db, row) => row as StockMovementRow);
+    const setStockAndCost = vi
+      .spyOn(ingredientRepository, 'setStockAndCost')
+      .mockImplementation(() => undefined);
+    vi.spyOn(ingredientRepository, 'setStockQuantity').mockImplementation(() => undefined);
+
+    const result = InventoryService.recordPurchase(db as never, DEFAULT_TENANT_ID, {
+      ingredientId: baseRow.id,
+      quantity: 50,
+      unit: 'g',
+      costPerUnit: 0.12,
+    });
+
+    expect(result.newStockQuantity).toBe(150);
+    expect(insert.mock.calls[0]![1].reason).toBe('purchase');
+    expect(insert.mock.calls[0]![1].referenceType).toBe('manual');
+    expect(insert.mock.calls[0]![1].changeQuantity).toBe(50); // forced +1
+    expect(setStockAndCost.mock.calls[0]![4]).toBeCloseTo((100 * 0.08 + 50 * 0.12) / 150, 6);
+    vi.restoreAllMocks();
+  });
+
+  it('recordPurchase without a cost still adds stock, leaving avg cost untouched', () => {
+    const db = makeFakeDb();
+    vi.spyOn(ingredientRepository, 'findById').mockReturnValue({
+      ...baseRow,
+      stockQuantity: 20,
+      currentAvgCostPerUnit: 3,
+    });
+    const insert = vi.spyOn(stockMovementRepository, 'insert').mockReturnValue({} as never);
+    const setStockAndCost = vi.spyOn(ingredientRepository, 'setStockAndCost');
+    const setStockOnly = vi
+      .spyOn(ingredientRepository, 'setStockQuantity')
+      .mockImplementation(() => undefined);
+
+    const result = InventoryService.recordPurchase(db as never, DEFAULT_TENANT_ID, {
+      ingredientId: baseRow.id,
+      quantity: 5,
+      unit: 'g',
+    });
+
+    expect(result.newStockQuantity).toBe(25);
+    expect(insert.mock.calls[0]![1].costPerUnitAtTime).toBeNull();
+    expect(setStockAndCost).not.toHaveBeenCalled();
+    expect(setStockOnly).toHaveBeenCalledTimes(1);
+    vi.restoreAllMocks();
+  });
+
   it('does not recompute avg cost on sale / wastage movements', () => {
     const db = makeFakeDb();
     vi.spyOn(ingredientRepository, 'findById').mockReturnValue({

@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
-import { flexRender, getCoreRowModel, useReactTable, createColumnHelper } from '@tanstack/react-table';
+import { Plus } from 'lucide-react';
 import { Button } from '@renderer/components/ui/button';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
@@ -9,6 +8,7 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -21,200 +21,90 @@ import {
   SelectValue,
 } from '@renderer/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@renderer/components/ui/table';
-import { BASE_UNITS, type BaseUnit } from '@shared/constants/enums';
+import { useIngredients } from '@renderer/hooks/ipc/useIngredients';
+import { useRecordPurchase } from '@renderer/hooks/ipc/useApplyMovement';
+import { usePurchaseHistory } from '@renderer/hooks/ipc/useStockMovements';
+import { unitsCompatibleWithBase } from '@shared/constants/unitConversions';
 import { formatINR } from '@shared/utils/currency';
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type BuyPart = {
-  id: string;
-  partName: string;
-  stock: number;
-  price: number;
-  units: BaseUnit;
-};
-
-type FormValues = {
-  partName: string;
-  stock: string;
-  price: string;
-  units: BaseUnit;
-};
-
-// ---------------------------------------------------------------------------
-// Persistence (localStorage)
-// ---------------------------------------------------------------------------
-
-const STORAGE_KEY = 'hyprride:buy-parts';
-
-function loadEntries(): BuyPart[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as BuyPart[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveEntries(entries: BuyPart[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-}
-
-function newId(): string {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-// ---------------------------------------------------------------------------
-// Table column helper
-// ---------------------------------------------------------------------------
-
-const columnHelper = createColumnHelper<BuyPart>();
+import { formatDateTime, formatStock } from '@renderer/lib/format';
+import type { Ingredient } from '@shared/schemas/ingredient';
 
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
 export function BuyPartsPage() {
-  const [entries, setEntries] = useState<BuyPart[]>(loadEntries);
+  // Include inactive so historical purchases of a since-deactivated part still
+  // resolve to a name in the log below.
+  const { data: parts = [] } = useIngredients({ includeInactive: true });
+  const { data: purchases = [], isLoading } = usePurchaseHistory(50);
+
+  const activeParts = useMemo(() => parts.filter((p) => p.isActive), [parts]);
+  const partsById = useMemo(
+    () => new Map(parts.map((p) => [p.id, p])),
+    [parts],
+  );
+
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<BuyPart | null>(null);
-
-  function persist(next: BuyPart[]) {
-    setEntries(next);
-    saveEntries(next);
-  }
-
-  function handleSave(values: FormValues) {
-    const entry: BuyPart = {
-      id: editing?.id ?? newId(),
-      partName: values.partName.trim(),
-      stock: Number(values.stock) || 0,
-      price: Number(values.price) || 0,
-      units: values.units,
-    };
-    if (editing) {
-      persist(entries.map((e) => (e.id === editing.id ? entry : e)));
-    } else {
-      persist([...entries, entry]);
-    }
-    setDialogOpen(false);
-    setEditing(null);
-  }
-
-  function handleEdit(row: BuyPart) {
-    setEditing(row);
-    setDialogOpen(true);
-  }
-
-  function handleDelete(id: string) {
-    persist(entries.filter((e) => e.id !== id));
-  }
-
-  function handleNew() {
-    setEditing(null);
-    setDialogOpen(true);
-  }
-
-  const columns = [
-    columnHelper.accessor('partName', {
-      header: 'Part name',
-      cell: (cell) => (
-        <span className="font-medium text-text-primary">{cell.getValue()}</span>
-      ),
-    }),
-    columnHelper.accessor('stock', {
-      header: 'Stock',
-      cell: (cell) => (
-        <span className="tabular-nums text-text-primary">{cell.getValue()}</span>
-      ),
-    }),
-    columnHelper.accessor('price', {
-      header: 'Price',
-      cell: (cell) => (
-        <span className="tabular-nums text-text-primary">
-          {cell.getValue() > 0 ? formatINR(cell.getValue()) : '—'}
-        </span>
-      ),
-    }),
-    columnHelper.accessor('units', {
-      header: 'Units',
-      cell: (cell) => (
-        <span className="text-text-secondary">{cell.getValue()}</span>
-      ),
-    }),
-    columnHelper.display({
-      id: 'actions',
-      header: '',
-      cell: (cell) => (
-        <div className="flex items-center justify-end gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => handleEdit(cell.row.original)}
-            aria-label="Edit"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => handleDelete(cell.row.original.id)}
-            aria-label="Delete"
-            className="text-text-danger hover:text-text-danger"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-      ),
-    }),
-  ];
-
-  const table = useReactTable({
-    data: entries,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-  });
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="text-[14px] font-medium text-text-primary">Buy Parts</h2>
-        <Button type="button" variant="primary" size="md" onClick={handleNew}>
-          <Plus className="h-3.5 w-3.5" /> New buy part
+        <Button
+          type="button"
+          variant="primary"
+          size="md"
+          onClick={() => setDialogOpen(true)}
+        >
+          <Plus className="h-3.5 w-3.5" /> Buy part
         </Button>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-border-tertiary bg-background-primary">
         <Table>
           <TableHeader>
-            {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id}>
-                {hg.headers.map((h) => (
-                  <TableHead key={h.id}>
-                    {flexRender(h.column.columnDef.header, h.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
+            <TableRow>
+              <TableHead>Part</TableHead>
+              <TableHead className="text-right">Qty added</TableHead>
+              <TableHead className="text-right">Cost / unit</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">When</TableHead>
+            </TableRow>
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id}>
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            {purchases.map((m) => {
+              const part = partsById.get(m.ingredientId);
+              const baseUnit = part?.baseUnit ?? 'each';
+              const hasCost = m.costPerUnitAtTime != null;
+              return (
+                <TableRow key={m.id}>
+                  <TableCell className="font-medium text-text-primary">
+                    {part?.name ?? 'Unknown part'}
                   </TableCell>
-                ))}
-              </TableRow>
-            ))}
-            {entries.length === 0 ? (
+                  <TableCell className="text-right tabular-nums text-text-secondary">
+                    +{formatStock(Math.abs(m.changeQuantity), baseUnit)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-text-secondary">
+                    {hasCost
+                      ? `${formatINR(m.costPerUnitAtTime!, { showPaise: true })} /${baseUnit}`
+                      : '—'}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-text-primary">
+                    {hasCost
+                      ? formatINR(Math.abs(m.changeQuantity) * m.costPerUnitAtTime!)
+                      : '—'}
+                  </TableCell>
+                  <TableCell className="text-right text-text-tertiary">
+                    {formatDateTime(m.occurredAt)}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+            {!isLoading && purchases.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="text-center text-text-tertiary">
-                  No entries yet — click <span className="font-medium">+ New buy part</span> to add one.
+                <TableCell colSpan={5} className="text-center text-text-tertiary">
+                  No purchases yet — click <span className="font-medium">+ Buy part</span> to record one.
                 </TableCell>
               </TableRow>
             ) : null}
@@ -224,12 +114,8 @@ export function BuyPartsPage() {
 
       <BuyPartDialog
         open={dialogOpen}
-        onOpenChange={(v) => {
-          setDialogOpen(v);
-          if (!v) setEditing(null);
-        }}
-        initial={editing ?? undefined}
-        onSave={handleSave}
+        onOpenChange={setDialogOpen}
+        parts={activeParts}
       />
     </div>
   );
@@ -239,100 +125,164 @@ export function BuyPartsPage() {
 // Dialog
 // ---------------------------------------------------------------------------
 
+type FormValues = {
+  ingredientId: string;
+  quantity: string;
+  unit: string;
+  costPerUnit: string;
+};
+
 type DialogProps = {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  initial?: BuyPart;
-  onSave: (values: FormValues) => void;
+  parts: Ingredient[];
 };
 
-function BuyPartDialog({ open, onOpenChange, initial, onSave }: DialogProps) {
+function BuyPartDialog({ open, onOpenChange, parts }: DialogProps) {
+  const recordPurchase = useRecordPurchase();
+  const [serverError, setServerError] = useState<string | null>(null);
+
   const { register, handleSubmit, reset, watch, setValue, formState } = useForm<FormValues>({
-    defaultValues: {
-      partName: '',
-      stock: '',
-      price: '',
-      units: 'each',
-    },
+    defaultValues: { ingredientId: '', quantity: '', unit: '', costPerUnit: '' },
   });
 
   useEffect(() => {
     if (open) {
-      reset({
-        partName: initial?.partName ?? '',
-        stock: initial != null ? String(initial.stock) : '',
-        price: initial != null ? String(initial.price) : '',
-        units: initial?.units ?? 'each',
-      });
+      reset({ ingredientId: '', quantity: '', unit: '', costPerUnit: '' });
+      setServerError(null);
     }
-  }, [open, initial, reset]);
+  }, [open, reset]);
 
-  const units = watch('units');
+  const ingredientId = watch('ingredientId');
+  const unit = watch('unit');
+  const selectedPart = parts.find((p) => p.id === ingredientId);
+  const compatibleUnits = selectedPart
+    ? unitsCompatibleWithBase(selectedPart.baseUnit)
+    : [];
+
+  // When the part changes, default the unit to its base unit.
+  function handlePartChange(id: string) {
+    setValue('ingredientId', id, { shouldValidate: true });
+    const part = parts.find((p) => p.id === id);
+    setValue('unit', part?.baseUnit ?? '');
+  }
+
+  const onSubmit = handleSubmit(async (values) => {
+    setServerError(null);
+    const quantity = Number(values.quantity);
+    const costStr = values.costPerUnit.trim();
+    const cost = costStr === '' ? undefined : Number(costStr);
+    try {
+      await recordPurchase.mutateAsync({
+        ingredientId: values.ingredientId,
+        quantity,
+        unit: values.unit,
+        ...(cost !== undefined && !Number.isNaN(cost) ? { costPerUnit: cost } : {}),
+      });
+      onOpenChange(false);
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : 'Could not record purchase');
+    }
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{initial ? 'Edit buy part' : 'New buy part'}</DialogTitle>
+          <DialogTitle>Buy part</DialogTitle>
+          <DialogDescription>
+            Adds stock to the selected part and updates its average cost in one transaction.
+          </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSave)} className="grid gap-3">
-          <div className="grid gap-1">
-            <Label htmlFor="bp-name">Part name</Label>
-            <Input
-              id="bp-name"
-              autoFocus
-              placeholder="e.g. Castrol 10W30 1L"
-              {...register('partName', { required: true, maxLength: 120 })}
-            />
+        {parts.length === 0 ? (
+          <div className="rounded-md border border-dashed border-border-tertiary bg-background-secondary px-3 py-6 text-center text-text-tertiary">
+            No parts yet — add one on the Parts page first, then come back to buy stock.
           </div>
-
-          <div className="grid grid-cols-2 gap-2">
+        ) : (
+          <form onSubmit={onSubmit} className="grid gap-3">
             <div className="grid gap-1">
-              <Label htmlFor="bp-stock">Stock (qty)</Label>
-              <Input
-                id="bp-stock"
-                type="number"
-                min={0}
-                step="any"
-                placeholder="0"
-                {...register('stock', { required: true, min: 0 })}
-              />
-            </div>
-            <div className="grid gap-1">
-              <Label>Units</Label>
-              <Select value={units} onValueChange={(v) => setValue('units', v as BaseUnit)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Label>Part</Label>
+              <Select value={ingredientId} onValueChange={handlePartChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a part…" />
+                </SelectTrigger>
                 <SelectContent>
-                  {BASE_UNITS.map((u) => (
-                    <SelectItem key={u} value={u}>{u}</SelectItem>
+                  {parts.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} · {formatStock(p.stockQuantity, p.baseUnit)} in stock
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {/* register keeps the field in the form state for validation */}
+              <input type="hidden" {...register('ingredientId', { required: true })} />
             </div>
-          </div>
 
-          <div className="grid gap-1">
-            <Label htmlFor="bp-price">Price (₹)</Label>
-            <Input
-              id="bp-price"
-              type="number"
-              min={0}
-              step="any"
-              placeholder="0.00"
-              {...register('price', { required: true, min: 0 })}
-            />
-          </div>
+            <div className="grid grid-cols-[1fr_120px] gap-2">
+              <div className="grid gap-1">
+                <Label htmlFor="bp-qty">Quantity bought</Label>
+                <Input
+                  id="bp-qty"
+                  type="number"
+                  min={0}
+                  step="any"
+                  placeholder="0"
+                  {...register('quantity', { required: true, min: 0 })}
+                />
+              </div>
+              <div className="grid gap-1">
+                <Label>Unit</Label>
+                <Select
+                  value={unit}
+                  onValueChange={(v) => setValue('unit', v)}
+                  disabled={!selectedPart}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="—" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {compatibleUnits.map((u) => (
+                      <SelectItem key={u} value={u}>{u}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="ghost" size="md">Cancel</Button>
-            </DialogClose>
-            <Button type="submit" variant="primary" size="md" disabled={formState.isSubmitting}>
-              {initial ? 'Save changes' : 'Add part'}
-            </Button>
-          </DialogFooter>
-        </form>
+            <div className="grid gap-1">
+              <Label htmlFor="bp-cost">Cost per unit (₹) · optional</Label>
+              <Input
+                id="bp-cost"
+                type="number"
+                min={0}
+                step="any"
+                placeholder="0.00"
+                {...register('costPerUnit', { min: 0 })}
+              />
+            </div>
+
+            {serverError ? (
+              <div className="rounded-md bg-background-danger px-2.5 py-1.5 text-[12px] text-text-danger">
+                {serverError}
+              </div>
+            ) : null}
+
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button type="button" variant="ghost" size="md">Cancel</Button>
+              </DialogClose>
+              <Button
+                type="submit"
+                variant="primary"
+                size="md"
+                disabled={!ingredientId || !unit || formState.isSubmitting || recordPurchase.isPending}
+              >
+                Add to stock
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

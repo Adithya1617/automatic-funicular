@@ -3,9 +3,7 @@ import {
   ClipboardList,
   Package,
   Bike,
-  Wrench,
   ShoppingCart,
-  FileUp,
   Settings,
   type LucideIcon,
 } from 'lucide-react';
@@ -25,8 +23,6 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Services', path: '/services', icon: ClipboardList, group: 'operations' },
   { label: 'Parts', path: '/parts', icon: Package, group: 'operations' },
   { label: 'Bikes', path: '/bikes', icon: Bike, group: 'operations' },
-  { label: 'Service templates', path: '/services/templates', icon: Wrench, group: 'operations' },
   { label: 'Buy Parts', path: '/buy-parts', icon: ShoppingCart, group: 'operations' },
-  { label: 'CSV import', path: '/import', icon: FileUp, group: 'system' },
   { label: 'Settings', path: '/settings', icon: Settings, group: 'system' },
 ];

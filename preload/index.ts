@@ -49,7 +49,7 @@ import type {
   ListStockMovementsInput,
   StockMovement,
 } from '@shared/schemas/stockMovement';
-import type { ManualAdjustmentInput } from '@shared/schemas/inventory';
+import type { ManualAdjustmentInput, RecordPurchaseInput } from '@shared/schemas/inventory';
 import type {
   GetActiveRecipeInput,
   ListRecipeVersionsInput,
@@ -205,6 +205,10 @@ const api = {
       ManualAdjustmentInput,
       { movement: StockMovement; newStockQuantity: number }
     >(IPC.inventory.applyMovement),
+    recordPurchase: invoke<
+      RecordPurchaseInput,
+      { movement: StockMovement; newStockQuantity: number }
+    >(IPC.inventory.recordPurchase),
   },
   recipe: {
     getActive: invoke<GetActiveRecipeInput, RecipeWithIngredients | null>(IPC.recipe.getActive),
