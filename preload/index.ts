@@ -132,6 +132,8 @@ import type {
 import type {
   DemoResetInput,
   DemoResetResult,
+  DemoSeedBikesInput,
+  DemoSeedBikesResult,
   DemoSeedInput,
   DemoSeedResult,
 } from '@shared/schemas/demo';
@@ -311,6 +313,7 @@ const api = {
   },
   demo: {
     seed: invoke<DemoSeedInput, DemoSeedResult>(IPC.demo.seed),
+    seedBikes: invoke<DemoSeedBikesInput, DemoSeedBikesResult>(IPC.demo.seedBikes),
     reset: invoke<DemoResetInput, DemoResetResult>(IPC.demo.reset),
   },
 } as const;

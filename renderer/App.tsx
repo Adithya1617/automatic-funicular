@@ -7,7 +7,6 @@ import { ServicesPage } from './pages/ServicesPage';
 import { RepairsPage } from './pages/RepairsPage';
 import { WashPage } from './pages/WashPage';
 import { ServiceEventEditorPage } from './pages/ServiceEventEditorPage';
-import { BuyPartsPage } from './pages/BuyPartsPage';
 import { SettingsPage } from './pages/SettingsPage';
 
 export function App() {
@@ -21,7 +20,8 @@ export function App() {
         <Route path="services/:id/edit" element={<ServiceEventEditorPage />} />
         <Route path="repairs" element={<RepairsPage />} />
         <Route path="wash" element={<WashPage />} />
-        <Route path="buy-parts" element={<BuyPartsPage />} />
+        {/* Buy Parts now lives as a tab inside Parts; keep the old URL working. */}
+        <Route path="buy-parts" element={<Navigate to="/parts?tab=buy" replace />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

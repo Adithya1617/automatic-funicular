@@ -5,7 +5,6 @@ import {
   Droplet,
   Package,
   Bike,
-  ShoppingCart,
   Settings,
   type LucideIcon,
 } from 'lucide-react';
@@ -27,6 +26,5 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Wash', path: '/wash', icon: Droplet, group: 'operations' },
   { label: 'Parts', path: '/parts', icon: Package, group: 'operations' },
   { label: 'Bikes', path: '/bikes', icon: Bike, group: 'operations' },
-  { label: 'Buy Parts', path: '/buy-parts', icon: ShoppingCart, group: 'operations' },
   { label: 'Settings', path: '/settings', icon: Settings, group: 'system' },
 ];

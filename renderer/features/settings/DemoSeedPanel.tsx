@@ -1,13 +1,18 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { RotateCcw, Sparkles } from 'lucide-react';
+import { Bike, RotateCcw, Sparkles } from 'lucide-react';
 import { Button } from '@renderer/components/ui/button';
 import { unwrap } from '@renderer/lib/ipc';
-import type { DemoResetResult, DemoSeedResult } from '@shared/schemas/demo';
+import type {
+  DemoResetResult,
+  DemoSeedBikesResult,
+  DemoSeedResult,
+} from '@shared/schemas/demo';
 
 export function DemoSeedPanel() {
   const qc = useQueryClient();
   const [seedResult, setSeedResult] = useState<DemoSeedResult | null>(null);
+  const [bikesResult, setBikesResult] = useState<DemoSeedBikesResult | null>(null);
   const [resetResult, setResetResult] = useState<DemoResetResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmingReset, setConfirmingReset] = useState(false);
@@ -16,6 +21,7 @@ export function DemoSeedPanel() {
     mutationFn: () => unwrap(window.hyprride.demo.seed({})),
     onSuccess: (data: DemoSeedResult) => {
       setSeedResult(data);
+      setBikesResult(null);
       setResetResult(null);
       setError(null);
       qc.invalidateQueries();
@@ -25,11 +31,26 @@ export function DemoSeedPanel() {
     },
   });
 
+  const seedBikes = useMutation({
+    mutationFn: () => unwrap(window.hyprride.demo.seedBikes({})),
+    onSuccess: (data: DemoSeedBikesResult) => {
+      setBikesResult(data);
+      setSeedResult(null);
+      setResetResult(null);
+      setError(null);
+      qc.invalidateQueries();
+    },
+    onError: (err) => {
+      setError(err instanceof Error ? err.message : 'Loading fleet failed');
+    },
+  });
+
   const reset = useMutation({
     mutationFn: () => unwrap(window.hyprride.demo.reset({})),
     onSuccess: (data: DemoResetResult) => {
       setResetResult(data);
       setSeedResult(null);
+      setBikesResult(null);
       setError(null);
       setConfirmingReset(false);
       qc.invalidateQueries();
@@ -53,6 +74,12 @@ export function DemoSeedPanel() {
             20 L · Gear oil 8 L · Air filter 25 · Mobile holder 15).
           </p>
           <p className="mt-2 max-w-prose text-[11px] text-text-tertiary">
+            <span className="font-medium text-text-secondary">Load fleet</span> adds
+            only the 34 fleet bikes (idempotent by bike number) — no suppliers,
+            purchases, or service events — so you can populate the Bikes section
+            without losing a clean slate.
+          </p>
+          <p className="mt-2 max-w-prose text-[11px] text-text-tertiary">
             <span className="font-medium text-text-secondary">Reset</span> wipes
             every supplier, bike, invoice, service template, recipe, stock movement,
             service event, and stock take in the current tenant, then zeroes out
@@ -66,10 +93,20 @@ export function DemoSeedPanel() {
             variant="primary"
             size="md"
             onClick={() => seed.mutate()}
-            disabled={seed.isPending || reset.isPending}
+            disabled={seed.isPending || seedBikes.isPending || reset.isPending}
           >
             <Sparkles className="h-3 w-3" />
             {seed.isPending ? 'Seeding…' : 'Load demo data'}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="md"
+            onClick={() => seedBikes.mutate()}
+            disabled={seed.isPending || seedBikes.isPending || reset.isPending}
+          >
+            <Bike className="h-3 w-3" />
+            {seedBikes.isPending ? 'Loading…' : 'Load fleet (34 bikes)'}
           </Button>
           {confirmingReset ? (
             <div className="flex items-center gap-1">
@@ -98,7 +135,7 @@ export function DemoSeedPanel() {
               variant="ghost"
               size="md"
               onClick={() => setConfirmingReset(true)}
-              disabled={seed.isPending || reset.isPending}
+              disabled={seed.isPending || seedBikes.isPending || reset.isPending}
               className="text-text-danger"
             >
               <RotateCcw className="h-3 w-3" />
@@ -124,6 +161,21 @@ export function DemoSeedPanel() {
               {seedResult.bikesCreated} bike(s) · {seedResult.purchasesAdded} historic
               purchase(s) · {seedResult.topUpsAdded} stock top-up(s) ·{' '}
               {seedResult.serviceEventsAdded} completed service event(s).
+            </span>
+          )}
+        </div>
+      ) : null}
+
+      {bikesResult ? (
+        <div className="mt-3 rounded-md border border-border-tertiary bg-background-secondary px-3 py-2 text-[11px] text-text-secondary">
+          {bikesResult.bikesCreated === 0 ? (
+            <span>All 34 fleet bikes are already present — nothing to add.</span>
+          ) : (
+            <span>
+              Added {bikesResult.bikesCreated} bike(s) to the fleet.
+              {bikesResult.skippedNoType > 0
+                ? ` Skipped ${bikesResult.skippedNoType} (no matching bike type).`
+                : ''}
             </span>
           )}
         </div>

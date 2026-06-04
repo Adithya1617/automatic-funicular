@@ -197,6 +197,53 @@ export type DemoSeedSummary = {
   alreadyPopulated: boolean;
 };
 
+/**
+ * Insert any fleet bikes (BIKE_SEEDS) not already present, idempotent by
+ * bike_number. Resolves each seed to an existing bike type by (engineCc, name);
+ * seeds whose type is missing are counted in `skippedNoType` and skipped — we
+ * never create bike types here (those are migration-seeded baseline data).
+ * Shared by the full demo `run()` and the bikes-only `seedBikes()`.
+ */
+function insertFleetBikes(
+  db: AppDb,
+  tenantId: number,
+  actorId: string,
+  now: number,
+): { created: number; skippedNoType: number } {
+  const bikeTypeKey = (cc: number, name: string) => `${cc}::${name.toLowerCase()}`;
+  const bikeTypeByKey = new Map<string, BikeTypeRow>();
+  for (const t of bikeTypeRepository.list(db, tenantId, { includeInactive: true })) {
+    bikeTypeByKey.set(bikeTypeKey(t.engineCc, t.name), t);
+  }
+
+  let created = 0;
+  let skippedNoType = 0;
+  for (const seed of BIKE_SEEDS) {
+    if (bikeRepository.findByBikeNumber(db, tenantId, seed.bikeNumber)) continue;
+    const bikeType = bikeTypeByKey.get(bikeTypeKey(seed.engineCc, seed.bikeTypeName));
+    if (!bikeType) {
+      skippedNoType += 1;
+      continue;
+    }
+    bikeRepository.insert(db, {
+      id: newId(),
+      tenantId,
+      bikeNumber: seed.bikeNumber,
+      bikeTypeId: bikeType.id,
+      licensePlate: seed.licensePlate,
+      odometerKm: seed.odometerKm,
+      notes: null,
+      isActive: true,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: actorId,
+      updatedBy: actorId,
+    });
+    created += 1;
+  }
+  return { created, skippedNoType };
+}
+
 export const DemoSeedService = {
   /**
    * Re-runnable demo seeder for prototyping/demo. Each step is idempotent —
@@ -211,11 +258,6 @@ export const DemoSeedService = {
     tenantId: number,
     actorId: string = SYSTEM_USER_ID,
   ): DemoSeedSummary {
-    const bikeTypes = bikeTypeRepository.list(db, tenantId, { includeInactive: true });
-    const bikeTypeKey = (cc: number, name: string) => `${cc}::${name.toLowerCase()}`;
-    const bikeTypeByKey = new Map<string, BikeTypeRow>();
-    for (const t of bikeTypes) bikeTypeByKey.set(bikeTypeKey(t.engineCc, t.name), t);
-
     const now = Date.now();
     let suppliersCreated = 0;
     let bikesCreated = 0;
@@ -243,27 +285,7 @@ export const DemoSeedService = {
     }
 
     // --- Bikes (idempotent by bike_number) -------------------------------
-    for (const seed of BIKE_SEEDS) {
-      const existing = bikeRepository.findByBikeNumber(db, tenantId, seed.bikeNumber);
-      if (existing) continue;
-      const bikeType = bikeTypeByKey.get(bikeTypeKey(seed.engineCc, seed.bikeTypeName));
-      if (!bikeType) continue;
-      bikeRepository.insert(db, {
-        id: newId(),
-        tenantId,
-        bikeNumber: seed.bikeNumber,
-        bikeTypeId: bikeType.id,
-        licensePlate: seed.licensePlate,
-        odometerKm: seed.odometerKm,
-        notes: null,
-        isActive: true,
-        createdAt: now,
-        updatedAt: now,
-        createdBy: actorId,
-        updatedBy: actorId,
-      });
-      bikesCreated += 1;
-    }
+    bikesCreated += insertFleetBikes(db, tenantId, actorId, now).created;
 
     // --- Historic stock purchases (first run only) -----------------------
     // Skip if the install already has any purchase movements — we don't want
@@ -495,6 +517,21 @@ export const DemoSeedService = {
         .run();
     });
     return { tablesCleared: cleared };
+  },
+
+  /**
+   * Bikes-only seed: insert the 34-bike fleet (idempotent by bike_number)
+   * without touching suppliers, purchases, service events, or part stock — so
+   * the Bikes section can be repopulated while the rest of the data stays a
+   * clean slate. `skippedNoType` counts seeds whose bike type isn't present.
+   */
+  seedBikes(
+    db: AppDb,
+    tenantId: number,
+    actorId: string = SYSTEM_USER_ID,
+  ): { bikesCreated: number; skippedNoType: number } {
+    const { created, skippedNoType } = insertFleetBikes(db, tenantId, actorId, Date.now());
+    return { bikesCreated: created, skippedNoType };
   },
 };
 

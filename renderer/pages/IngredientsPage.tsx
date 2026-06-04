@@ -10,11 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@renderer/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@renderer/components/ui/tabs';
 import { useIngredients } from '@renderer/hooks/ipc/useIngredients';
 import { IngredientsTable } from '@renderer/features/ingredients/IngredientsTable';
 import { IngredientDetailPanel } from '@renderer/features/ingredients/IngredientDetailPanel';
 import { ManualAdjustmentDialog } from '@renderer/features/ingredients/ManualAdjustmentDialog';
 import { NewIngredientDialog } from '@renderer/features/ingredients/NewIngredientDialog';
+import { BuyPartsPanel } from '@renderer/features/ingredients/BuyPartsPanel';
 import { PART_CATEGORIES } from '@shared/constants/enums';
 
 const CATEGORY_FILTER_VALUES = ['all', ...PART_CATEGORIES] as const;
@@ -23,9 +25,17 @@ type CategoryFilter = (typeof CATEGORY_FILTER_VALUES)[number];
 export function IngredientsPage() {
   const [params, setParams] = useSearchParams();
   const selectedId = params.get('selected') ?? undefined;
+  const tab = params.get('tab') === 'buy' ? 'buy' : 'inventory';
 
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
+
+  function handleTabChange(next: string) {
+    const sp = new URLSearchParams(params);
+    if (next === 'buy') sp.set('tab', 'buy');
+    else sp.delete('tab');
+    setParams(sp, { replace: true });
+  }
 
   const filter = useMemo(() => {
     const f: Parameters<typeof useIngredients>[0] = { includeInactive: false };
@@ -51,61 +61,72 @@ export function IngredientsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex flex-1 items-center gap-2">
-          <Input
-            placeholder="Search parts…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="max-w-[320px]"
-          />
-          <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as CategoryFilter)}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All categories</SelectItem>
-              {PART_CATEGORIES.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="md"
-            disabled={!selectedPart}
-            onClick={() => setAdjustOpen(true)}
-          >
-            <Sliders className="h-3.5 w-3.5" /> Adjust stock
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            size="md"
-            onClick={() => setNewOpen(true)}
-          >
-            <Plus className="h-3.5 w-3.5" /> New part
-          </Button>
-        </div>
-      </div>
+    <Tabs value={tab} onValueChange={handleTabChange} className="flex flex-col gap-4">
+      <TabsList>
+        <TabsTrigger value="inventory">Inventory</TabsTrigger>
+        <TabsTrigger value="buy">Buy parts</TabsTrigger>
+      </TabsList>
 
-      {isLoading ? (
-        <div className="rounded-lg border border-border-tertiary bg-background-primary px-4 py-6 text-text-tertiary">
-          Loading parts…
+      <TabsContent value="inventory" className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-1 items-center gap-2">
+            <Input
+              placeholder="Search parts…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-[320px]"
+            />
+            <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as CategoryFilter)}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All categories</SelectItem>
+                {PART_CATEGORIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              disabled={!selectedPart}
+              onClick={() => setAdjustOpen(true)}
+            >
+              <Sliders className="h-3.5 w-3.5" /> Adjust stock
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              onClick={() => setNewOpen(true)}
+            >
+              <Plus className="h-3.5 w-3.5" /> New part
+            </Button>
+          </div>
         </div>
-      ) : (
-        <IngredientsTable rows={parts} selectedId={selectedId} onSelect={handleSelect} />
-      )}
 
-      {selectedPart ? (
-        <IngredientDetailPanel ingredient={selectedPart} />
-      ) : null}
+        {isLoading ? (
+          <div className="rounded-lg border border-border-tertiary bg-background-primary px-4 py-6 text-text-tertiary">
+            Loading parts…
+          </div>
+        ) : (
+          <IngredientsTable rows={parts} selectedId={selectedId} onSelect={handleSelect} />
+        )}
+
+        {selectedPart ? (
+          <IngredientDetailPanel ingredient={selectedPart} />
+        ) : null}
+      </TabsContent>
+
+      <TabsContent value="buy">
+        <BuyPartsPanel />
+      </TabsContent>
 
       <ManualAdjustmentDialog
         open={adjustOpen}
@@ -113,6 +134,6 @@ export function IngredientsPage() {
         ingredient={selectedPart ?? null}
       />
       <NewIngredientDialog open={newOpen} onOpenChange={setNewOpen} />
-    </div>
+    </Tabs>
   );
 }

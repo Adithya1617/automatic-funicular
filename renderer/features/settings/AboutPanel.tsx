@@ -6,7 +6,7 @@ export function AboutPanel() {
         <dt className="text-text-tertiary">Version</dt>
         <dd className="text-text-primary">0.1.0</dd>
         <dt className="text-text-tertiary">Tenant</dt>
-        <dd className="text-text-primary">Laurans Food Court</dd>
+        <dd className="text-text-primary">Hyprride</dd>
         <dt className="text-text-tertiary">Stack</dt>
         <dd className="text-text-secondary">
           Electron · React 18 · TypeScript · SQLite (better-sqlite3) · Drizzle ORM

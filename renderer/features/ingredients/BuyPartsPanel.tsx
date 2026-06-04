@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@renderer/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@renderer/components/ui/table';
+import { NewIngredientDialog } from '@renderer/features/ingredients/NewIngredientDialog';
 import { useIngredients } from '@renderer/hooks/ipc/useIngredients';
 import { useRecordPurchase } from '@renderer/hooks/ipc/useApplyMovement';
 import { usePurchaseHistory } from '@renderer/hooks/ipc/useStockMovements';
@@ -30,10 +31,11 @@ import { formatDateTime, formatStock } from '@renderer/lib/format';
 import type { Ingredient } from '@shared/schemas/ingredient';
 
 // ---------------------------------------------------------------------------
-// Page
+// Panel — the "Buy parts" tab of the Parts page: a purchase log plus the
+// dialog that records a new purchase against live part stock.
 // ---------------------------------------------------------------------------
 
-export function BuyPartsPage() {
+export function BuyPartsPanel() {
   // Include inactive so historical purchases of a since-deactivated part still
   // resolve to a name in the log below.
   const { data: parts = [] } = useIngredients({ includeInactive: true });
@@ -50,7 +52,9 @@ export function BuyPartsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-[14px] font-medium text-text-primary">Buy Parts</h2>
+        <p className="text-[12px] text-text-tertiary">
+          Recent purchases — each adds stock and updates the part's average cost.
+        </p>
         <Button
           type="button"
           variant="primary"
@@ -141,6 +145,7 @@ type DialogProps = {
 function BuyPartDialog({ open, onOpenChange, parts }: DialogProps) {
   const recordPurchase = useRecordPurchase();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [newPartOpen, setNewPartOpen] = useState(false);
 
   const { register, handleSubmit, reset, watch, setValue, formState } = useForm<FormValues>({
     defaultValues: { ingredientId: '', quantity: '', unit: '', costPerUnit: '' },
@@ -165,6 +170,15 @@ function BuyPartDialog({ open, onOpenChange, parts }: DialogProps) {
     setValue('ingredientId', id, { shouldValidate: true });
     const part = parts.find((p) => p.id === id);
     setValue('unit', part?.baseUnit ?? '');
+  }
+
+  // A part created from here is inserted into the parts inventory by
+  // NewIngredientDialog (useCreateIngredient); we just preselect it for this
+  // purchase. The parts list refreshes via query invalidation.
+  function handlePartCreated(part: Ingredient) {
+    setValue('ingredientId', part.id, { shouldValidate: true });
+    setValue('unit', part.baseUnit);
+    setNewPartOpen(false);
   }
 
   const onSubmit = handleSubmit(async (values) => {
@@ -196,13 +210,25 @@ function BuyPartDialog({ open, onOpenChange, parts }: DialogProps) {
         </DialogHeader>
 
         {parts.length === 0 ? (
-          <div className="rounded-md border border-dashed border-border-tertiary bg-background-secondary px-3 py-6 text-center text-text-tertiary">
-            No parts yet — add one on the Parts page first, then come back to buy stock.
+          <div className="flex flex-col items-center gap-3 rounded-md border border-dashed border-border-tertiary bg-background-secondary px-3 py-6 text-center text-text-tertiary">
+            <span>No parts yet — create one to add it to the inventory and buy stock.</span>
+            <Button type="button" variant="primary" size="md" onClick={() => setNewPartOpen(true)}>
+              <Plus className="h-3.5 w-3.5" /> New part
+            </Button>
           </div>
         ) : (
           <form onSubmit={onSubmit} className="grid gap-3">
             <div className="grid gap-1">
-              <Label>Part</Label>
+              <div className="flex items-center justify-between">
+                <Label>Part</Label>
+                <button
+                  type="button"
+                  onClick={() => setNewPartOpen(true)}
+                  className="inline-flex items-center gap-1 text-[12px] font-medium text-text-info hover:underline"
+                >
+                  <Plus className="h-3 w-3" /> New part
+                </button>
+              </div>
               <Select value={ingredientId} onValueChange={handlePartChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a part…" />
@@ -283,6 +309,12 @@ function BuyPartDialog({ open, onOpenChange, parts }: DialogProps) {
             </DialogFooter>
           </form>
         )}
+
+        <NewIngredientDialog
+          open={newPartOpen}
+          onOpenChange={setNewPartOpen}
+          onCreated={handlePartCreated}
+        />
       </DialogContent>
     </Dialog>
   );

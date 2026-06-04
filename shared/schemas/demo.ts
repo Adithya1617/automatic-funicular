@@ -13,6 +13,15 @@ export const demoSeedResultSchema = z.object({
 });
 export type DemoSeedResult = z.infer<typeof demoSeedResultSchema>;
 
+export const demoSeedBikesInputSchema = z.object({}).default({});
+export type DemoSeedBikesInput = z.infer<typeof demoSeedBikesInputSchema>;
+
+export const demoSeedBikesResultSchema = z.object({
+  bikesCreated: z.number().int().nonnegative(),
+  skippedNoType: z.number().int().nonnegative(),
+});
+export type DemoSeedBikesResult = z.infer<typeof demoSeedBikesResultSchema>;
+
 export const demoResetInputSchema = z.object({}).default({});
 export type DemoResetInput = z.infer<typeof demoResetInputSchema>;
 

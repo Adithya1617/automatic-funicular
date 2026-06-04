@@ -135,6 +135,7 @@ export const IPC = {
   },
   demo: {
     seed: 'demo:seed',
+    seedBikes: 'demo:seedBikes',
     reset: 'demo:reset',
   },
 } as const;
