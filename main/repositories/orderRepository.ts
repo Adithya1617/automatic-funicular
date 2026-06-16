@@ -13,7 +13,7 @@ export type OrderFilter = {
 };
 
 export const orderRepository = {
-  list(db: AppDb, tenantId: number, filter: OrderFilter = {}): OrderRow[] {
+  async list(db: AppDb, tenantId: number, filter: OrderFilter = {}): Promise<OrderRow[]> {
     const conditions: SQL[] = [eq(orders.tenantId, tenantId)];
     if (filter.status) conditions.push(eq(orders.status, filter.status));
     if (filter.source) conditions.push(eq(orders.source, filter.source));
@@ -22,25 +22,24 @@ export const orderRepository = {
       .from(orders)
       .where(and(...conditions))
       .orderBy(desc(orders.placedAt))
-      .limit(Math.max(1, Math.min(500, filter.limit ?? 200)))
-      .all();
+      .limit(Math.max(1, Math.min(500, filter.limit ?? 200)));
   },
 
-  findById(db: AppDb, tenantId: number, id: string): OrderRow | undefined {
-    return db
+  async findById(db: AppDb, tenantId: number, id: string): Promise<OrderRow | undefined> {
+    const rows = await db
       .select()
       .from(orders)
-      .where(and(eq(orders.tenantId, tenantId), eq(orders.id, id)))
-      .get();
+      .where(and(eq(orders.tenantId, tenantId), eq(orders.id, id)));
+    return rows[0];
   },
 
-  findByExternalId(
+  async findByExternalId(
     db: AppDb,
     tenantId: number,
     source: OrderSource,
     externalOrderId: string,
-  ): OrderRow | undefined {
-    return db
+  ): Promise<OrderRow | undefined> {
+    const rows = await db
       .select()
       .from(orders)
       .where(
@@ -49,38 +48,40 @@ export const orderRepository = {
           eq(orders.source, source),
           eq(orders.externalOrderId, externalOrderId),
         ),
-      )
-      .get();
+      );
+    return rows[0];
   },
 
-  insert(db: AppDb, row: OrderInsert): OrderRow {
-    return db.insert(orders).values(row).returning().get();
+  async insert(db: AppDb, row: OrderInsert): Promise<OrderRow> {
+    const [inserted] = await db.insert(orders).values(row).returning();
+    if (!inserted) throw new Error('order insert returned no row');
+    return inserted;
   },
 
-  update(
+  async update(
     db: AppDb,
     tenantId: number,
     id: string,
     patch: Partial<OrderInsert>,
-  ): OrderRow | undefined {
-    return db
+  ): Promise<OrderRow | undefined> {
+    const [updated] = await db
       .update(orders)
       .set(patch)
       .where(and(eq(orders.tenantId, tenantId), eq(orders.id, id)))
-      .returning()
-      .get();
+      .returning();
+    return updated;
   },
 
   /**
    * Orders placed in [start, end). Filtered to a status if provided.
    * Drives revenue / order-volume by channel.
    */
-  listInRange(
+  async listInRange(
     db: AppDb,
     tenantId: number,
     range: OrderDateRange,
     status?: OrderStatus,
-  ): OrderRow[] {
+  ): Promise<OrderRow[]> {
     const conditions: SQL[] = [
       eq(orders.tenantId, tenantId),
       gte(orders.placedAt, range.startMs),
@@ -91,7 +92,6 @@ export const orderRepository = {
       .select()
       .from(orders)
       .where(and(...conditions))
-      .orderBy(asc(orders.placedAt))
-      .all();
+      .orderBy(asc(orders.placedAt));
   },
 };

@@ -63,8 +63,8 @@ function dailyBuckets(range: DateRange): number[] {
 
 export const DashboardService = {
   /* --------------------------------- Tile 1 --------------------------------- */
-  stockValue(db: AppDb, tenantId: number): StockValueResponse {
-    const ingredients = ingredientRepository.list(db, tenantId, { includeInactive: false });
+  async stockValue(db: AppDb, tenantId: number): Promise<StockValueResponse> {
+    const ingredients = await ingredientRepository.list(db, tenantId, { includeInactive: false });
     const total = ingredients.reduce(
       (acc, i) => acc + i.stockQuantity * i.currentAvgCostPerUnit,
       0,
@@ -78,12 +78,12 @@ export const DashboardService = {
    * matches the "stock value over time" headline definition (qty × cost-now).
    * Future work could snapshot cost on every movement and integrate.
    * --------------------------------------------------------------------------*/
-  stockValueSeries(
+  async stockValueSeries(
     db: AppDb,
     tenantId: number,
     range: DateRange,
-  ): StockValueSeriesResponse {
-    const ingredients = ingredientRepository.list(db, tenantId, { includeInactive: false });
+  ): Promise<StockValueSeriesResponse> {
+    const ingredients = await ingredientRepository.list(db, tenantId, { includeInactive: false });
     const stockNow = new Map<string, number>();
     const cost = new Map<string, number>();
     for (const i of ingredients) {
@@ -92,7 +92,11 @@ export const DashboardService = {
     }
 
     // Stock at start = current - sum(changeQty for movements occurred >= start).
-    const movementsAtOrAfterStart = stockMovementRepository.listSince(db, tenantId, range.startMs);
+    const movementsAtOrAfterStart = await stockMovementRepository.listSince(
+      db,
+      tenantId,
+      range.startMs,
+    );
     const stockAtT = new Map<string, number>(stockNow);
     for (const m of movementsAtOrAfterStart) {
       stockAtT.set(m.ingredientId, (stockAtT.get(m.ingredientId) ?? 0) - m.changeQuantity);
@@ -124,11 +128,11 @@ export const DashboardService = {
   },
 
   /* --------------------------------- Tile 3 (Spending) --------------------- */
-  spending(db: AppDb, tenantId: number, range: DateRange): SpendingResponse {
-    const invoices = invoiceRepository.listCommittedInRange(db, tenantId, range);
-    const lines = invoiceLineRepository.listForInvoices(db, invoices.map((i) => i.id));
+  async spending(db: AppDb, tenantId: number, range: DateRange): Promise<SpendingResponse> {
+    const invoices = await invoiceRepository.listCommittedInRange(db, tenantId, range);
+    const lines = await invoiceLineRepository.listForInvoices(db, invoices.map((i) => i.id));
 
-    const ingredients = ingredientRepository.list(db, tenantId, { includeInactive: true });
+    const ingredients = await ingredientRepository.list(db, tenantId, { includeInactive: true });
     const ingredientById = new Map(ingredients.map((i) => [i.id, i]));
 
     let totalSpend = 0;
@@ -172,12 +176,12 @@ export const DashboardService = {
   },
 
   /* --------------------------------- Tile 5 (Wastage) ---------------------- */
-  wastage(db: AppDb, tenantId: number, range: DateRange): WastageResponse {
+  async wastage(db: AppDb, tenantId: number, range: DateRange): Promise<WastageResponse> {
     const reasons: StockMovementReason[] = ['wastage', 'prep_loss', 'staff_meal'];
-    const movements = stockMovementRepository.listInRange(db, tenantId, range, reasons);
+    const movements = await stockMovementRepository.listInRange(db, tenantId, range, reasons);
     const byReason = new Map<string, number>();
     const byIngredient = new Map<string, number>();
-    const ingredients = ingredientRepository.list(db, tenantId, { includeInactive: true });
+    const ingredients = await ingredientRepository.list(db, tenantId, { includeInactive: true });
     const ingById = new Map(ingredients.map((i) => [i.id, i]));
 
     let total = 0;
@@ -206,9 +210,9 @@ export const DashboardService = {
   },
 
   /* --------------------------------- Tile 7 (Low stock) -------------------- */
-  lowStock(db: AppDb, tenantId: number, range: DateRange): LowStockResponse {
-    const ingredients = ingredientRepository.list(db, tenantId, { includeInactive: false });
-    const consumption = consumptionPerDay(db, tenantId, range);
+  async lowStock(db: AppDb, tenantId: number, range: DateRange): Promise<LowStockResponse> {
+    const ingredients = await ingredientRepository.list(db, tenantId, { includeInactive: false });
+    const consumption = await consumptionPerDay(db, tenantId, range);
     const rows = ingredients
       .filter((i) => i.stockQuantity < i.lowStockThreshold || (consumption.get(i.id) ?? 0) > 0)
       .map((i) => {
@@ -234,14 +238,14 @@ export const DashboardService = {
   },
 
   /* --------------------------------- Tile 8 (Reorder) --------------------- */
-  reorder(
+  async reorder(
     db: AppDb,
     tenantId: number,
     range: DateRange,
     leadTimeDays: number = REORDER_LEAD_TIME_DAYS,
-  ): ReorderResponse {
-    const ingredients = ingredientRepository.list(db, tenantId, { includeInactive: false });
-    const consumption = consumptionPerDay(db, tenantId, range);
+  ): Promise<ReorderResponse> {
+    const ingredients = await ingredientRepository.list(db, tenantId, { includeInactive: false });
+    const consumption = await consumptionPerDay(db, tenantId, range);
     const rows = ingredients
       .map((i) => {
         const perDay = consumption.get(i.id) ?? 0;
@@ -284,8 +288,8 @@ export const DashboardService = {
    * NOT included here — the bike never received the part, the original
    * consumption is offset, and the cost shouldn't show against the bike.
    */
-  costPerBike(db: AppDb, tenantId: number, range: DateRange): CostPerBikeResponse {
-    const movements = stockMovementRepository.listInRange(db, tenantId, range, [
+  async costPerBike(db: AppDb, tenantId: number, range: DateRange): Promise<CostPerBikeResponse> {
+    const movements = await stockMovementRepository.listInRange(db, tenantId, range, [
       'service_consumed',
       'service_reversal',
     ]);
@@ -294,8 +298,8 @@ export const DashboardService = {
     // listing all event lines for events in range. This is bounded by the
     // number of completed/cancelled events in the range — far smaller than
     // walking every movement individually.
-    const eventRows = serviceEventRepository.listInRange(db, tenantId, range);
-    const eventLinesByEvent = serviceEventLineRepository.listForEvents(
+    const eventRows = await serviceEventRepository.listInRange(db, tenantId, range);
+    const eventLinesByEvent = await serviceEventLineRepository.listForEvents(
       db,
       eventRows.map((e) => e.id),
     );
@@ -306,11 +310,12 @@ export const DashboardService = {
     const eventById = new Map(eventRows.map((e) => [e.id, e]));
 
     const bikeIds = uniq(eventRows.map((e) => e.bikeId));
-    const bikes = bikeIds
-      .map((id) => bikeRepository.findById(db, tenantId, id))
-      .filter((b): b is NonNullable<typeof b> => Boolean(b));
+    const bikeRows = await Promise.all(
+      bikeIds.map((id) => bikeRepository.findById(db, tenantId, id)),
+    );
+    const bikes = bikeRows.filter((b): b is NonNullable<typeof b> => Boolean(b));
     const bikeById = new Map(bikes.map((b) => [b.id, b]));
-    const bikeTypes = bikeTypeRepository.list(db, tenantId, { includeInactive: true });
+    const bikeTypes = await bikeTypeRepository.list(db, tenantId, { includeInactive: true });
     const bikeTypeById = new Map(bikeTypes.map((t) => [t.id, t]));
 
     type Agg = {
@@ -377,14 +382,14 @@ export const DashboardService = {
    * bikes in each type bucket (so the operator can read "across the 14 110cc
    * bikes we spent ₹X on Y services" at a glance).
    */
-  costPerBikeType(
+  async costPerBikeType(
     db: AppDb,
     tenantId: number,
     range: DateRange,
-  ): CostPerBikeTypeResponse {
-    const perBike = DashboardService.costPerBike(db, tenantId, range);
-    const bikeTypes = bikeTypeRepository.list(db, tenantId, { includeInactive: true });
-    const activeBikes = bikeRepository.list(db, tenantId, { includeInactive: false });
+  ): Promise<CostPerBikeTypeResponse> {
+    const perBike = await DashboardService.costPerBike(db, tenantId, range);
+    const bikeTypes = await bikeTypeRepository.list(db, tenantId, { includeInactive: true });
+    const activeBikes = await bikeRepository.list(db, tenantId, { includeInactive: false });
     const activeCountByType = new Map<string, number>();
     for (const b of activeBikes) {
       activeCountByType.set(
@@ -416,17 +421,17 @@ export const DashboardService = {
   },
 
   /* --------------- Hyprride Tile C — Top consumed parts ------------------- */
-  topConsumedParts(
+  async topConsumedParts(
     db: AppDb,
     tenantId: number,
     range: DateRange,
     limit = 10,
-  ): TopConsumedPartsResponse {
-    const movements = stockMovementRepository.listInRange(db, tenantId, range, [
+  ): Promise<TopConsumedPartsResponse> {
+    const movements = await stockMovementRepository.listInRange(db, tenantId, range, [
       'service_consumed',
       'service_reversal',
     ]);
-    const ingredients = ingredientRepository.list(db, tenantId, { includeInactive: true });
+    const ingredients = await ingredientRepository.list(db, tenantId, { includeInactive: true });
     const ingById = new Map(ingredients.map((i) => [i.id, i]));
 
     type Agg = { qty: number; cost: number };
@@ -465,17 +470,17 @@ export const DashboardService = {
    * Cancelled events don't count — they didn't actually result in
    * material consumed (or the wastage case is captured separately).
    */
-  serviceVolumeByBikeType(
+  async serviceVolumeByBikeType(
     db: AppDb,
     tenantId: number,
     range: DateRange,
-  ): ServiceVolumeResponse {
-    const events = serviceEventRepository.listInRange(db, tenantId, range, {
+  ): Promise<ServiceVolumeResponse> {
+    const events = await serviceEventRepository.listInRange(db, tenantId, range, {
       status: 'completed',
     });
-    const bikes = bikeRepository.list(db, tenantId, { includeInactive: true });
+    const bikes = await bikeRepository.list(db, tenantId, { includeInactive: true });
     const bikeById = new Map(bikes.map((b) => [b.id, b]));
-    const bikeTypes = bikeTypeRepository.list(db, tenantId, { includeInactive: true });
+    const bikeTypes = await bikeTypeRepository.list(db, tenantId, { includeInactive: true });
 
     const countByType = new Map<string, number>();
     for (const e of events) {
@@ -505,45 +510,47 @@ export const DashboardService = {
    * see "this bike's standard service should cost ~₹X in parts" before any
    * event runs.
    */
-  theoreticalServiceCost(
+  async theoreticalServiceCost(
     db: AppDb,
     tenantId: number,
-  ): TheoreticalServiceCostResponse {
-    const templates = serviceTemplateRepository.list(db, tenantId, { includeInactive: false });
-    const ingredients = ingredientRepository.list(db, tenantId, { includeInactive: true });
+  ): Promise<TheoreticalServiceCostResponse> {
+    const templates = await serviceTemplateRepository.list(db, tenantId, { includeInactive: false });
+    const ingredients = await ingredientRepository.list(db, tenantId, { includeInactive: true });
     const ingredientById = new Map(ingredients.map((i) => [i.id, i]));
-    const bikeTypes = bikeTypeRepository.list(db, tenantId, { includeInactive: true });
+    const bikeTypes = await bikeTypeRepository.list(db, tenantId, { includeInactive: true });
     const bikeTypeById = new Map(bikeTypes.map((t) => [t.id, t]));
 
-    const rows: TheoreticalServiceCostRow[] = templates.map((tpl) => {
-      const recipe = recipeRepository.findActiveVersion(db, {
-        tenantId,
-        parentId: tpl.id,
-        parentType: 'service_template',
-      });
-      let totalCost = 0;
-      let hasActiveRecipe = false;
-      if (recipe) {
-        hasActiveRecipe = true;
-        const lines = recipeRepository.ingredientsForVersion(db, recipe.id);
-        for (const line of lines) {
-          const ing = ingredientById.get(line.childIngredientId);
-          if (!ing) continue;
-          const baseQty = safeToBase(line.quantity, line.unit, ing.baseUnit, ing.densityGPerMl);
-          if (baseQty === null) continue;
-          totalCost += baseQty * ing.currentAvgCostPerUnit;
+    const rows: TheoreticalServiceCostRow[] = await Promise.all(
+      templates.map(async (tpl) => {
+        const recipe = await recipeRepository.findActiveVersion(db, {
+          tenantId,
+          parentId: tpl.id,
+          parentType: 'service_template',
+        });
+        let totalCost = 0;
+        let hasActiveRecipe = false;
+        if (recipe) {
+          hasActiveRecipe = true;
+          const lines = await recipeRepository.ingredientsForVersion(db, recipe.id);
+          for (const line of lines) {
+            const ing = ingredientById.get(line.childIngredientId);
+            if (!ing) continue;
+            const baseQty = safeToBase(line.quantity, line.unit, ing.baseUnit, ing.densityGPerMl);
+            if (baseQty === null) continue;
+            totalCost += baseQty * ing.currentAvgCostPerUnit;
+          }
         }
-      }
-      const bt = bikeTypeById.get(tpl.bikeTypeId);
-      return {
-        serviceTemplateId: tpl.id,
-        serviceTemplateName: tpl.name,
-        bikeTypeId: tpl.bikeTypeId,
-        bikeTypeName: bt ? formatBikeTypeLabel(bt) : '(unknown)',
-        totalCost: round2(totalCost),
-        hasActiveRecipe,
-      };
-    });
+        const bt = bikeTypeById.get(tpl.bikeTypeId);
+        return {
+          serviceTemplateId: tpl.id,
+          serviceTemplateName: tpl.name,
+          bikeTypeId: tpl.bikeTypeId,
+          bikeTypeName: bt ? formatBikeTypeLabel(bt) : '(unknown)',
+          totalCost: round2(totalCost),
+          hasActiveRecipe,
+        };
+      }),
+    );
     rows.sort((a, b) => {
       // Stable sort by bike type then template name.
       const t = a.bikeTypeName.localeCompare(b.bikeTypeName);
@@ -561,15 +568,15 @@ export const DashboardService = {
    * `daysRemaining` is null when the bike has never had that activity — the UI
    * treats null as urgent (overdue / due now).
    */
-  maintenanceSchedule(
+  async maintenanceSchedule(
     db: AppDb,
     tenantId: number,
-  ): MaintenanceScheduleResponse {
-    const bikes = bikeRepository.list(db, tenantId, { includeInactive: false });
-    const bikeTypes = bikeTypeRepository.list(db, tenantId, { includeInactive: true });
+  ): Promise<MaintenanceScheduleResponse> {
+    const bikes = await bikeRepository.list(db, tenantId, { includeInactive: false });
+    const bikeTypes = await bikeTypeRepository.list(db, tenantId, { includeInactive: true });
     const bikeTypeById = new Map(bikeTypes.map((t) => [t.id, t]));
-    const lastService = serviceEventRepository.lastCompletedAtByBike(db, tenantId, 'service');
-    const lastWash = serviceEventRepository.lastCompletedAtByBike(db, tenantId, 'wash');
+    const lastService = await serviceEventRepository.lastCompletedAtByBike(db, tenantId, 'service');
+    const lastWash = await serviceEventRepository.lastCompletedAtByBike(db, tenantId, 'wash');
     const now = Date.now();
 
     const due = (lastAt: number | undefined, intervalDays: number) => {
@@ -610,17 +617,17 @@ export const DashboardService = {
    * Pairs with serviceVolumeByBikeType so the operator can drill from "by
    * model" to "by bike".
    */
-  serviceVolumeByBike(
+  async serviceVolumeByBike(
     db: AppDb,
     tenantId: number,
     range: DateRange,
-  ): ServiceVolumeByBikeResponse {
-    const events = serviceEventRepository.listInRange(db, tenantId, range, {
+  ): Promise<ServiceVolumeByBikeResponse> {
+    const events = await serviceEventRepository.listInRange(db, tenantId, range, {
       status: 'completed',
     });
-    const bikes = bikeRepository.list(db, tenantId, { includeInactive: true });
+    const bikes = await bikeRepository.list(db, tenantId, { includeInactive: true });
     const bikeById = new Map(bikes.map((b) => [b.id, b]));
-    const bikeTypes = bikeTypeRepository.list(db, tenantId, { includeInactive: true });
+    const bikeTypes = await bikeTypeRepository.list(db, tenantId, { includeInactive: true });
     const bikeTypeById = new Map(bikeTypes.map((t) => [t.id, t]));
 
     const byBike = new Map<string, ServiceVolumeByBikeRow>();
@@ -658,8 +665,12 @@ export const DashboardService = {
  * (Hyprride) so parts bleeding through servicing surface alongside the
  * Laurans-era sale / wastage reasons.
  */
-function consumptionPerDay(db: AppDb, tenantId: number, range: DateRange): Map<string, number> {
-  const movements = stockMovementRepository.listInRange(db, tenantId, range, [
+async function consumptionPerDay(
+  db: AppDb,
+  tenantId: number,
+  range: DateRange,
+): Promise<Map<string, number>> {
+  const movements = await stockMovementRepository.listInRange(db, tenantId, range, [
     'sale',
     'wastage',
     'staff_meal',

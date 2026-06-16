@@ -12,11 +12,11 @@ export type ListBatchesFilter = {
 };
 
 export const productionBatchRepository = {
-  list(
+  async list(
     db: AppDb,
     tenantId: number,
     filter: ListBatchesFilter = {},
-  ): ProductionBatchRow[] {
+  ): Promise<ProductionBatchRow[]> {
     const conditions = [eq(productionBatches.tenantId, tenantId)];
     if (filter.preparedIngredientId) {
       conditions.push(
@@ -28,11 +28,12 @@ export const productionBatchRepository = {
       .from(productionBatches)
       .where(and(...conditions))
       .orderBy(desc(productionBatches.producedAt))
-      .limit(Math.max(1, Math.min(200, filter.limit ?? 50)))
-      .all();
+      .limit(Math.max(1, Math.min(200, filter.limit ?? 50)));
   },
 
-  insert(db: AppDb, row: ProductionBatchInsert): ProductionBatchRow {
-    return db.insert(productionBatches).values(row).returning().get();
+  async insert(db: AppDb, row: ProductionBatchInsert): Promise<ProductionBatchRow> {
+    const [inserted] = await db.insert(productionBatches).values(row).returning();
+    if (!inserted) throw new Error('production batch insert returned no row');
+    return inserted;
   },
 };

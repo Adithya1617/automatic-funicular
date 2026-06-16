@@ -1,0 +1,27 @@
+# Local Postgres for Hyprride web migration (W0).
+# Brings up a single Postgres 16 instance matching the credentials in .env.example.
+#   docker compose up -d      # start
+#   docker compose down       # stop (keeps data in the named volume)
+#   docker compose down -v    # stop AND wipe data
+services:
+  postgres:
+    image: postgres:16
+    container_name: hyprride-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hyprride
+      POSTGRES_PASSWORD: hyprride
+      POSTGRES_DB: hyprride
+    ports:
+      # Host 5433 -> container 5432 (host 5432 is taken by other local Postgres instances)
+      - "5433:5432"
+    volumes:
+      - hyprride_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hyprride -d hyprride"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  hyprride_pgdata:

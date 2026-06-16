@@ -18,12 +18,12 @@ const DRIFT_TOLERANCE = 1e-6;
  * a defect — never silently ignored. Returns drift entries; main process
  * logs them and surfaces via `app:reconciliation` later.
  */
-export function runReconciliation(
+export async function runReconciliation(
   db: AppDb,
   tenantId: number,
-): ReconciliationDrift[] {
-  const ingredients = ingredientRepository.list(db, tenantId, { includeInactive: true });
-  const sums = stockMovementRepository.sumByIngredient(db, tenantId);
+): Promise<ReconciliationDrift[]> {
+  const ingredients = await ingredientRepository.list(db, tenantId, { includeInactive: true });
+  const sums = await stockMovementRepository.sumByIngredient(db, tenantId);
   const sumByIngredientId = new Map(sums.map((s) => [s.ingredientId, s.total]));
 
   const drifts: ReconciliationDrift[] = [];

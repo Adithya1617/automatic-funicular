@@ -10,6 +10,8 @@ export type IpcErrorCode =
   | 'CONFLICT'
   | 'VALIDATION'
   | 'INVARIANT_VIOLATION'
+  | 'UNAUTHENTICATED'
+  | 'FORBIDDEN'
   | 'UNKNOWN';
 
 export type IpcError = {

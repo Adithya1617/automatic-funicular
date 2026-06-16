@@ -13,11 +13,11 @@ export type ServiceTemplateFilter = {
 };
 
 export const serviceTemplateRepository = {
-  list(
+  async list(
     db: AppDb,
     tenantId: number,
     filter: ServiceTemplateFilter = {},
-  ): ServiceTemplateRow[] {
+  ): Promise<ServiceTemplateRow[]> {
     const conditions = [eq(serviceTemplates.tenantId, tenantId)];
     if (!filter.includeInactive)
       conditions.push(eq(serviceTemplates.isActive, true));
@@ -30,31 +30,28 @@ export const serviceTemplateRepository = {
       .select()
       .from(serviceTemplates)
       .where(and(...conditions))
-      .orderBy(asc(serviceTemplates.displayOrder), asc(serviceTemplates.name))
-      .all();
+      .orderBy(asc(serviceTemplates.displayOrder), asc(serviceTemplates.name));
   },
 
-  findById(
+  async findById(
     db: AppDb,
     tenantId: number,
     id: string,
-  ): ServiceTemplateRow | undefined {
-    return db
+  ): Promise<ServiceTemplateRow | undefined> {
+    const rows = await db
       .select()
       .from(serviceTemplates)
-      .where(
-        and(eq(serviceTemplates.tenantId, tenantId), eq(serviceTemplates.id, id)),
-      )
-      .get();
+      .where(and(eq(serviceTemplates.tenantId, tenantId), eq(serviceTemplates.id, id)));
+    return rows[0];
   },
 
-  findByNameAndType(
+  async findByNameAndType(
     db: AppDb,
     tenantId: number,
     name: string,
     bikeTypeId: string,
-  ): ServiceTemplateRow | undefined {
-    return db
+  ): Promise<ServiceTemplateRow | undefined> {
+    const rows = await db
       .select()
       .from(serviceTemplates)
       .where(
@@ -63,27 +60,27 @@ export const serviceTemplateRepository = {
           eq(serviceTemplates.name, name),
           eq(serviceTemplates.bikeTypeId, bikeTypeId),
         ),
-      )
-      .get();
+      );
+    return rows[0];
   },
 
-  insert(db: AppDb, row: ServiceTemplateInsert): ServiceTemplateRow {
-    return db.insert(serviceTemplates).values(row).returning().get();
+  async insert(db: AppDb, row: ServiceTemplateInsert): Promise<ServiceTemplateRow> {
+    const [inserted] = await db.insert(serviceTemplates).values(row).returning();
+    if (!inserted) throw new Error('service template insert returned no row');
+    return inserted;
   },
 
-  update(
+  async update(
     db: AppDb,
     tenantId: number,
     id: string,
     patch: Partial<ServiceTemplateInsert>,
-  ): ServiceTemplateRow | undefined {
-    return db
+  ): Promise<ServiceTemplateRow | undefined> {
+    const [updated] = await db
       .update(serviceTemplates)
       .set(patch)
-      .where(
-        and(eq(serviceTemplates.tenantId, tenantId), eq(serviceTemplates.id, id)),
-      )
-      .returning()
-      .get();
+      .where(and(eq(serviceTemplates.tenantId, tenantId), eq(serviceTemplates.id, id)))
+      .returning();
+    return updated;
   },
 };

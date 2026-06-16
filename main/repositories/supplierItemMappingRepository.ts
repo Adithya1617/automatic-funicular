@@ -11,7 +11,11 @@ function normalize(description: string): string {
 }
 
 export const supplierItemMappingRepository = {
-  listForSupplier(db: AppDb, tenantId: number, supplierId: string): SupplierItemMappingRow[] {
+  async listForSupplier(
+    db: AppDb,
+    tenantId: number,
+    supplierId: string,
+  ): Promise<SupplierItemMappingRow[]> {
     return db
       .select()
       .from(supplierItemMappings)
@@ -21,17 +25,16 @@ export const supplierItemMappingRepository = {
           eq(supplierItemMappings.supplierId, supplierId),
         ),
       )
-      .orderBy(desc(supplierItemMappings.lastUsedAt))
-      .all();
+      .orderBy(desc(supplierItemMappings.lastUsedAt));
   },
 
-  suggest(
+  async suggest(
     db: AppDb,
     tenantId: number,
     supplierId: string,
     partial: string,
     limit: number,
-  ): SupplierItemMappingRow[] {
+  ): Promise<SupplierItemMappingRow[]> {
     const conditions = [
       eq(supplierItemMappings.tenantId, tenantId),
       eq(supplierItemMappings.supplierId, supplierId),
@@ -45,17 +48,16 @@ export const supplierItemMappingRepository = {
       .from(supplierItemMappings)
       .where(and(...conditions))
       .orderBy(desc(supplierItemMappings.lastUsedAt), asc(supplierItemMappings.rawDescription))
-      .limit(Math.max(1, Math.min(50, limit)))
-      .all();
+      .limit(Math.max(1, Math.min(50, limit)));
   },
 
-  findByDescription(
+  async findByDescription(
     db: AppDb,
     tenantId: number,
     supplierId: string,
     rawDescription: string,
-  ): SupplierItemMappingRow | undefined {
-    return db
+  ): Promise<SupplierItemMappingRow | undefined> {
+    const rows = await db
       .select()
       .from(supplierItemMappings)
       .where(
@@ -64,31 +66,32 @@ export const supplierItemMappingRepository = {
           eq(supplierItemMappings.supplierId, supplierId),
           eq(supplierItemMappings.rawDescription, normalize(rawDescription)),
         ),
-      )
-      .get();
+      );
+    return rows[0];
   },
 
-  insert(db: AppDb, row: SupplierItemMappingInsert): SupplierItemMappingRow {
-    return db
+  async insert(db: AppDb, row: SupplierItemMappingInsert): Promise<SupplierItemMappingRow> {
+    const [inserted] = await db
       .insert(supplierItemMappings)
       .values({ ...row, rawDescription: normalize(row.rawDescription) })
-      .returning()
-      .get();
+      .returning();
+    if (!inserted) throw new Error('supplier item mapping insert returned no row');
+    return inserted;
   },
 
-  update(
+  async update(
     db: AppDb,
     id: string,
     patch: Partial<SupplierItemMappingInsert>,
-  ): SupplierItemMappingRow | undefined {
+  ): Promise<SupplierItemMappingRow | undefined> {
     const next: Partial<SupplierItemMappingInsert> = patch.rawDescription
       ? { ...patch, rawDescription: normalize(patch.rawDescription) }
       : patch;
-    return db
+    const [updated] = await db
       .update(supplierItemMappings)
       .set(next)
       .where(eq(supplierItemMappings.id, id))
-      .returning()
-      .get();
+      .returning();
+    return updated;
   },
 };

@@ -28,13 +28,17 @@ export const InvoiceParserService = {
     // Resolve supplier by GSTIN (active only).
     let supplierId: string | null = null;
     if (tplResult.header.supplierGstin) {
-      const sup = supplierRepository.findByGstin(db, tenantId, tplResult.header.supplierGstin);
+      const sup = await supplierRepository.findByGstin(
+        db,
+        tenantId,
+        tplResult.header.supplierGstin,
+      );
       if (sup && sup.isActive) supplierId = sup.id;
     }
 
     // Duplicate check.
     if (supplierId && tplResult.header.invoiceNumber) {
-      const existing = invoiceRepository.findByNumber(
+      const existing = await invoiceRepository.findByNumber(
         db,
         tenantId,
         supplierId,
@@ -46,19 +50,21 @@ export const InvoiceParserService = {
     }
 
     // Per-line mapping resolve.
-    const lines = tplResult.lines.map((line) => {
-      let ingredientId: string | null = null;
-      if (supplierId) {
-        const mapping = supplierItemMappingRepository.findByDescription(
-          db,
-          tenantId,
-          supplierId,
-          line.rawDescription,
-        );
-        if (mapping) ingredientId = mapping.ingredientId;
-      }
-      return { ...line, ingredientId };
-    });
+    const lines = await Promise.all(
+      tplResult.lines.map(async (line) => {
+        let ingredientId: string | null = null;
+        if (supplierId) {
+          const mapping = await supplierItemMappingRepository.findByDescription(
+            db,
+            tenantId,
+            supplierId,
+            line.rawDescription,
+          );
+          if (mapping) ingredientId = mapping.ingredientId;
+        }
+        return { ...line, ingredientId };
+      }),
+    );
 
     return {
       ok: true,

@@ -78,14 +78,14 @@ export const InventoryService = {
    * transaction. Throws DomainError on invariant violations; the caller
    * sees the failure as a transaction rollback.
    */
-  applyMovement(
+  async applyMovement(
     db: AppDb,
     tenantId: number,
     input: ApplyMovementInput,
     actorId: string = SYSTEM_USER_ID,
     options: ApplyMovementOptions = {},
-  ): ApplyMovementResult {
-    const ingredient = ingredientRepository.findById(db, tenantId, input.ingredientId);
+  ): Promise<ApplyMovementResult> {
+    const ingredient = await ingredientRepository.findById(db, tenantId, input.ingredientId);
     if (!ingredient) throw new NotFoundError('Ingredient', input.ingredientId);
 
     const direction = FORCED_DIRECTION[input.reason] ?? input.direction;
@@ -141,8 +141,8 @@ export const InventoryService = {
     const now = Date.now();
     const occurredAt = input.occurredAt ?? now;
 
-    const result = db.transaction((tx) => {
-      const movementRow = stockMovementRepository.insert(tx, {
+    const result = await db.transaction(async (tx) => {
+      const movementRow = await stockMovementRepository.insert(tx, {
         id: newId(),
         tenantId,
         ingredientId: input.ingredientId,
@@ -158,7 +158,7 @@ export const InventoryService = {
       });
 
       if (shouldRecomputeAvg) {
-        ingredientRepository.setStockAndCost(
+        await ingredientRepository.setStockAndCost(
           tx,
           tenantId,
           input.ingredientId,
@@ -168,7 +168,7 @@ export const InventoryService = {
           actorId,
         );
       } else {
-        ingredientRepository.setStockQuantity(
+        await ingredientRepository.setStockQuantity(
           tx,
           tenantId,
           input.ingredientId,
@@ -185,18 +185,18 @@ export const InventoryService = {
     });
 
     if (!options.skipAvailabilityRecompute) {
-      AvailabilityService.recomputeForIngredients(db, tenantId, [input.ingredientId]);
+      await AvailabilityService.recomputeForIngredients(db, tenantId, [input.ingredientId]);
     }
 
     return result;
   },
 
-  applyManualAdjustment(
+  async applyManualAdjustment(
     db: AppDb,
     tenantId: number,
     input: ManualAdjustmentInput,
     actorId: string = SYSTEM_USER_ID,
-  ): ApplyMovementResult {
+  ): Promise<ApplyMovementResult> {
     return InventoryService.applyMovement(
       db,
       tenantId,
@@ -218,12 +218,12 @@ export const InventoryService = {
    * increases stock; when a cost is supplied it lifts the part's weighted-avg
    * cost. Direction is forced +1 inside applyMovement.
    */
-  recordPurchase(
+  async recordPurchase(
     db: AppDb,
     tenantId: number,
     input: RecordPurchaseInput,
     actorId: string = SYSTEM_USER_ID,
-  ): ApplyMovementResult {
+  ): Promise<ApplyMovementResult> {
     return InventoryService.applyMovement(
       db,
       tenantId,
@@ -246,12 +246,12 @@ export const InventoryService = {
 
 export const __internalForBatching = {
   /** Internal: skip-availability-recompute applyMovement for use inside multi-movement transactions. */
-  applyMovementSkipAvailability(
+  async applyMovementSkipAvailability(
     db: AppDb,
     tenantId: number,
     input: ApplyMovementInput,
     actorId: string = SYSTEM_USER_ID,
-  ): ApplyMovementResult {
+  ): Promise<ApplyMovementResult> {
     return InventoryService.applyMovement(db, tenantId, input, actorId, {
       skipAvailabilityRecompute: true,
     });

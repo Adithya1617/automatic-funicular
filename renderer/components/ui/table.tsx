@@ -5,11 +5,14 @@ export const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, ...props }, ref) => (
-  <table
-    ref={ref}
-    className={cn('w-full caption-bottom text-[12px]', className)}
-    {...props}
-  />
+  // Wrapper lets wide tables scroll horizontally on narrow (mobile) screens.
+  <div className="w-full overflow-x-auto">
+    <table
+      ref={ref}
+      className={cn('w-full caption-bottom text-[12px]', className)}
+      {...props}
+    />
+  </div>
 ));
 Table.displayName = 'Table';
 

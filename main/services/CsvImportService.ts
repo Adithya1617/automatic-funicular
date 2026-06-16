@@ -30,12 +30,12 @@ import type {
 type Issue = CsvImportIssue;
 
 export const CsvImportService = {
-  run(
+  async run(
     db: AppDb,
     tenantId: number,
     input: CsvImportInput,
     actorId: string = SYSTEM_USER_ID,
-  ): CsvImportResult {
+  ): Promise<CsvImportResult> {
     const table = parseCsvTable(input.content);
     switch (input.kind) {
       case 'parts':
@@ -55,13 +55,13 @@ export const CsvImportService = {
 // CSV always sets type='raw' — there are no "prepared" parts for bike rentals,
 // so we don't expose that column to the operator.
 
-function importParts(
+async function importParts(
   db: AppDb,
   tenantId: number,
   table: CsvTable,
   dryRun: boolean,
   actorId: string,
-): CsvImportResult {
+): Promise<CsvImportResult> {
   const issues: Issue[] = [];
   requireHeaders(table, ['name', 'category', 'base_unit'], 'parts', issues);
 
@@ -75,7 +75,7 @@ function importParts(
       };
   const plans: Plan[] = [];
   const existingByName = new Map<string, IngredientRow>();
-  for (const ing of ingredientRepository.list(db, tenantId, { includeInactive: true })) {
+  for (const ing of await ingredientRepository.list(db, tenantId, { includeInactive: true })) {
     existingByName.set(ing.name.toLowerCase(), ing);
   }
 
@@ -85,7 +85,7 @@ function importParts(
     const existing = existingByName.get(draft.name.toLowerCase());
     if (existing) {
       if (existing.baseUnit !== draft.baseUnit) {
-        const movements = stockMovementRepository.list(db, tenantId, {
+        const movements = await stockMovementRepository.list(db, tenantId, {
           ingredientId: existing.id,
           limit: 1,
         });
@@ -110,12 +110,12 @@ function importParts(
     toUpdate: plans.filter((p) => p.mode === 'update').length,
     skipped: table.rows.length - plans.length,
   };
-  return finishImport('parts', summary, issues, dryRun, () => {
-    db.transaction((tx) => {
+  return finishImport('parts', summary, issues, dryRun, async () => {
+    await db.transaction(async (tx) => {
       const now = Date.now();
       for (const plan of plans) {
         if (plan.mode === 'create') {
-          ingredientRepository.insert(tx, {
+          await ingredientRepository.insert(tx, {
             id: newId(),
             tenantId,
             name: plan.row.name,
@@ -134,7 +134,7 @@ function importParts(
             updatedBy: actorId,
           });
         } else {
-          ingredientRepository.update(tx, tenantId, plan.existing.id, {
+          await ingredientRepository.update(tx, tenantId, plan.existing.id, {
             name: plan.row.name,
             category: plan.row.category,
             baseUnit: plan.row.baseUnit,
@@ -219,13 +219,13 @@ function parsePartRow(
 
 /* ============================== Suppliers ================================ */
 
-function importSuppliers(
+async function importSuppliers(
   db: AppDb,
   tenantId: number,
   table: CsvTable,
   dryRun: boolean,
   actorId: string,
-): CsvImportResult {
+): Promise<CsvImportResult> {
   const issues: Issue[] = [];
   requireHeaders(table, ['name'], 'suppliers', issues);
 
@@ -234,7 +234,7 @@ function importSuppliers(
     | { mode: 'update'; existing: SupplierRow; row: RowDraftSupplier; lineNumber: number };
   const plans: Plan[] = [];
   const existingByName = new Map<string, SupplierRow>();
-  for (const s of supplierRepository.list(db, tenantId, { includeInactive: true })) {
+  for (const s of await supplierRepository.list(db, tenantId, { includeInactive: true })) {
     existingByName.set(s.name.toLowerCase(), s);
   }
 
@@ -260,12 +260,12 @@ function importSuppliers(
     toUpdate: plans.filter((p) => p.mode === 'update').length,
     skipped: table.rows.length - plans.length,
   };
-  return finishImport('suppliers', summary, issues, dryRun, () => {
-    db.transaction((tx) => {
+  return finishImport('suppliers', summary, issues, dryRun, async () => {
+    await db.transaction(async (tx) => {
       const now = Date.now();
       for (const plan of plans) {
         if (plan.mode === 'create') {
-          supplierRepository.insert(tx, {
+          await supplierRepository.insert(tx, {
             id: newId(),
             tenantId,
             name: plan.row.name,
@@ -278,7 +278,7 @@ function importSuppliers(
             updatedBy: actorId,
           });
         } else {
-          supplierRepository.update(tx, tenantId, plan.existing.id, {
+          await supplierRepository.update(tx, tenantId, plan.existing.id, {
             name: plan.row.name,
             contactInfo: plan.row.contactInfo,
             notes: plan.row.notes,
@@ -303,17 +303,17 @@ type RowDraftSupplier = {
 // inserting orphan types (CLAUDE.md treats bike_types as a fixed roster
 // that's seeded via migration).
 
-function importBikes(
+async function importBikes(
   db: AppDb,
   tenantId: number,
   table: CsvTable,
   dryRun: boolean,
   actorId: string,
-): CsvImportResult {
+): Promise<CsvImportResult> {
   const issues: Issue[] = [];
   requireHeaders(table, ['bike_number', 'engine_cc', 'bike_type'], 'bikes', issues);
 
-  const allBikeTypes = bikeTypeRepository.list(db, tenantId, { includeInactive: true });
+  const allBikeTypes = await bikeTypeRepository.list(db, tenantId, { includeInactive: true });
   const bikeTypeKey = (cc: number, name: string) => `${cc}::${name.toLowerCase()}`;
   const bikeTypeByKey = new Map<string, BikeTypeRow>();
   for (const t of allBikeTypes) {
@@ -325,7 +325,7 @@ function importBikes(
     | { mode: 'update'; existing: BikeRow; row: RowDraftBikeResolved; lineNumber: number };
   const plans: Plan[] = [];
   const existingByNumber = new Map<string, BikeRow>();
-  for (const b of bikeRepository.list(db, tenantId, { includeInactive: true })) {
+  for (const b of await bikeRepository.list(db, tenantId, { includeInactive: true })) {
     existingByNumber.set(b.bikeNumber.toLowerCase(), b);
   }
 
@@ -364,12 +364,12 @@ function importBikes(
     toUpdate: plans.filter((p) => p.mode === 'update').length,
     skipped: table.rows.length - plans.length,
   };
-  return finishImport('bikes', summary, issues, dryRun, () => {
-    db.transaction((tx) => {
+  return finishImport('bikes', summary, issues, dryRun, async () => {
+    await db.transaction(async (tx) => {
       const now = Date.now();
       for (const plan of plans) {
         if (plan.mode === 'create') {
-          bikeRepository.insert(tx, {
+          await bikeRepository.insert(tx, {
             id: newId(),
             tenantId,
             bikeNumber: plan.row.bikeNumber,
@@ -384,7 +384,7 @@ function importBikes(
             updatedBy: actorId,
           });
         } else {
-          bikeRepository.update(tx, tenantId, plan.existing.id, {
+          await bikeRepository.update(tx, tenantId, plan.existing.id, {
             bikeNumber: plan.row.bikeNumber,
             bikeTypeId: plan.row.bikeTypeId,
             licensePlate: plan.row.licensePlate,
@@ -491,13 +491,13 @@ type ServiceTemplateRowDraft = {
   lineNumber: number;
 };
 
-function importServiceTemplates(
+async function importServiceTemplates(
   db: AppDb,
   tenantId: number,
   table: CsvTable,
   dryRun: boolean,
   actorId: string,
-): CsvImportResult {
+): Promise<CsvImportResult> {
   const issues: Issue[] = [];
   requireHeaders(
     table,
@@ -506,14 +506,14 @@ function importServiceTemplates(
     issues,
   );
 
-  const allBikeTypes = bikeTypeRepository.list(db, tenantId, { includeInactive: true });
+  const allBikeTypes = await bikeTypeRepository.list(db, tenantId, { includeInactive: true });
   const bikeTypeKey = (cc: number, name: string) => `${cc}::${name.toLowerCase()}`;
   const bikeTypeByKey = new Map<string, BikeTypeRow>();
   for (const t of allBikeTypes) {
     bikeTypeByKey.set(bikeTypeKey(t.engineCc, t.name), t);
   }
   const ingredientsByName = new Map<string, IngredientRow>();
-  for (const i of ingredientRepository.list(db, tenantId, { includeInactive: true })) {
+  for (const i of await ingredientRepository.list(db, tenantId, { includeInactive: true })) {
     ingredientsByName.set(i.name.toLowerCase(), i);
   }
 
@@ -587,7 +587,7 @@ function importServiceTemplates(
   }
 
   const existingTemplatesByKey = new Map<string, ServiceTemplateRow>();
-  for (const t of serviceTemplateRepository.list(db, tenantId, { includeInactive: true })) {
+  for (const t of await serviceTemplateRepository.list(db, tenantId, { includeInactive: true })) {
     existingTemplatesByKey.set(
       `${t.name.toLowerCase()}::${t.bikeTypeId}`,
       t,
@@ -606,14 +606,14 @@ function importServiceTemplates(
     toUpdate,
     skipped: table.rows.length - totalGroupedRows,
   };
-  return finishImport('service_templates', summary, issues, dryRun, () => {
-    db.transaction((tx) => {
+  return finishImport('service_templates', summary, issues, dryRun, async () => {
+    await db.transaction(async (tx) => {
       const now = Date.now();
       for (const group of planGroups) {
         const lookupKey = `${group.templateName.toLowerCase()}::${group.bikeTypeId}`;
         let template = existingTemplatesByKey.get(lookupKey);
         if (!template) {
-          template = serviceTemplateRepository.insert(tx, {
+          template = await serviceTemplateRepository.insert(tx, {
             id: newId(),
             tenantId,
             name: group.templateName,
@@ -626,7 +626,7 @@ function importServiceTemplates(
             updatedBy: actorId,
           });
         }
-        RecipeService.saveVersion(
+        await RecipeService.saveVersion(
           tx,
           tenantId,
           {
@@ -735,16 +735,16 @@ function requireHeaders(table: CsvTable, required: string[], kind: string, issue
   }
 }
 
-function finishImport(
+async function finishImport(
   kind: import('@shared/schemas/csvImport').CsvImportKind,
   summary: import('@shared/schemas/csvImport').CsvImportSummary,
   issues: Issue[],
   dryRun: boolean,
-  commit: () => void,
-): CsvImportResult {
+  commit: () => Promise<void>,
+): Promise<CsvImportResult> {
   const blocked = issues.length > 0;
   const committed = !dryRun && !blocked;
-  if (committed) commit();
+  if (committed) await commit();
   return {
     kind,
     dryRun,

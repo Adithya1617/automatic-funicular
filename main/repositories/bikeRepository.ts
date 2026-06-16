@@ -9,7 +9,7 @@ export type BikeFilter = {
 };
 
 export const bikeRepository = {
-  list(db: AppDb, tenantId: number, filter: BikeFilter = {}): BikeRow[] {
+  async list(db: AppDb, tenantId: number, filter: BikeFilter = {}): Promise<BikeRow[]> {
     const conditions = [eq(bikes.tenantId, tenantId)];
     if (!filter.includeInactive) conditions.push(eq(bikes.isActive, true));
     if (filter.bikeTypeId) conditions.push(eq(bikes.bikeTypeId, filter.bikeTypeId));
@@ -28,45 +28,46 @@ export const bikeRepository = {
       .select()
       .from(bikes)
       .where(and(...conditions))
-      .orderBy(asc(bikes.bikeNumber))
-      .all();
+      .orderBy(asc(bikes.bikeNumber));
   },
 
-  findById(db: AppDb, tenantId: number, id: string): BikeRow | undefined {
-    return db
+  async findById(db: AppDb, tenantId: number, id: string): Promise<BikeRow | undefined> {
+    const rows = await db
       .select()
       .from(bikes)
-      .where(and(eq(bikes.tenantId, tenantId), eq(bikes.id, id)))
-      .get();
+      .where(and(eq(bikes.tenantId, tenantId), eq(bikes.id, id)));
+    return rows[0];
   },
 
-  findByBikeNumber(
+  async findByBikeNumber(
     db: AppDb,
     tenantId: number,
     bikeNumber: string,
-  ): BikeRow | undefined {
-    return db
+  ): Promise<BikeRow | undefined> {
+    const rows = await db
       .select()
       .from(bikes)
-      .where(and(eq(bikes.tenantId, tenantId), eq(bikes.bikeNumber, bikeNumber)))
-      .get();
+      .where(and(eq(bikes.tenantId, tenantId), eq(bikes.bikeNumber, bikeNumber)));
+    return rows[0];
   },
 
-  insert(db: AppDb, row: BikeInsert): BikeRow {
-    return db.insert(bikes).values(row).returning().get();
+  async insert(db: AppDb, row: BikeInsert): Promise<BikeRow> {
+    const [inserted] = await db.insert(bikes).values(row).returning();
+    if (!inserted) throw new Error('bike insert returned no row');
+    return inserted;
   },
 
-  update(
+  async update(
     db: AppDb,
     tenantId: number,
     id: string,
     patch: Partial<BikeInsert>,
-  ): BikeRow | undefined {
-    return db
+  ): Promise<BikeRow | undefined> {
+    const [updated] = await db
       .update(bikes)
       .set(patch)
       .where(and(eq(bikes.tenantId, tenantId), eq(bikes.id, id)))
-      .returning()
-      .get();
+      .returning();
+    return updated;
   },
 };

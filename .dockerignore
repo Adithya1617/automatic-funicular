@@ -1,0 +1,13 @@
+node_modules
+out
+.git
+.gitignore
+*.sqlite
+*.sqlite-*
+.env
+.env.*
+!.env.example
+!.env.prod.example
+docs
+dist
+*.md

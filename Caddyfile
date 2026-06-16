@@ -1,0 +1,6 @@
+# Caddy terminates TLS (automatic Let's Encrypt certificate for $DOMAIN) and
+# reverse-proxies to the app. $DOMAIN must be a real public hostname pointing
+# at this server, with ports 80 + 443 reachable.
+{$DOMAIN} {
+	reverse_proxy app:3001
+}

@@ -10,7 +10,11 @@ export type IngredientFilter = {
 };
 
 export const ingredientRepository = {
-  list(db: AppDb, tenantId: number, filter: IngredientFilter = {}): IngredientRow[] {
+  async list(
+    db: AppDb,
+    tenantId: number,
+    filter: IngredientFilter = {},
+  ): Promise<IngredientRow[]> {
     const conditions = [eq(ingredients.tenantId, tenantId)];
     if (!filter.includeInactive) conditions.push(eq(ingredients.isActive, true));
     if (filter.category) conditions.push(eq(ingredients.category, filter.category));
@@ -26,62 +30,67 @@ export const ingredientRepository = {
       .select()
       .from(ingredients)
       .where(and(...conditions))
-      .orderBy(asc(ingredients.name))
-      .all();
+      .orderBy(asc(ingredients.name));
   },
 
-  findById(db: AppDb, tenantId: number, id: string): IngredientRow | undefined {
-    return db
+  async findById(db: AppDb, tenantId: number, id: string): Promise<IngredientRow | undefined> {
+    const rows = await db
       .select()
       .from(ingredients)
-      .where(and(eq(ingredients.tenantId, tenantId), eq(ingredients.id, id)))
-      .get();
+      .where(and(eq(ingredients.tenantId, tenantId), eq(ingredients.id, id)));
+    return rows[0];
   },
 
-  findByName(db: AppDb, tenantId: number, name: string): IngredientRow | undefined {
-    return db
+  async findByName(
+    db: AppDb,
+    tenantId: number,
+    name: string,
+  ): Promise<IngredientRow | undefined> {
+    const rows = await db
       .select()
       .from(ingredients)
-      .where(and(eq(ingredients.tenantId, tenantId), eq(ingredients.name, name)))
-      .get();
+      .where(and(eq(ingredients.tenantId, tenantId), eq(ingredients.name, name)));
+    return rows[0];
   },
 
-  insert(db: AppDb, row: IngredientInsert): IngredientRow {
-    return db.insert(ingredients).values(row).returning().get();
+  async insert(db: AppDb, row: IngredientInsert): Promise<IngredientRow> {
+    const [inserted] = await db.insert(ingredients).values(row).returning();
+    if (!inserted) throw new Error('ingredient insert returned no row');
+    return inserted;
   },
 
-  update(
+  async update(
     db: AppDb,
     tenantId: number,
     id: string,
     patch: Partial<IngredientInsert>,
-  ): IngredientRow | undefined {
-    return db
+  ): Promise<IngredientRow | undefined> {
+    const [updated] = await db
       .update(ingredients)
       .set(patch)
       .where(and(eq(ingredients.tenantId, tenantId), eq(ingredients.id, id)))
-      .returning()
-      .get();
+      .returning();
+    return updated;
   },
 
   /** Unsafe in normal flows — used only by InventoryService. */
-  setStockQuantity(
+  async setStockQuantity(
     db: AppDb,
     tenantId: number,
     id: string,
     stockQuantity: number,
     updatedAt: number,
     updatedBy: string,
-  ): void {
-    db.update(ingredients)
+  ): Promise<void> {
+    await db
+      .update(ingredients)
       .set({ stockQuantity, updatedAt, updatedBy })
-      .where(and(eq(ingredients.tenantId, tenantId), eq(ingredients.id, id)))
-      .run();
+      .where(and(eq(ingredients.tenantId, tenantId), eq(ingredients.id, id)));
   },
 
   /** Stock + weighted-avg cost in one update — used by InventoryService when
    *  a movement carries a cost (purchase, production_output). */
-  setStockAndCost(
+  async setStockAndCost(
     db: AppDb,
     tenantId: number,
     id: string,
@@ -89,10 +98,10 @@ export const ingredientRepository = {
     currentAvgCostPerUnit: number,
     updatedAt: number,
     updatedBy: string,
-  ): void {
-    db.update(ingredients)
+  ): Promise<void> {
+    await db
+      .update(ingredients)
       .set({ stockQuantity, currentAvgCostPerUnit, updatedAt, updatedBy })
-      .where(and(eq(ingredients.tenantId, tenantId), eq(ingredients.id, id)))
-      .run();
+      .where(and(eq(ingredients.tenantId, tenantId), eq(ingredients.id, id)));
   },
 };

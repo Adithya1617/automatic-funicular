@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.node.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": [
+    "server/**/*.ts",
+    "shared/**/*.ts",
+    "main/repositories/**/*.ts",
+    "main/services/**/*.ts",
+    "main/jobs/reconciliation.ts",
+    "main/lib/**/*.ts"
+  ]
+}

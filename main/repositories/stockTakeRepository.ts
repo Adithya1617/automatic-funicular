@@ -9,7 +9,7 @@ export type StockTakeFilter = {
 };
 
 export const stockTakeRepository = {
-  list(db: AppDb, tenantId: number, filter: StockTakeFilter = {}): StockTakeRow[] {
+  async list(db: AppDb, tenantId: number, filter: StockTakeFilter = {}): Promise<StockTakeRow[]> {
     const conditions: SQL[] = [eq(stockTakes.tenantId, tenantId)];
     if (filter.status) conditions.push(eq(stockTakes.status, filter.status));
     return db
@@ -17,41 +17,42 @@ export const stockTakeRepository = {
       .from(stockTakes)
       .where(and(...conditions))
       .orderBy(desc(stockTakes.startedAt))
-      .limit(Math.max(1, Math.min(500, filter.limit ?? 100)))
-      .all();
+      .limit(Math.max(1, Math.min(500, filter.limit ?? 100)));
   },
 
-  findById(db: AppDb, tenantId: number, id: string): StockTakeRow | undefined {
-    return db
+  async findById(db: AppDb, tenantId: number, id: string): Promise<StockTakeRow | undefined> {
+    const rows = await db
       .select()
       .from(stockTakes)
-      .where(and(eq(stockTakes.tenantId, tenantId), eq(stockTakes.id, id)))
-      .get();
+      .where(and(eq(stockTakes.tenantId, tenantId), eq(stockTakes.id, id)));
+    return rows[0];
   },
 
-  findInProgress(db: AppDb, tenantId: number): StockTakeRow | undefined {
-    return db
+  async findInProgress(db: AppDb, tenantId: number): Promise<StockTakeRow | undefined> {
+    const rows = await db
       .select()
       .from(stockTakes)
-      .where(and(eq(stockTakes.tenantId, tenantId), eq(stockTakes.status, 'in_progress')))
-      .get();
+      .where(and(eq(stockTakes.tenantId, tenantId), eq(stockTakes.status, 'in_progress')));
+    return rows[0];
   },
 
-  insert(db: AppDb, row: StockTakeInsert): StockTakeRow {
-    return db.insert(stockTakes).values(row).returning().get();
+  async insert(db: AppDb, row: StockTakeInsert): Promise<StockTakeRow> {
+    const [inserted] = await db.insert(stockTakes).values(row).returning();
+    if (!inserted) throw new Error('stock take insert returned no row');
+    return inserted;
   },
 
-  update(
+  async update(
     db: AppDb,
     tenantId: number,
     id: string,
     patch: Partial<StockTakeInsert>,
-  ): StockTakeRow | undefined {
-    return db
+  ): Promise<StockTakeRow | undefined> {
+    const [updated] = await db
       .update(stockTakes)
       .set(patch)
       .where(and(eq(stockTakes.tenantId, tenantId), eq(stockTakes.id, id)))
-      .returning()
-      .get();
+      .returning();
+    return updated;
   },
 };

@@ -8,7 +8,11 @@ export type SupplierFilter = {
 };
 
 export const supplierRepository = {
-  list(db: AppDb, tenantId: number, filter: SupplierFilter = {}): SupplierRow[] {
+  async list(
+    db: AppDb,
+    tenantId: number,
+    filter: SupplierFilter = {},
+  ): Promise<SupplierRow[]> {
     const conditions = [eq(suppliers.tenantId, tenantId)];
     if (!filter.includeInactive) conditions.push(eq(suppliers.isActive, true));
     if (filter.search) {
@@ -18,49 +22,54 @@ export const supplierRepository = {
       .select()
       .from(suppliers)
       .where(and(...conditions))
-      .orderBy(asc(suppliers.name))
-      .all();
+      .orderBy(asc(suppliers.name));
   },
 
-  findById(db: AppDb, tenantId: number, id: string): SupplierRow | undefined {
-    return db
+  async findById(db: AppDb, tenantId: number, id: string): Promise<SupplierRow | undefined> {
+    const rows = await db
       .select()
       .from(suppliers)
-      .where(and(eq(suppliers.tenantId, tenantId), eq(suppliers.id, id)))
-      .get();
+      .where(and(eq(suppliers.tenantId, tenantId), eq(suppliers.id, id)));
+    return rows[0];
   },
 
-  findByName(db: AppDb, tenantId: number, name: string): SupplierRow | undefined {
-    return db
+  async findByName(db: AppDb, tenantId: number, name: string): Promise<SupplierRow | undefined> {
+    const rows = await db
       .select()
       .from(suppliers)
-      .where(and(eq(suppliers.tenantId, tenantId), eq(suppliers.name, name)))
-      .get();
+      .where(and(eq(suppliers.tenantId, tenantId), eq(suppliers.name, name)));
+    return rows[0];
   },
 
-  findByGstin(db: AppDb, tenantId: number, gstin: string): SupplierRow | undefined {
-    return db
+  async findByGstin(
+    db: AppDb,
+    tenantId: number,
+    gstin: string,
+  ): Promise<SupplierRow | undefined> {
+    const rows = await db
       .select()
       .from(suppliers)
-      .where(and(eq(suppliers.tenantId, tenantId), eq(suppliers.gstin, gstin)))
-      .get();
+      .where(and(eq(suppliers.tenantId, tenantId), eq(suppliers.gstin, gstin)));
+    return rows[0];
   },
 
-  insert(db: AppDb, row: SupplierInsert): SupplierRow {
-    return db.insert(suppliers).values(row).returning().get();
+  async insert(db: AppDb, row: SupplierInsert): Promise<SupplierRow> {
+    const [inserted] = await db.insert(suppliers).values(row).returning();
+    if (!inserted) throw new Error('supplier insert returned no row');
+    return inserted;
   },
 
-  update(
+  async update(
     db: AppDb,
     tenantId: number,
     id: string,
     patch: Partial<SupplierInsert>,
-  ): SupplierRow | undefined {
-    return db
+  ): Promise<SupplierRow | undefined> {
+    const [updated] = await db
       .update(suppliers)
       .set(patch)
       .where(and(eq(suppliers.tenantId, tenantId), eq(suppliers.id, id)))
-      .returning()
-      .get();
+      .returning();
+    return updated;
   },
 };

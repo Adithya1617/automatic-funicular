@@ -11,38 +11,43 @@ import type {
 import { ConflictError, NotFoundError } from '@shared/errors/DomainError';
 import { SYSTEM_USER_ID } from '@shared/constants/system';
 
-function toIngredient(row: ReturnType<typeof ingredientRepository.findById>): Ingredient {
+function toIngredient(
+  row: Awaited<ReturnType<typeof ingredientRepository.findById>>,
+): Ingredient {
   if (!row) throw new Error('toIngredient called with empty row');
   return row as unknown as Ingredient;
 }
 
 export const IngredientService = {
-  list(db: AppDb, tenantId: number, filter: ListIngredientsInput): Ingredient[] {
-    return ingredientRepository
-      .list(db, tenantId, filter)
-      .map((row) => row as unknown as Ingredient);
+  async list(
+    db: AppDb,
+    tenantId: number,
+    filter: ListIngredientsInput,
+  ): Promise<Ingredient[]> {
+    const rows = await ingredientRepository.list(db, tenantId, filter);
+    return rows.map((row) => row as unknown as Ingredient);
   },
 
-  get(db: AppDb, tenantId: number, id: string): Ingredient {
-    const row = ingredientRepository.findById(db, tenantId, id);
+  async get(db: AppDb, tenantId: number, id: string): Promise<Ingredient> {
+    const row = await ingredientRepository.findById(db, tenantId, id);
     if (!row) throw new NotFoundError('Ingredient', id);
     return toIngredient(row);
   },
 
-  create(
+  async create(
     db: AppDb,
     tenantId: number,
     input: CreateIngredientInput,
     actorId: string = SYSTEM_USER_ID,
-  ): Ingredient {
-    const existing = ingredientRepository.findByName(db, tenantId, input.name);
+  ): Promise<Ingredient> {
+    const existing = await ingredientRepository.findByName(db, tenantId, input.name);
     if (existing) {
       throw new ConflictError(`An ingredient named "${input.name}" already exists`, {
         name: 'duplicate',
       });
     }
     const now = Date.now();
-    const row = ingredientRepository.insert(db, {
+    const row = await ingredientRepository.insert(db, {
       id: newId(),
       tenantId,
       name: input.name,
@@ -63,17 +68,17 @@ export const IngredientService = {
     return toIngredient(row);
   },
 
-  update(
+  async update(
     db: AppDb,
     tenantId: number,
     input: UpdateIngredientInput,
     actorId: string = SYSTEM_USER_ID,
-  ): Ingredient {
-    const existing = ingredientRepository.findById(db, tenantId, input.id);
+  ): Promise<Ingredient> {
+    const existing = await ingredientRepository.findById(db, tenantId, input.id);
     if (!existing) throw new NotFoundError('Ingredient', input.id);
 
     if (input.name && input.name !== existing.name) {
-      const dup = ingredientRepository.findByName(db, tenantId, input.name);
+      const dup = await ingredientRepository.findByName(db, tenantId, input.name);
       if (dup && dup.id !== existing.id) {
         throw new ConflictError(`An ingredient named "${input.name}" already exists`, {
           name: 'duplicate',
@@ -90,7 +95,7 @@ export const IngredientService = {
     if (input.densityGPerMl !== undefined) patch['densityGPerMl'] = input.densityGPerMl;
     if (input.isActive !== undefined) patch['isActive'] = input.isActive;
 
-    const row = ingredientRepository.update(db, tenantId, input.id, patch);
+    const row = await ingredientRepository.update(db, tenantId, input.id, patch);
     if (!row) throw new NotFoundError('Ingredient', input.id);
     return toIngredient(row);
   },
@@ -101,15 +106,15 @@ export const IngredientService = {
    * we permit deactivation always, but we forbid actual deletion here
    * because the spec calls it out.
    */
-  deactivate(
+  async deactivate(
     db: AppDb,
     tenantId: number,
     id: string,
     actorId: string = SYSTEM_USER_ID,
-  ): Ingredient {
-    const existing = ingredientRepository.findById(db, tenantId, id);
+  ): Promise<Ingredient> {
+    const existing = await ingredientRepository.findById(db, tenantId, id);
     if (!existing) throw new NotFoundError('Ingredient', id);
-    const row = ingredientRepository.update(db, tenantId, id, {
+    const row = await ingredientRepository.update(db, tenantId, id, {
       isActive: false,
       updatedAt: Date.now(),
       updatedBy: actorId,
@@ -118,9 +123,11 @@ export const IngredientService = {
     return toIngredient(row);
   },
 
-  hasMovements(db: AppDb, tenantId: number, id: string): boolean {
-    return (
-      stockMovementRepository.list(db, tenantId, { ingredientId: id, limit: 1 }).length > 0
-    );
+  async hasMovements(db: AppDb, tenantId: number, id: string): Promise<boolean> {
+    const rows = await stockMovementRepository.list(db, tenantId, {
+      ingredientId: id,
+      limit: 1,
+    });
+    return rows.length > 0;
   },
 };

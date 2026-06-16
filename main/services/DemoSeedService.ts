@@ -57,15 +57,15 @@ type BikeSeed = {
   bikeTypeName: string;
   engineCc: number;
   licensePlate: string;
-  odometerKm: number;
+  odometerKm: number | null;
 };
 
-// 34 bikes — plates from the real fleet, numbered 1..34 for friendly UI labels.
+// 37 bikes — plates from the real fleet, numbered 1..37 for friendly UI labels.
 const BIKE_SEEDS: BikeSeed[] = [
   ...['TS08UL8345', 'TG08X0007', 'TG08T0480', 'TG08X0004', 'TG08T0483', 'TG08X0013', 'TS08UL8347']
     .map<BikeSeed>((plate, i) => ({
       bikeNumber: String(i + 1),
-      bikeTypeName: 'Activa',
+      bikeTypeName: 'Jupiter',
       engineCc: 110,
       licensePlate: plate,
       odometerKm: 4_500 + i * 700,
@@ -97,6 +97,9 @@ const BIKE_SEEDS: BikeSeed[] = [
       licensePlate: plate,
       odometerKm: 4_800 + i * 900,
     })),
+  { bikeNumber: '35', bikeTypeName: 'Jupiter', engineCc: 110, licensePlate: 'TG08AA5639', odometerKm: 162_280 },
+  { bikeNumber: '36', bikeTypeName: 'Raider', engineCc: 125, licensePlate: 'TG08T1700', odometerKm: null },
+  { bikeNumber: '37', bikeTypeName: 'Ntorq', engineCc: 125, licensePlate: 'TG08T5247', odometerKm: null },
 ];
 
 // Purchase batches — stocked 20 days ago so the weighted-avg cost is well-defined
@@ -204,28 +207,28 @@ export type DemoSeedSummary = {
  * never create bike types here (those are migration-seeded baseline data).
  * Shared by the full demo `run()` and the bikes-only `seedBikes()`.
  */
-function insertFleetBikes(
+async function insertFleetBikes(
   db: AppDb,
   tenantId: number,
   actorId: string,
   now: number,
-): { created: number; skippedNoType: number } {
+): Promise<{ created: number; skippedNoType: number }> {
   const bikeTypeKey = (cc: number, name: string) => `${cc}::${name.toLowerCase()}`;
   const bikeTypeByKey = new Map<string, BikeTypeRow>();
-  for (const t of bikeTypeRepository.list(db, tenantId, { includeInactive: true })) {
+  for (const t of await bikeTypeRepository.list(db, tenantId, { includeInactive: true })) {
     bikeTypeByKey.set(bikeTypeKey(t.engineCc, t.name), t);
   }
 
   let created = 0;
   let skippedNoType = 0;
   for (const seed of BIKE_SEEDS) {
-    if (bikeRepository.findByBikeNumber(db, tenantId, seed.bikeNumber)) continue;
+    if (await bikeRepository.findByBikeNumber(db, tenantId, seed.bikeNumber)) continue;
     const bikeType = bikeTypeByKey.get(bikeTypeKey(seed.engineCc, seed.bikeTypeName));
     if (!bikeType) {
       skippedNoType += 1;
       continue;
     }
-    bikeRepository.insert(db, {
+    await bikeRepository.insert(db, {
       id: newId(),
       tenantId,
       bikeNumber: seed.bikeNumber,
@@ -253,11 +256,11 @@ export const DemoSeedService = {
    * TARGET_STOCK. Click the button as many times as you like — depleted parts
    * get topped back up, missing services get back-filled.
    */
-  run(
+  async run(
     db: AppDb,
     tenantId: number,
     actorId: string = SYSTEM_USER_ID,
-  ): DemoSeedSummary {
+  ): Promise<DemoSeedSummary> {
     const now = Date.now();
     let suppliersCreated = 0;
     let bikesCreated = 0;
@@ -267,9 +270,9 @@ export const DemoSeedService = {
 
     // --- Suppliers (idempotent by name) ----------------------------------
     for (const seed of SUPPLIER_SEEDS) {
-      const existing = supplierRepository.findByName(db, tenantId, seed.name);
+      const existing = await supplierRepository.findByName(db, tenantId, seed.name);
       if (existing) continue;
-      supplierRepository.insert(db, {
+      await supplierRepository.insert(db, {
         id: newId(),
         tenantId,
         name: seed.name,
@@ -285,25 +288,25 @@ export const DemoSeedService = {
     }
 
     // --- Bikes (idempotent by bike_number) -------------------------------
-    bikesCreated += insertFleetBikes(db, tenantId, actorId, now).created;
+    bikesCreated += (await insertFleetBikes(db, tenantId, actorId, now)).created;
 
     // --- Historic stock purchases (first run only) -----------------------
     // Skip if the install already has any purchase movements — we don't want
     // to spam duplicate purchase rows on every reseed click. Top-up below
     // handles the case where stock has been depleted since.
-    const existingPurchases = stockMovementRepository.list(db, tenantId, {
+    const existingPurchases = await stockMovementRepository.list(db, tenantId, {
       reason: 'purchase',
       limit: 1,
     });
     const partsByName = new Map<string, IngredientRow>();
-    for (const p of ingredientRepository.list(db, tenantId, { includeInactive: true })) {
+    for (const p of await ingredientRepository.list(db, tenantId, { includeInactive: true })) {
       partsByName.set(p.name.toLowerCase(), p);
     }
     if (existingPurchases.length === 0) {
       for (const purchase of PURCHASE_SEEDS) {
         const part = partsByName.get(purchase.partName.toLowerCase());
         if (!part) continue;
-        InventoryService.applyMovement(
+        await InventoryService.applyMovement(
           db,
           tenantId,
           {
@@ -325,17 +328,17 @@ export const DemoSeedService = {
 
     // Refresh part snapshots — applyMovement updated stock + avg cost.
     const refreshedParts = new Map<string, IngredientRow>();
-    for (const p of ingredientRepository.list(db, tenantId, { includeInactive: true })) {
+    for (const p of await ingredientRepository.list(db, tenantId, { includeInactive: true })) {
       refreshedParts.set(p.name.toLowerCase(), p);
     }
 
     // --- Service events --------------------------------------------------
     // Back-fill up to TARGET_SERVICE_EVENTS — never grow beyond that on
     // reseeds, so the demo timeline stays bounded.
-    const activeBikes = bikeRepository.list(db, tenantId, { includeInactive: false });
-    const existingEventsCount = serviceEventRepository.list(db, tenantId, {
-      limit: 500,
-    }).length;
+    const activeBikes = await bikeRepository.list(db, tenantId, { includeInactive: false });
+    const existingEventsCount = (
+      await serviceEventRepository.list(db, tenantId, { limit: 500 })
+    ).length;
     const toAdd = Math.max(0, TARGET_SERVICE_EVENTS - existingEventsCount);
     if (toAdd > 0 && activeBikes.length > 0) {
       // Spread the new events across the last 60 days, starting from the
@@ -355,7 +358,7 @@ export const DemoSeedService = {
         if (usableLines.length === 0) continue;
 
         try {
-          seedServiceEvent(
+          await seedServiceEvent(
             db,
             tenantId,
             actorId,
@@ -391,7 +394,7 @@ export const DemoSeedService = {
       if (!part) continue;
       const deficit = target.target - part.stockQuantity;
       if (deficit <= 0) continue;
-      InventoryService.applyMovement(
+      await InventoryService.applyMovement(
         db,
         tenantId,
         {
@@ -434,13 +437,14 @@ export const DemoSeedService = {
    * parts to zero stock and zero avg cost. Bike types, tenants, and the
    * parts rows themselves stay (they're baseline data).
    */
-  reset(db: AppDb, tenantId: number): { tablesCleared: number } {
+  async reset(db: AppDb, tenantId: number): Promise<{ tablesCleared: number }> {
     let cleared = 0;
-    db.transaction((tx) => {
+    await db.transaction(async (tx) => {
       // Child rows first so FKs don't block the parent deletes. service_event_lines
       // and invoice_lines have no tenant_id of their own; their parents do, so
       // we filter on the parent's tenancy where needed.
-      tx.delete(serviceEventLines)
+      await tx
+        .delete(serviceEventLines)
         .where(
           inArray(
             serviceEventLines.serviceEventId,
@@ -449,12 +453,12 @@ export const DemoSeedService = {
               .from(serviceEvents)
               .where(eq(serviceEvents.tenantId, tenantId)),
           ),
-        )
-        .run();
+        );
       cleared += 1;
-      tx.delete(serviceEvents).where(eq(serviceEvents.tenantId, tenantId)).run();
+      await tx.delete(serviceEvents).where(eq(serviceEvents.tenantId, tenantId));
       cleared += 1;
-      tx.delete(invoiceLines)
+      await tx
+        .delete(invoiceLines)
         .where(
           inArray(
             invoiceLines.invoiceId,
@@ -463,12 +467,12 @@ export const DemoSeedService = {
               .from(invoices)
               .where(eq(invoices.tenantId, tenantId)),
           ),
-        )
-        .run();
+        );
       cleared += 1;
-      tx.delete(invoices).where(eq(invoices.tenantId, tenantId)).run();
+      await tx.delete(invoices).where(eq(invoices.tenantId, tenantId));
       cleared += 1;
-      tx.delete(stockTakeLines)
+      await tx
+        .delete(stockTakeLines)
         .where(
           inArray(
             stockTakeLines.stockTakeId,
@@ -477,12 +481,12 @@ export const DemoSeedService = {
               .from(stockTakes)
               .where(eq(stockTakes.tenantId, tenantId)),
           ),
-        )
-        .run();
+        );
       cleared += 1;
-      tx.delete(stockTakes).where(eq(stockTakes.tenantId, tenantId)).run();
+      await tx.delete(stockTakes).where(eq(stockTakes.tenantId, tenantId));
       cleared += 1;
-      tx.delete(recipeIngredients)
+      await tx
+        .delete(recipeIngredients)
         .where(
           inArray(
             recipeIngredients.recipeVersionId,
@@ -491,30 +495,29 @@ export const DemoSeedService = {
               .from(recipeVersions)
               .where(eq(recipeVersions.tenantId, tenantId)),
           ),
-        )
-        .run();
+        );
       cleared += 1;
-      tx.delete(recipeVersions).where(eq(recipeVersions.tenantId, tenantId)).run();
+      await tx.delete(recipeVersions).where(eq(recipeVersions.tenantId, tenantId));
       cleared += 1;
-      tx.delete(serviceTemplates).where(eq(serviceTemplates.tenantId, tenantId)).run();
+      await tx.delete(serviceTemplates).where(eq(serviceTemplates.tenantId, tenantId));
       cleared += 1;
-      tx.delete(stockMovements).where(eq(stockMovements.tenantId, tenantId)).run();
+      await tx.delete(stockMovements).where(eq(stockMovements.tenantId, tenantId));
       cleared += 1;
-      tx.delete(bikes).where(eq(bikes.tenantId, tenantId)).run();
+      await tx.delete(bikes).where(eq(bikes.tenantId, tenantId));
       cleared += 1;
-      tx.delete(suppliers).where(eq(suppliers.tenantId, tenantId)).run();
+      await tx.delete(suppliers).where(eq(suppliers.tenantId, tenantId));
       cleared += 1;
       // Reset the seeded parts catalog back to zero stock + zero avg cost.
       const now = Date.now();
-      tx.update(ingredients)
+      await tx
+        .update(ingredients)
         .set({
           stockQuantity: 0,
           reservedQuantity: 0,
           currentAvgCostPerUnit: 0,
           updatedAt: now,
         })
-        .where(eq(ingredients.tenantId, tenantId))
-        .run();
+        .where(eq(ingredients.tenantId, tenantId));
     });
     return { tablesCleared: cleared };
   },
@@ -525,17 +528,17 @@ export const DemoSeedService = {
    * the Bikes section can be repopulated while the rest of the data stays a
    * clean slate. `skippedNoType` counts seeds whose bike type isn't present.
    */
-  seedBikes(
+  async seedBikes(
     db: AppDb,
     tenantId: number,
     actorId: string = SYSTEM_USER_ID,
-  ): { bikesCreated: number; skippedNoType: number } {
-    const { created, skippedNoType } = insertFleetBikes(db, tenantId, actorId, Date.now());
+  ): Promise<{ bikesCreated: number; skippedNoType: number }> {
+    const { created, skippedNoType } = await insertFleetBikes(db, tenantId, actorId, Date.now());
     return { bikesCreated: created, skippedNoType };
   },
 };
 
-function seedServiceEvent(
+async function seedServiceEvent(
   db: AppDb,
   tenantId: number,
   actorId: string,
@@ -543,9 +546,9 @@ function seedServiceEvent(
   occurredAt: number,
   label: string,
   lines: Array<{ ingredientId: string; quantity: number; unit: 'g' | 'ml' | 'each' }>,
-): void {
-  db.transaction((tx) => {
-    const event = serviceEventRepository.insert(tx, {
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    const event = await serviceEventRepository.insert(tx, {
       id: newId(),
       tenantId,
       bikeId,
@@ -564,7 +567,7 @@ function seedServiceEvent(
       updatedBy: actorId,
     });
 
-    const inserted = serviceEventLineRepository.insertMany(
+    const inserted = await serviceEventLineRepository.insertMany(
       tx,
       lines.map((l, idx) => ({
         id: newId(),
@@ -578,7 +581,7 @@ function seedServiceEvent(
     );
 
     for (const line of inserted) {
-      InventoryService.applyMovement(
+      await InventoryService.applyMovement(
         tx,
         tenantId,
         {

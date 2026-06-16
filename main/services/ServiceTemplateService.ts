@@ -12,39 +12,38 @@ import { ConflictError, NotFoundError } from '@shared/errors/DomainError';
 import { SYSTEM_USER_ID } from '@shared/constants/system';
 
 function toTemplate(
-  row: ReturnType<typeof serviceTemplateRepository.findById>,
+  row: Awaited<ReturnType<typeof serviceTemplateRepository.findById>>,
 ): ServiceTemplate {
   if (!row) throw new Error('toTemplate called with empty row');
   return row as unknown as ServiceTemplate;
 }
 
 export const ServiceTemplateService = {
-  list(
+  async list(
     db: AppDb,
     tenantId: number,
     filter: ListServiceTemplatesInput,
-  ): ServiceTemplate[] {
-    return serviceTemplateRepository
-      .list(db, tenantId, filter)
-      .map((row) => row as unknown as ServiceTemplate);
+  ): Promise<ServiceTemplate[]> {
+    const rows = await serviceTemplateRepository.list(db, tenantId, filter);
+    return rows.map((row) => row as unknown as ServiceTemplate);
   },
 
-  get(db: AppDb, tenantId: number, id: string): ServiceTemplate {
-    const row = serviceTemplateRepository.findById(db, tenantId, id);
+  async get(db: AppDb, tenantId: number, id: string): Promise<ServiceTemplate> {
+    const row = await serviceTemplateRepository.findById(db, tenantId, id);
     if (!row) throw new NotFoundError('ServiceTemplate', id);
     return toTemplate(row);
   },
 
-  create(
+  async create(
     db: AppDb,
     tenantId: number,
     input: CreateServiceTemplateInput,
     actorId: string = SYSTEM_USER_ID,
-  ): ServiceTemplate {
-    const bikeType = bikeTypeRepository.findById(db, tenantId, input.bikeTypeId);
+  ): Promise<ServiceTemplate> {
+    const bikeType = await bikeTypeRepository.findById(db, tenantId, input.bikeTypeId);
     if (!bikeType) throw new NotFoundError('BikeType', input.bikeTypeId);
 
-    const dup = serviceTemplateRepository.findByNameAndType(
+    const dup = await serviceTemplateRepository.findByNameAndType(
       db,
       tenantId,
       input.name,
@@ -58,7 +57,7 @@ export const ServiceTemplateService = {
     }
 
     const now = Date.now();
-    const row = serviceTemplateRepository.insert(db, {
+    const row = await serviceTemplateRepository.insert(db, {
       id: newId(),
       tenantId,
       name: input.name,
@@ -73,17 +72,17 @@ export const ServiceTemplateService = {
     return toTemplate(row);
   },
 
-  update(
+  async update(
     db: AppDb,
     tenantId: number,
     input: UpdateServiceTemplateInput,
     actorId: string = SYSTEM_USER_ID,
-  ): ServiceTemplate {
-    const existing = serviceTemplateRepository.findById(db, tenantId, input.id);
+  ): Promise<ServiceTemplate> {
+    const existing = await serviceTemplateRepository.findById(db, tenantId, input.id);
     if (!existing) throw new NotFoundError('ServiceTemplate', input.id);
 
     if (input.bikeTypeId && input.bikeTypeId !== existing.bikeTypeId) {
-      const bikeType = bikeTypeRepository.findById(db, tenantId, input.bikeTypeId);
+      const bikeType = await bikeTypeRepository.findById(db, tenantId, input.bikeTypeId);
       if (!bikeType) throw new NotFoundError('BikeType', input.bikeTypeId);
     }
 
@@ -93,7 +92,7 @@ export const ServiceTemplateService = {
       (input.name && input.name !== existing.name) ||
       (input.bikeTypeId && input.bikeTypeId !== existing.bikeTypeId)
     ) {
-      const dup = serviceTemplateRepository.findByNameAndType(
+      const dup = await serviceTemplateRepository.findByNameAndType(
         db,
         tenantId,
         nextName,
@@ -116,20 +115,20 @@ export const ServiceTemplateService = {
     if (input.displayOrder !== undefined) patch['displayOrder'] = input.displayOrder;
     if (input.isActive !== undefined) patch['isActive'] = input.isActive;
 
-    const row = serviceTemplateRepository.update(db, tenantId, input.id, patch);
+    const row = await serviceTemplateRepository.update(db, tenantId, input.id, patch);
     if (!row) throw new NotFoundError('ServiceTemplate', input.id);
     return toTemplate(row);
   },
 
-  deactivate(
+  async deactivate(
     db: AppDb,
     tenantId: number,
     id: string,
     actorId: string = SYSTEM_USER_ID,
-  ): ServiceTemplate {
-    const existing = serviceTemplateRepository.findById(db, tenantId, id);
+  ): Promise<ServiceTemplate> {
+    const existing = await serviceTemplateRepository.findById(db, tenantId, id);
     if (!existing) throw new NotFoundError('ServiceTemplate', id);
-    const row = serviceTemplateRepository.update(db, tenantId, id, {
+    const row = await serviceTemplateRepository.update(db, tenantId, id, {
       isActive: false,
       updatedAt: Date.now(),
       updatedBy: actorId,

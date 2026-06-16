@@ -17,8 +17,8 @@ type ParentSelector = {
 };
 
 export const recipeRepository = {
-  findActiveVersion(db: AppDb, sel: ParentSelector): RecipeVersionRow | undefined {
-    return db
+  async findActiveVersion(db: AppDb, sel: ParentSelector): Promise<RecipeVersionRow | undefined> {
+    const rows = await db
       .select()
       .from(recipeVersions)
       .where(
@@ -28,19 +28,23 @@ export const recipeRepository = {
           eq(recipeVersions.parentType, sel.parentType),
           eq(recipeVersions.isCurrent, true),
         ),
-      )
-      .get();
+      );
+    return rows[0];
   },
 
-  findVersionById(db: AppDb, tenantId: number, id: string): RecipeVersionRow | undefined {
-    return db
+  async findVersionById(
+    db: AppDb,
+    tenantId: number,
+    id: string,
+  ): Promise<RecipeVersionRow | undefined> {
+    const rows = await db
       .select()
       .from(recipeVersions)
-      .where(and(eq(recipeVersions.tenantId, tenantId), eq(recipeVersions.id, id)))
-      .get();
+      .where(and(eq(recipeVersions.tenantId, tenantId), eq(recipeVersions.id, id)));
+    return rows[0];
   },
 
-  listVersions(db: AppDb, sel: ParentSelector): RecipeVersionRow[] {
+  async listVersions(db: AppDb, sel: ParentSelector): Promise<RecipeVersionRow[]> {
     return db
       .select()
       .from(recipeVersions)
@@ -51,12 +55,11 @@ export const recipeRepository = {
           eq(recipeVersions.parentType, sel.parentType),
         ),
       )
-      .orderBy(desc(recipeVersions.versionNumber))
-      .all();
+      .orderBy(desc(recipeVersions.versionNumber));
   },
 
-  nextVersionNumber(db: AppDb, sel: ParentSelector): number {
-    const result = db
+  async nextVersionNumber(db: AppDb, sel: ParentSelector): Promise<number> {
+    const rows = await db
       .select({ value: max(recipeVersions.versionNumber) })
       .from(recipeVersions)
       .where(
@@ -65,25 +68,27 @@ export const recipeRepository = {
           eq(recipeVersions.parentId, sel.parentId),
           eq(recipeVersions.parentType, sel.parentType),
         ),
-      )
-      .get();
-    return (result?.value ?? 0) + 1;
+      );
+    return (rows[0]?.value ?? 0) + 1;
   },
 
-  insertVersion(db: AppDb, row: RecipeVersionInsert): RecipeVersionRow {
-    return db.insert(recipeVersions).values(row).returning().get();
+  async insertVersion(db: AppDb, row: RecipeVersionInsert): Promise<RecipeVersionRow> {
+    const [inserted] = await db.insert(recipeVersions).values(row).returning();
+    if (!inserted) throw new Error('recipe version insert returned no row');
+    return inserted;
   },
 
-  insertIngredients(
+  async insertIngredients(
     db: AppDb,
     rows: RecipeIngredientInsert[],
-  ): RecipeIngredientRow[] {
+  ): Promise<RecipeIngredientRow[]> {
     if (rows.length === 0) return [];
-    return db.insert(recipeIngredients).values(rows).returning().all();
+    return db.insert(recipeIngredients).values(rows).returning();
   },
 
-  clearCurrentFlag(db: AppDb, sel: ParentSelector): void {
-    db.update(recipeVersions)
+  async clearCurrentFlag(db: AppDb, sel: ParentSelector): Promise<void> {
+    await db
+      .update(recipeVersions)
       .set({ isCurrent: false })
       .where(
         and(
@@ -92,25 +97,25 @@ export const recipeRepository = {
           eq(recipeVersions.parentType, sel.parentType),
           eq(recipeVersions.isCurrent, true),
         ),
-      )
-      .run();
+      );
   },
 
-  ingredientsForVersion(db: AppDb, versionId: string): RecipeIngredientRow[] {
+  async ingredientsForVersion(db: AppDb, versionId: string): Promise<RecipeIngredientRow[]> {
     return db
       .select()
       .from(recipeIngredients)
       .where(eq(recipeIngredients.recipeVersionId, versionId))
-      .orderBy(asc(recipeIngredients.displayOrder), asc(recipeIngredients.id))
-      .all();
+      .orderBy(asc(recipeIngredients.displayOrder), asc(recipeIngredients.id));
   },
 
-  ingredientsForVersions(db: AppDb, versionIds: string[]): RecipeIngredientRow[] {
+  async ingredientsForVersions(
+    db: AppDb,
+    versionIds: string[],
+  ): Promise<RecipeIngredientRow[]> {
     if (versionIds.length === 0) return [];
     return db
       .select()
       .from(recipeIngredients)
-      .where(inArray(recipeIngredients.recipeVersionId, versionIds))
-      .all();
+      .where(inArray(recipeIngredients.recipeVersionId, versionIds));
   },
 };

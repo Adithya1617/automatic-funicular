@@ -33,34 +33,33 @@ export type BoMNode = {
 };
 
 export const RecipeService = {
-  getActive(
+  async getActive(
     db: AppDb,
     tenantId: number,
     parentId: string,
     parentType: RecipeParentType,
-  ): RecipeWithIngredients | null {
-    const version = recipeRepository.findActiveVersion(db, {
+  ): Promise<RecipeWithIngredients | null> {
+    const version = await recipeRepository.findActiveVersion(db, {
       tenantId,
       parentId,
       parentType,
     });
     if (!version) return null;
-    const ings = recipeRepository.ingredientsForVersion(db, version.id);
+    const ings = await recipeRepository.ingredientsForVersion(db, version.id);
     return {
       ...(version as RecipeVersion),
       ingredients: ings as unknown as RecipeIngredient[],
     };
   },
 
-  listVersions(
+  async listVersions(
     db: AppDb,
     tenantId: number,
     parentId: string,
     parentType: RecipeParentType,
-  ): RecipeVersion[] {
-    return recipeRepository
-      .listVersions(db, { tenantId, parentId, parentType })
-      .map((v) => v as unknown as RecipeVersion);
+  ): Promise<RecipeVersion[]> {
+    const versions = await recipeRepository.listVersions(db, { tenantId, parentId, parentType });
+    return versions.map((v) => v as unknown as RecipeVersion);
   },
 
   /**
@@ -68,23 +67,23 @@ export const RecipeService = {
    * old rows stay frozen). Wraps the flip-current + insert-version +
    * insert-ingredients in a single transaction.
    */
-  saveVersion(
+  async saveVersion(
     db: AppDb,
     tenantId: number,
     input: SaveRecipeVersionInput,
     actorId: string = SYSTEM_USER_ID,
-  ): RecipeWithIngredients {
+  ): Promise<RecipeWithIngredients> {
     let parentName: string;
     if (input.parentType === 'menu_item') {
-      const menuItem = menuItemRepository.findById(db, tenantId, input.parentId);
+      const menuItem = await menuItemRepository.findById(db, tenantId, input.parentId);
       if (!menuItem) throw new NotFoundError('MenuItem', input.parentId);
       parentName = menuItem.name;
     } else if (input.parentType === 'service_template') {
-      const template = serviceTemplateRepository.findById(db, tenantId, input.parentId);
+      const template = await serviceTemplateRepository.findById(db, tenantId, input.parentId);
       if (!template) throw new NotFoundError('ServiceTemplate', input.parentId);
       parentName = template.name;
     } else {
-      const ingredient = ingredientRepository.findById(db, tenantId, input.parentId);
+      const ingredient = await ingredientRepository.findById(db, tenantId, input.parentId);
       if (!ingredient) throw new NotFoundError('Ingredient', input.parentId);
       if (ingredient.type !== 'prepared') {
         throw new ValidationError(
@@ -109,37 +108,38 @@ export const RecipeService = {
     }
 
     // Resolve children, validate units convert to each child's base unit.
-    const children = input.rows.map((row) => {
-      const child = ingredientRepository.findById(db, tenantId, row.childIngredientId);
+    const childIds: string[] = [];
+    for (const row of input.rows) {
+      const child = await ingredientRepository.findById(db, tenantId, row.childIngredientId);
       if (!child) throw new NotFoundError('Ingredient', row.childIngredientId);
       // Throws ValidationError if the unit can't be converted.
       toBase(row.quantity, row.unit, child.baseUnit, {
         densityGPerMl: child.densityGPerMl ?? undefined,
       });
-      return child;
-    });
+      childIds.push(child.id);
+    }
 
     // Cycle detection only applies when the parent is itself an ingredient —
     // a menu item can't appear as a child of any recipe, so cycles can't form.
     if (input.parentType === 'ingredient') {
-      detectCycle(db, tenantId, input.parentId, children.map((c) => c.id));
+      await detectCycle(db, tenantId, input.parentId, childIds);
     }
 
-    const result = db.transaction((tx) => {
-      recipeRepository.clearCurrentFlag(tx, {
+    const result = await db.transaction(async (tx) => {
+      await recipeRepository.clearCurrentFlag(tx, {
         tenantId,
         parentId: input.parentId,
         parentType: input.parentType,
       });
 
-      const versionNumber = recipeRepository.nextVersionNumber(tx, {
+      const versionNumber = await recipeRepository.nextVersionNumber(tx, {
         tenantId,
         parentId: input.parentId,
         parentType: input.parentType,
       });
 
       const now = Date.now();
-      const versionRow = recipeRepository.insertVersion(tx, {
+      const versionRow = await recipeRepository.insertVersion(tx, {
         id: newId(),
         tenantId,
         parentId: input.parentId,
@@ -152,7 +152,7 @@ export const RecipeService = {
         createdBy: actorId,
       });
 
-      const ingredientRows = recipeRepository.insertIngredients(
+      const ingredientRows = await recipeRepository.insertIngredients(
         tx,
         input.rows.map((row, idx) => ({
           id: newId(),
@@ -174,14 +174,14 @@ export const RecipeService = {
     // Recipe edits change menu availability. Trigger after the tx commits so
     // reads inside the recompute see the new rows.
     if (input.parentType === 'menu_item') {
-      AvailabilityService.recomputeForMenuItem(db, tenantId, input.parentId);
+      await AvailabilityService.recomputeForMenuItem(db, tenantId, input.parentId);
     } else if (input.parentType === 'ingredient') {
       // Editing a prepared ingredient's recipe affects every menu using it
       // (the recipe rows changed but stock didn't — still need to refresh
       // the cache because the ingredient's "qty per serving" path is now
       // different in some menus' food cost calc later. Keep it simple:
       // recompute menus that depend on this prepared ingredient.)
-      AvailabilityService.recomputeForIngredients(db, tenantId, [input.parentId]);
+      await AvailabilityService.recomputeForIngredients(db, tenantId, [input.parentId]);
     }
     // service_template: no availability cache to bust — service events compute
     // feasibility on demand from the active template.
@@ -194,29 +194,29 @@ export const RecipeService = {
    * Children are expanded recursively only for `prepared` ingredients,
    * up to MAX_BOM_DEPTH.
    */
-  walkBoM(
+  async walkBoM(
     db: AppDb,
     tenantId: number,
     parentId: string,
     parentType: RecipeParentType,
     maxDepth: number = MAX_BOM_DEPTH,
-  ): BoMNode[] {
-    const recipe = RecipeService.getActive(db, tenantId, parentId, parentType);
+  ): Promise<BoMNode[]> {
+    const recipe = await RecipeService.getActive(db, tenantId, parentId, parentType);
     if (!recipe) return [];
     return walkChildren(db, tenantId, recipe.ingredients, maxDepth, new Set([parentId]));
   },
 };
 
-function walkChildren(
+async function walkChildren(
   db: AppDb,
   tenantId: number,
   rows: RecipeIngredient[],
   remainingDepth: number,
   visited: Set<string>,
-): BoMNode[] {
+): Promise<BoMNode[]> {
   const out: BoMNode[] = [];
   for (const row of rows) {
-    const child = ingredientRepository.findById(db, tenantId, row.childIngredientId);
+    const child = await ingredientRepository.findById(db, tenantId, row.childIngredientId);
     if (!child) continue;
     const node: BoMNode = {
       ingredientId: child.id,
@@ -227,14 +227,14 @@ function walkChildren(
       children: [],
     };
     if (child.type === 'prepared' && remainingDepth > 1 && !visited.has(child.id)) {
-      const childRecipe = recipeRepository.findActiveVersion(db, {
+      const childRecipe = await recipeRepository.findActiveVersion(db, {
         tenantId,
         parentId: child.id,
         parentType: 'ingredient',
       });
       if (childRecipe) {
-        const childRows = recipeRepository.ingredientsForVersion(db, childRecipe.id);
-        node.children = walkChildren(
+        const childRows = await recipeRepository.ingredientsForVersion(db, childRecipe.id);
+        node.children = await walkChildren(
           db,
           tenantId,
           childRows as unknown as RecipeIngredient[],
@@ -253,12 +253,12 @@ function walkChildren(
  * descendant references `parentId`, raise `ConflictError` describing the cycle.
  * Also enforces MAX_BOM_DEPTH.
  */
-function detectCycle(
+async function detectCycle(
   db: AppDb,
   tenantId: number,
   parentId: string,
   immediateChildIds: string[],
-): void {
+): Promise<void> {
   type Frame = { id: string; depth: number; chain: string[] };
   const visited = new Set<string>();
   const stack: Frame[] = immediateChildIds.map((id) => ({
@@ -277,17 +277,17 @@ function detectCycle(
     if (visited.has(frame.id)) continue;
     visited.add(frame.id);
 
-    const child = ingredientRepository.findById(db, tenantId, frame.id);
+    const child = await ingredientRepository.findById(db, tenantId, frame.id);
     if (!child || child.type !== 'prepared') continue;
 
-    const recipe = recipeRepository.findActiveVersion(db, {
+    const recipe = await recipeRepository.findActiveVersion(db, {
       tenantId,
       parentId: child.id,
       parentType: 'ingredient',
     });
     if (!recipe) continue;
 
-    const grandchildren = recipeRepository.ingredientsForVersion(db, recipe.id);
+    const grandchildren = await recipeRepository.ingredientsForVersion(db, recipe.id);
     for (const gc of grandchildren) {
       if (gc.childIngredientId === parentId) {
         throw new ConflictError(

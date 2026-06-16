@@ -7,58 +7,59 @@ import {
 } from '../db/schema';
 
 export const serviceEventLineRepository = {
-  listForEvent(db: AppDb, serviceEventId: string): ServiceEventLineRow[] {
+  async listForEvent(db: AppDb, serviceEventId: string): Promise<ServiceEventLineRow[]> {
     return db
       .select()
       .from(serviceEventLines)
       .where(eq(serviceEventLines.serviceEventId, serviceEventId))
-      .orderBy(asc(serviceEventLines.displayOrder), asc(serviceEventLines.id))
-      .all();
+      .orderBy(asc(serviceEventLines.displayOrder), asc(serviceEventLines.id));
   },
 
   /** Used by H6 dashboard tiles that aggregate per-event line totals. */
-  listForEvents(db: AppDb, serviceEventIds: string[]): ServiceEventLineRow[] {
+  async listForEvents(
+    db: AppDb,
+    serviceEventIds: string[],
+  ): Promise<ServiceEventLineRow[]> {
     if (serviceEventIds.length === 0) return [];
     return db
       .select()
       .from(serviceEventLines)
-      .where(inArray(serviceEventLines.serviceEventId, serviceEventIds))
-      .all();
+      .where(inArray(serviceEventLines.serviceEventId, serviceEventIds));
   },
 
-  insertMany(
+  async insertMany(
     db: AppDb,
     rows: ServiceEventLineInsert[],
-  ): ServiceEventLineRow[] {
+  ): Promise<ServiceEventLineRow[]> {
     if (rows.length === 0) return [];
-    return db.insert(serviceEventLines).values(rows).returning().all();
+    return db.insert(serviceEventLines).values(rows).returning();
   },
 
   /** Replace all lines for an event — used by updateLines while in_progress. */
-  replaceLines(
+  async replaceLines(
     db: AppDb,
     serviceEventId: string,
     rows: ServiceEventLineInsert[],
-  ): ServiceEventLineRow[] {
-    db.delete(serviceEventLines)
-      .where(eq(serviceEventLines.serviceEventId, serviceEventId))
-      .run();
+  ): Promise<ServiceEventLineRow[]> {
+    await db
+      .delete(serviceEventLines)
+      .where(eq(serviceEventLines.serviceEventId, serviceEventId));
     if (rows.length === 0) return [];
-    return db.insert(serviceEventLines).values(rows).returning().all();
+    return db.insert(serviceEventLines).values(rows).returning();
   },
 
   // Kept for symmetry with orderLineRepository — useful if a single-line patch
   // is ever needed without rewriting the full set.
-  updateOne(
+  async updateOne(
     db: AppDb,
     id: string,
     patch: Partial<ServiceEventLineInsert>,
-  ): ServiceEventLineRow | undefined {
-    return db
+  ): Promise<ServiceEventLineRow | undefined> {
+    const [updated] = await db
       .update(serviceEventLines)
       .set(patch)
       .where(and(eq(serviceEventLines.id, id)))
-      .returning()
-      .get();
+      .returning();
+    return updated;
   },
 };

@@ -19,11 +19,11 @@ export type ServiceEventFilter = {
 };
 
 export const serviceEventRepository = {
-  list(
+  async list(
     db: AppDb,
     tenantId: number,
     filter: ServiceEventFilter = {},
-  ): ServiceEventRow[] {
+  ): Promise<ServiceEventRow[]> {
     const conditions: SQL[] = [eq(serviceEvents.tenantId, tenantId)];
     if (filter.status) conditions.push(eq(serviceEvents.status, filter.status));
     if (filter.kind) conditions.push(eq(serviceEvents.kind, filter.kind));
@@ -35,54 +35,51 @@ export const serviceEventRepository = {
       .from(serviceEvents)
       .where(and(...conditions))
       .orderBy(desc(serviceEvents.startedAt))
-      .limit(Math.max(1, Math.min(500, filter.limit ?? 200)))
-      .all();
+      .limit(Math.max(1, Math.min(500, filter.limit ?? 200)));
   },
 
-  findById(
+  async findById(
     db: AppDb,
     tenantId: number,
     id: string,
-  ): ServiceEventRow | undefined {
-    return db
+  ): Promise<ServiceEventRow | undefined> {
+    const rows = await db
       .select()
       .from(serviceEvents)
-      .where(
-        and(eq(serviceEvents.tenantId, tenantId), eq(serviceEvents.id, id)),
-      )
-      .get();
+      .where(and(eq(serviceEvents.tenantId, tenantId), eq(serviceEvents.id, id)));
+    return rows[0];
   },
 
-  insert(db: AppDb, row: ServiceEventInsert): ServiceEventRow {
-    return db.insert(serviceEvents).values(row).returning().get();
+  async insert(db: AppDb, row: ServiceEventInsert): Promise<ServiceEventRow> {
+    const [inserted] = await db.insert(serviceEvents).values(row).returning();
+    if (!inserted) throw new Error('service event insert returned no row');
+    return inserted;
   },
 
-  update(
+  async update(
     db: AppDb,
     tenantId: number,
     id: string,
     patch: Partial<ServiceEventInsert>,
-  ): ServiceEventRow | undefined {
-    return db
+  ): Promise<ServiceEventRow | undefined> {
+    const [updated] = await db
       .update(serviceEvents)
       .set(patch)
-      .where(
-        and(eq(serviceEvents.tenantId, tenantId), eq(serviceEvents.id, id)),
-      )
-      .returning()
-      .get();
+      .where(and(eq(serviceEvents.tenantId, tenantId), eq(serviceEvents.id, id)))
+      .returning();
+    return updated;
   },
 
   /**
    * Bike + range query used by the cost-per-bike dashboard tile (lands in H6).
    * `bikeId` is optional — when omitted, returns every event in range.
    */
-  listInRange(
+  async listInRange(
     db: AppDb,
     tenantId: number,
     range: { startMs: number; endMs: number },
     opts: { status?: ServiceEventStatus; kind?: ServiceEventKind; bikeId?: string } = {},
-  ): ServiceEventRow[] {
+  ): Promise<ServiceEventRow[]> {
     const conditions: SQL[] = [
       eq(serviceEvents.tenantId, tenantId),
       gte(serviceEvents.startedAt, range.startMs),
@@ -95,8 +92,7 @@ export const serviceEventRepository = {
       .select()
       .from(serviceEvents)
       .where(and(...conditions))
-      .orderBy(asc(serviceEvents.startedAt))
-      .all();
+      .orderBy(asc(serviceEvents.startedAt));
   },
 
   /**
@@ -105,12 +101,12 @@ export const serviceEventRepository = {
    * (service due / wash due) and the per-bike schedule columns. Returns one
    * entry only for bikes that have at least one completed event of that kind.
    */
-  lastCompletedAtByBike(
+  async lastCompletedAtByBike(
     db: AppDb,
     tenantId: number,
     kind: ServiceEventKind,
-  ): Map<string, number> {
-    const rows = db
+  ): Promise<Map<string, number>> {
+    const rows = await db
       .select({ bikeId: serviceEvents.bikeId, startedAt: serviceEvents.startedAt })
       .from(serviceEvents)
       .where(
@@ -119,8 +115,7 @@ export const serviceEventRepository = {
           eq(serviceEvents.kind, kind),
           eq(serviceEvents.status, 'completed'),
         ),
-      )
-      .all();
+      );
     const byBike = new Map<string, number>();
     for (const r of rows) {
       const prev = byBike.get(r.bikeId);

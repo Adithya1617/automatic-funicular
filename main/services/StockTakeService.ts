@@ -24,8 +24,8 @@ import {
 import { SYSTEM_USER_ID } from '@shared/constants/system';
 
 function withLines(
-  take: ReturnType<typeof stockTakeRepository.findById>,
-  lines: ReturnType<typeof stockTakeLineRepository.listForTake>,
+  take: Awaited<ReturnType<typeof stockTakeRepository.findById>>,
+  lines: Awaited<ReturnType<typeof stockTakeLineRepository.listForTake>>,
 ): StockTakeWithLines {
   if (!take) throw new Error('withLines called with empty take');
   return {
@@ -35,24 +35,23 @@ function withLines(
 }
 
 export const StockTakeService = {
-  list(db: AppDb, tenantId: number, filter: ListStockTakesInput): StockTake[] {
-    return stockTakeRepository
-      .list(db, tenantId, filter)
-      .map((row) => row as unknown as StockTake);
+  async list(db: AppDb, tenantId: number, filter: ListStockTakesInput): Promise<StockTake[]> {
+    const rows = await stockTakeRepository.list(db, tenantId, filter);
+    return rows.map((row) => row as unknown as StockTake);
   },
 
-  get(db: AppDb, tenantId: number, id: string): StockTakeWithLines {
-    const row = stockTakeRepository.findById(db, tenantId, id);
+  async get(db: AppDb, tenantId: number, id: string): Promise<StockTakeWithLines> {
+    const row = await stockTakeRepository.findById(db, tenantId, id);
     if (!row) throw new NotFoundError('StockTake', id);
-    const lines = stockTakeLineRepository.listForTake(db, id);
+    const lines = await stockTakeLineRepository.listForTake(db, id);
     return withLines(row, lines);
   },
 
   /** Returns the open take for this tenant, or null if none. */
-  getInProgress(db: AppDb, tenantId: number): StockTakeWithLines | null {
-    const row = stockTakeRepository.findInProgress(db, tenantId);
+  async getInProgress(db: AppDb, tenantId: number): Promise<StockTakeWithLines | null> {
+    const row = await stockTakeRepository.findInProgress(db, tenantId);
     if (!row) return null;
-    const lines = stockTakeLineRepository.listForTake(db, row.id);
+    const lines = await stockTakeLineRepository.listForTake(db, row.id);
     return withLines(row, lines);
   },
 
@@ -62,27 +61,27 @@ export const StockTakeService = {
    * Sets the cross-module `stockTakeLock` so the order poller skips ticks
    * until commit or discard.
    */
-  start(
+  async start(
     db: AppDb,
     tenantId: number,
     input: StartStockTakeInput,
     actorId: string = SYSTEM_USER_ID,
-  ): StockTakeWithLines {
-    const open = stockTakeRepository.findInProgress(db, tenantId);
+  ): Promise<StockTakeWithLines> {
+    const open = await stockTakeRepository.findInProgress(db, tenantId);
     if (open) {
       throw new ConflictError(
         `A stock take is already in progress (${open.id}); commit or discard it first`,
       );
     }
-    const ingredients = ingredientRepository.list(db, tenantId, { includeInactive: false });
+    const ingredients = await ingredientRepository.list(db, tenantId, { includeInactive: false });
     if (ingredients.length === 0) {
       throw new ValidationError('No active ingredients to count');
     }
 
-    const result = db.transaction((tx) => {
+    const result = await db.transaction(async (tx) => {
       const now = Date.now();
       const id = newId();
-      const inserted = stockTakeRepository.insert(tx, {
+      const inserted = await stockTakeRepository.insert(tx, {
         id,
         tenantId,
         startedAt: now,
@@ -94,7 +93,7 @@ export const StockTakeService = {
         createdBy: actorId,
         updatedBy: actorId,
       });
-      const lineRows = stockTakeLineRepository.insertMany(
+      const lineRows = await stockTakeLineRepository.insertMany(
         tx,
         ingredients.map((ing) => ({
           id: newId(),
@@ -117,19 +116,19 @@ export const StockTakeService = {
    * to a take that is no longer in_progress (e.g. user committed in another
    * window) — that surfaces as a NotFoundError-flavored ConflictError.
    */
-  saveCount(
+  async saveCount(
     db: AppDb,
     tenantId: number,
     input: SaveStockTakeCountInput,
-  ): StockTakeLine {
-    const line = stockTakeLineRepository.findById(db, input.lineId);
+  ): Promise<StockTakeLine> {
+    const line = await stockTakeLineRepository.findById(db, input.lineId);
     if (!line) throw new NotFoundError('StockTakeLine', input.lineId);
-    const take = stockTakeRepository.findById(db, tenantId, line.stockTakeId);
+    const take = await stockTakeRepository.findById(db, tenantId, line.stockTakeId);
     if (!take) throw new NotFoundError('StockTake', line.stockTakeId);
     if (take.status !== 'in_progress') {
       throw new ConflictError('Cannot edit counts on a closed stock take');
     }
-    const updated = stockTakeLineRepository.updateCounted(
+    const updated = await stockTakeLineRepository.updateCounted(
       db,
       input.lineId,
       input.countedQuantity,
@@ -144,31 +143,31 @@ export const StockTakeService = {
    * Discards lines without a counted value (operator left them unchecked).
    * Re-enables the order poller after a successful commit.
    */
-  commit(
+  async commit(
     db: AppDb,
     tenantId: number,
     input: CommitStockTakeInput,
     actorId: string = SYSTEM_USER_ID,
-  ): StockTakeWithLines {
-    const take = stockTakeRepository.findById(db, tenantId, input.id);
+  ): Promise<StockTakeWithLines> {
+    const take = await stockTakeRepository.findById(db, tenantId, input.id);
     if (!take) throw new NotFoundError('StockTake', input.id);
     if (take.status !== 'in_progress') {
       throw new ConflictError(`Cannot commit a stock take in status ${take.status}`);
     }
-    const lines = stockTakeLineRepository.listForTake(db, input.id);
+    const lines = await stockTakeLineRepository.listForTake(db, input.id);
 
     const touchedIngredients = new Set<string>();
 
-    db.transaction((tx) => {
+    await db.transaction(async (tx) => {
       for (const line of lines) {
         if (line.countedQuantity === null || line.countedQuantity === undefined) {
-          stockTakeLineRepository.setDifference(tx, line.id, null);
+          await stockTakeLineRepository.setDifference(tx, line.id, null);
           continue;
         }
-        const ingredient = ingredientRepository.findById(tx, tenantId, line.ingredientId);
+        const ingredient = await ingredientRepository.findById(tx, tenantId, line.ingredientId);
         if (!ingredient) {
           // Ingredient deleted between start and commit — skip but record diff.
-          stockTakeLineRepository.setDifference(tx, line.id, null);
+          await stockTakeLineRepository.setDifference(tx, line.id, null);
           continue;
         }
         // Re-read book at commit-time so a movement that landed *during* the
@@ -176,10 +175,10 @@ export const StockTakeService = {
         // re-applied. Operator's count is authoritative.
         const currentStock = ingredient.stockQuantity;
         const delta = line.countedQuantity - currentStock;
-        stockTakeLineRepository.setDifference(tx, line.id, delta);
+        await stockTakeLineRepository.setDifference(tx, line.id, delta);
         if (delta === 0) continue;
         touchedIngredients.add(ingredient.id);
-        InventoryService.applyMovement(
+        await InventoryService.applyMovement(
           tx,
           tenantId,
           {
@@ -198,7 +197,7 @@ export const StockTakeService = {
       }
 
       const now = Date.now();
-      stockTakeRepository.update(tx, tenantId, input.id, {
+      await stockTakeRepository.update(tx, tenantId, input.id, {
         status: 'committed',
         completedAt: now,
         notes: input.notes ?? take.notes,
@@ -209,25 +208,25 @@ export const StockTakeService = {
 
     if (stockTakeLock.value === input.id) stockTakeLock.value = null;
     if (touchedIngredients.size > 0) {
-      AvailabilityService.recomputeForIngredients(db, tenantId, [...touchedIngredients]);
+      await AvailabilityService.recomputeForIngredients(db, tenantId, [...touchedIngredients]);
     }
     return StockTakeService.get(db, tenantId, input.id);
   },
 
   /** Discard. Stock untouched; just close the take and free the lock. */
-  discard(
+  async discard(
     db: AppDb,
     tenantId: number,
     input: DiscardStockTakeInput,
     actorId: string = SYSTEM_USER_ID,
-  ): StockTakeWithLines {
-    const take = stockTakeRepository.findById(db, tenantId, input.id);
+  ): Promise<StockTakeWithLines> {
+    const take = await stockTakeRepository.findById(db, tenantId, input.id);
     if (!take) throw new NotFoundError('StockTake', input.id);
     if (take.status !== 'in_progress') {
       throw new ConflictError(`Cannot discard a stock take in status ${take.status}`);
     }
     const now = Date.now();
-    stockTakeRepository.update(db, tenantId, input.id, {
+    await stockTakeRepository.update(db, tenantId, input.id, {
       status: 'discarded',
       completedAt: now,
       updatedAt: now,

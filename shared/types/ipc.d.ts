@@ -1,4 +1,4 @@
-import type { HyprrideBridge } from '../../preload/index';
+import type { HyprrideBridge } from '../bridge';
 
 declare global {
   interface Window {

@@ -7,49 +7,41 @@ import {
 } from '../db/schema';
 
 export const stockTakeLineRepository = {
-  listForTake(db: AppDb, stockTakeId: string): StockTakeLineRow[] {
+  async listForTake(db: AppDb, stockTakeId: string): Promise<StockTakeLineRow[]> {
     return db
       .select()
       .from(stockTakeLines)
       .where(eq(stockTakeLines.stockTakeId, stockTakeId))
-      .orderBy(asc(stockTakeLines.id))
-      .all();
+      .orderBy(asc(stockTakeLines.id));
   },
 
-  findById(db: AppDb, id: string): StockTakeLineRow | undefined {
-    return db
-      .select()
-      .from(stockTakeLines)
-      .where(eq(stockTakeLines.id, id))
-      .get();
+  async findById(db: AppDb, id: string): Promise<StockTakeLineRow | undefined> {
+    const rows = await db.select().from(stockTakeLines).where(eq(stockTakeLines.id, id));
+    return rows[0];
   },
 
-  insertMany(db: AppDb, rows: StockTakeLineInsert[]): StockTakeLineRow[] {
+  async insertMany(db: AppDb, rows: StockTakeLineInsert[]): Promise<StockTakeLineRow[]> {
     if (rows.length === 0) return [];
-    return db.insert(stockTakeLines).values(rows).returning().all();
+    return db.insert(stockTakeLines).values(rows).returning();
   },
 
-  updateCounted(
+  async updateCounted(
     db: AppDb,
     id: string,
     countedQuantity: number | null,
-  ): StockTakeLineRow | undefined {
-    return db
+  ): Promise<StockTakeLineRow | undefined> {
+    const [updated] = await db
       .update(stockTakeLines)
       .set({ countedQuantity })
       .where(eq(stockTakeLines.id, id))
-      .returning()
-      .get();
+      .returning();
+    return updated;
   },
 
-  setDifference(
-    db: AppDb,
-    id: string,
-    difference: number | null,
-  ): void {
-    db.update(stockTakeLines)
+  async setDifference(db: AppDb, id: string, difference: number | null): Promise<void> {
+    await db
+      .update(stockTakeLines)
       .set({ difference })
-      .where(eq(stockTakeLines.id, id))
-      .run();
+      .where(eq(stockTakeLines.id, id));
   },
 };

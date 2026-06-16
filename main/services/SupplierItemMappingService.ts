@@ -13,39 +13,46 @@ export type UpsertMappingInput = {
   lastUnitCost: number;
 };
 
-function toDomain(row: ReturnType<typeof supplierItemMappingRepository.findByDescription>): SupplierItemMapping | null {
+function toDomain(
+  row: Awaited<ReturnType<typeof supplierItemMappingRepository.findByDescription>>,
+): SupplierItemMapping | null {
   if (!row) return null;
   return row as unknown as SupplierItemMapping;
 }
 
 export const SupplierItemMappingService = {
-  suggest(
+  async suggest(
     db: AppDb,
     tenantId: number,
     supplierId: string,
     partial: string,
     limit: number,
-  ): SupplierItemMapping[] {
-    return supplierItemMappingRepository
-      .suggest(db, tenantId, supplierId, partial, limit)
-      .map((row) => row as unknown as SupplierItemMapping);
+  ): Promise<SupplierItemMapping[]> {
+    const rows = await supplierItemMappingRepository.suggest(
+      db,
+      tenantId,
+      supplierId,
+      partial,
+      limit,
+    );
+    return rows.map((row) => row as unknown as SupplierItemMapping);
   },
 
-  upsert(
+  async upsert(
     db: AppDb,
     tenantId: number,
     input: UpsertMappingInput,
     _actorId: string = SYSTEM_USER_ID,
-  ): SupplierItemMapping {
+  ): Promise<SupplierItemMapping> {
     const now = Date.now();
-    const existing = supplierItemMappingRepository.findByDescription(
+    const existing = await supplierItemMappingRepository.findByDescription(
       db,
       tenantId,
       input.supplierId,
       input.rawDescription,
     );
     if (existing) {
-      const updated = supplierItemMappingRepository.update(db, existing.id, {
+      const updated = await supplierItemMappingRepository.update(db, existing.id, {
         ingredientId: input.ingredientId,
         defaultQuantity: input.defaultQuantity,
         defaultUnit: input.defaultUnit,
@@ -55,7 +62,7 @@ export const SupplierItemMappingService = {
       });
       return toDomain(updated)!;
     }
-    const inserted = supplierItemMappingRepository.insert(db, {
+    const inserted = await supplierItemMappingRepository.insert(db, {
       id: newId(),
       tenantId,
       supplierId: input.supplierId,

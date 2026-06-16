@@ -7,28 +7,20 @@ import { appSettings } from '../db/schema';
  * as JSON strings; AppSettingsService is responsible for typed (de)serialization.
  */
 export const appSettingsRepository = {
-  get(db: AppDb, key: string): string | undefined {
-    const row = db
-      .select()
-      .from(appSettings)
-      .where(eq(appSettings.key, key))
-      .get();
-    return row?.value;
+  async get(db: AppDb, key: string): Promise<string | undefined> {
+    const rows = await db.select().from(appSettings).where(eq(appSettings.key, key));
+    return rows[0]?.value;
   },
 
-  set(db: AppDb, key: string, value: string, updatedAt: number): void {
-    const existing = db
-      .select()
-      .from(appSettings)
-      .where(eq(appSettings.key, key))
-      .get();
-    if (existing) {
-      db.update(appSettings)
+  async set(db: AppDb, key: string, value: string, updatedAt: number): Promise<void> {
+    const rows = await db.select().from(appSettings).where(eq(appSettings.key, key));
+    if (rows[0]) {
+      await db
+        .update(appSettings)
         .set({ value, updatedAt })
-        .where(eq(appSettings.key, key))
-        .run();
+        .where(eq(appSettings.key, key));
     } else {
-      db.insert(appSettings).values({ key, value, updatedAt }).run();
+      await db.insert(appSettings).values({ key, value, updatedAt });
     }
   },
 };

@@ -13,52 +13,50 @@ import type {
 import { ConflictError, NotFoundError } from '@shared/errors/DomainError';
 import { SYSTEM_USER_ID } from '@shared/constants/system';
 
-function toBike(row: ReturnType<typeof bikeRepository.findById>): Bike {
+function toBike(row: Awaited<ReturnType<typeof bikeRepository.findById>>): Bike {
   if (!row) throw new Error('toBike called with empty row');
   return row as unknown as Bike;
 }
 
-function toBikeType(row: ReturnType<typeof bikeTypeRepository.findById>): BikeType {
+function toBikeType(row: Awaited<ReturnType<typeof bikeTypeRepository.findById>>): BikeType {
   if (!row) throw new Error('toBikeType called with empty row');
   return row as unknown as BikeType;
 }
 
 export const BikeService = {
-  listTypes(db: AppDb, tenantId: number, filter: ListBikeTypesInput): BikeType[] {
-    return bikeTypeRepository
-      .list(db, tenantId, filter)
-      .map((row) => row as unknown as BikeType);
+  async listTypes(db: AppDb, tenantId: number, filter: ListBikeTypesInput): Promise<BikeType[]> {
+    const rows = await bikeTypeRepository.list(db, tenantId, filter);
+    return rows.map((row) => row as unknown as BikeType);
   },
 
-  list(db: AppDb, tenantId: number, filter: ListBikesInput): Bike[] {
-    return bikeRepository
-      .list(db, tenantId, filter)
-      .map((row) => row as unknown as Bike);
+  async list(db: AppDb, tenantId: number, filter: ListBikesInput): Promise<Bike[]> {
+    const rows = await bikeRepository.list(db, tenantId, filter);
+    return rows.map((row) => row as unknown as Bike);
   },
 
-  get(db: AppDb, tenantId: number, id: string): Bike {
-    const row = bikeRepository.findById(db, tenantId, id);
+  async get(db: AppDb, tenantId: number, id: string): Promise<Bike> {
+    const row = await bikeRepository.findById(db, tenantId, id);
     if (!row) throw new NotFoundError('Bike', id);
     return toBike(row);
   },
 
-  create(
+  async create(
     db: AppDb,
     tenantId: number,
     input: CreateBikeInput,
     actorId: string = SYSTEM_USER_ID,
-  ): Bike {
-    const bikeType = bikeTypeRepository.findById(db, tenantId, input.bikeTypeId);
+  ): Promise<Bike> {
+    const bikeType = await bikeTypeRepository.findById(db, tenantId, input.bikeTypeId);
     if (!bikeType) throw new NotFoundError('BikeType', input.bikeTypeId);
 
-    const dup = bikeRepository.findByBikeNumber(db, tenantId, input.bikeNumber);
+    const dup = await bikeRepository.findByBikeNumber(db, tenantId, input.bikeNumber);
     if (dup) {
       throw new ConflictError(`A bike numbered "${input.bikeNumber}" already exists`, {
         bikeNumber: 'duplicate',
       });
     }
     const now = Date.now();
-    const row = bikeRepository.insert(db, {
+    const row = await bikeRepository.insert(db, {
       id: newId(),
       tenantId,
       bikeNumber: input.bikeNumber,
@@ -75,22 +73,22 @@ export const BikeService = {
     return toBike(row);
   },
 
-  update(
+  async update(
     db: AppDb,
     tenantId: number,
     input: UpdateBikeInput,
     actorId: string = SYSTEM_USER_ID,
-  ): Bike {
-    const existing = bikeRepository.findById(db, tenantId, input.id);
+  ): Promise<Bike> {
+    const existing = await bikeRepository.findById(db, tenantId, input.id);
     if (!existing) throw new NotFoundError('Bike', input.id);
 
     if (input.bikeTypeId && input.bikeTypeId !== existing.bikeTypeId) {
-      const bikeType = bikeTypeRepository.findById(db, tenantId, input.bikeTypeId);
+      const bikeType = await bikeTypeRepository.findById(db, tenantId, input.bikeTypeId);
       if (!bikeType) throw new NotFoundError('BikeType', input.bikeTypeId);
     }
 
     if (input.bikeNumber && input.bikeNumber !== existing.bikeNumber) {
-      const dup = bikeRepository.findByBikeNumber(db, tenantId, input.bikeNumber);
+      const dup = await bikeRepository.findByBikeNumber(db, tenantId, input.bikeNumber);
       if (dup && dup.id !== existing.id) {
         throw new ConflictError(
           `A bike numbered "${input.bikeNumber}" already exists`,
@@ -108,20 +106,20 @@ export const BikeService = {
     if (input.notes !== undefined) patch['notes'] = input.notes;
     if (input.isActive !== undefined) patch['isActive'] = input.isActive;
 
-    const row = bikeRepository.update(db, tenantId, input.id, patch);
+    const row = await bikeRepository.update(db, tenantId, input.id, patch);
     if (!row) throw new NotFoundError('Bike', input.id);
     return toBike(row);
   },
 
-  deactivate(
+  async deactivate(
     db: AppDb,
     tenantId: number,
     id: string,
     actorId: string = SYSTEM_USER_ID,
-  ): Bike {
-    const existing = bikeRepository.findById(db, tenantId, id);
+  ): Promise<Bike> {
+    const existing = await bikeRepository.findById(db, tenantId, id);
     if (!existing) throw new NotFoundError('Bike', id);
-    const row = bikeRepository.update(db, tenantId, id, {
+    const row = await bikeRepository.update(db, tenantId, id, {
       isActive: false,
       updatedAt: Date.now(),
       updatedBy: actorId,
@@ -132,8 +130,8 @@ export const BikeService = {
 
   // Used by future ServiceTemplate code to validate a bikeTypeId reference.
   // Re-exported here so callers don't have to import the repository directly.
-  getType(db: AppDb, tenantId: number, id: string): BikeType {
-    const row = bikeTypeRepository.findById(db, tenantId, id);
+  async getType(db: AppDb, tenantId: number, id: string): Promise<BikeType> {
+    const row = await bikeTypeRepository.findById(db, tenantId, id);
     if (!row) throw new NotFoundError('BikeType', id);
     return toBikeType(row);
   },

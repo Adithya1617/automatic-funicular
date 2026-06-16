@@ -7,30 +7,35 @@ import {
 } from '../db/schema';
 
 export const orderingChannelRepository = {
-  list(
+  async list(
     db: AppDb,
     tenantId: number,
     enabledOnly: boolean = false,
-  ): OrderingChannelRow[] {
+  ): Promise<OrderingChannelRow[]> {
     const conditions = [eq(orderingChannels.tenantId, tenantId)];
     if (enabledOnly) conditions.push(eq(orderingChannels.enabled, true));
     return db
       .select()
       .from(orderingChannels)
       .where(and(...conditions))
-      .orderBy(asc(orderingChannels.displayName))
-      .all();
+      .orderBy(asc(orderingChannels.displayName));
   },
 
-  findByKey(db: AppDb, tenantId: number, key: string): OrderingChannelRow | undefined {
-    return db
+  async findByKey(
+    db: AppDb,
+    tenantId: number,
+    key: string,
+  ): Promise<OrderingChannelRow | undefined> {
+    const rows = await db
       .select()
       .from(orderingChannels)
-      .where(and(eq(orderingChannels.tenantId, tenantId), eq(orderingChannels.key, key)))
-      .get();
+      .where(and(eq(orderingChannels.tenantId, tenantId), eq(orderingChannels.key, key)));
+    return rows[0];
   },
 
-  insert(db: AppDb, row: OrderingChannelInsert): OrderingChannelRow {
-    return db.insert(orderingChannels).values(row).returning().get();
+  async insert(db: AppDb, row: OrderingChannelInsert): Promise<OrderingChannelRow> {
+    const [inserted] = await db.insert(orderingChannels).values(row).returning();
+    if (!inserted) throw new Error('ordering channel insert returned no row');
+    return inserted;
   },
 };

@@ -16,9 +16,20 @@ const groupOrder: Array<{ key: 'operations' | 'system'; label: string }> = [
   { key: 'system', label: 'System' },
 ];
 
-export function Sidebar() {
+type SidebarProps = {
+  className?: string;
+  /** Called when a nav link is clicked — used to close the mobile drawer. */
+  onNavigate?: () => void;
+};
+
+export function Sidebar({ className, onNavigate }: SidebarProps) {
   return (
-    <aside className="flex w-[138px] shrink-0 flex-col gap-0.5 border-r border-border-tertiary bg-background-secondary px-2.5 py-3.5">
+    <aside
+      className={cn(
+        'flex w-[138px] shrink-0 flex-col gap-0.5 border-r border-border-tertiary bg-background-secondary px-2.5 py-3.5',
+        className,
+      )}
+    >
       <div className="flex items-center gap-2 px-1.5 pb-3.5 pt-1">
         <div className="flex h-[22px] w-[22px] items-center justify-center rounded-[6px] bg-text-primary text-[12px] font-medium text-background-primary">
           H
@@ -32,7 +43,7 @@ export function Sidebar() {
             {group.label}
           </div>
           {NAV_ITEMS.filter((item) => item.group === group.key).map((item) => (
-            <SidebarLink key={item.path} item={item} />
+            <SidebarLink key={item.path} item={item} onNavigate={onNavigate} />
           ))}
         </div>
       ))}
@@ -40,7 +51,7 @@ export function Sidebar() {
   );
 }
 
-function SidebarLink({ item }: { item: NavItem }) {
+function SidebarLink({ item, onNavigate }: { item: NavItem; onNavigate?: () => void }) {
   const Icon = item.icon;
   const location = useLocation();
   const active = pathMatchesNav(item.path, location.pathname);
@@ -48,6 +59,7 @@ function SidebarLink({ item }: { item: NavItem }) {
   return (
     <NavLink
       to={item.path}
+      onClick={onNavigate}
       className={cn(
         'flex min-h-[32px] items-center gap-2 rounded-[6px] px-2 py-1.5 text-[12px] text-text-secondary transition-colors',
         'hover:bg-background-tertiary',

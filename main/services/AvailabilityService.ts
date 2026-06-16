@@ -14,27 +14,24 @@ type AvailabilityRow = {
 };
 
 export const AvailabilityService = {
-  list(
+  async list(
     db: AppDb,
     tenantId: number,
     menuItemIds?: string[],
-  ): MenuItemAvailability[] {
-    return menuItemAvailabilityRepository
-      .list(db, tenantId, menuItemIds)
-      .map((row) => row as unknown as MenuItemAvailability);
+  ): Promise<MenuItemAvailability[]> {
+    const rows = await menuItemAvailabilityRepository.list(db, tenantId, menuItemIds);
+    return rows.map((row) => row as unknown as MenuItemAvailability);
   },
 
   /**
    * Recompute every active menu item's availability. Used after large state
    * changes (e.g. seed data load); called individually for targeted updates.
    */
-  recomputeAllMenuItems(db: AppDb, tenantId: number): void {
-    const menuIds = menuItemRepository
-      .listAllActive(db, tenantId)
-      .map((m) => m.id);
-    for (const id of menuIds) {
-      const computed = computeForMenuItem(db, tenantId, id);
-      writeRow(db, tenantId, computed);
+  async recomputeAllMenuItems(db: AppDb, tenantId: number): Promise<void> {
+    const menus = await menuItemRepository.listAllActive(db, tenantId);
+    for (const menu of menus) {
+      const computed = await computeForMenuItem(db, tenantId, menu.id);
+      await writeRow(db, tenantId, computed);
     }
   },
 
@@ -47,16 +44,16 @@ export const AvailabilityService = {
    * prepared ingredient whose recipe references one of them. Then recompute
    * each affected menu's availability looking only at its immediate recipe.
    */
-  recomputeForIngredients(
+  async recomputeForIngredients(
     db: AppDb,
     tenantId: number,
     ingredientIds: string[],
-  ): void {
+  ): Promise<void> {
     if (ingredientIds.length === 0) return;
-    const affected = findAffectedMenuItems(db, tenantId, ingredientIds);
+    const affected = await findAffectedMenuItems(db, tenantId, ingredientIds);
     for (const menuId of affected) {
-      const computed = computeForMenuItem(db, tenantId, menuId);
-      writeRow(db, tenantId, computed);
+      const computed = await computeForMenuItem(db, tenantId, menuId);
+      await writeRow(db, tenantId, computed);
     }
   },
 
@@ -65,14 +62,14 @@ export const AvailabilityService = {
    * Cheaper than walking the dependency graph since the recipe edit is the
    * trigger.
    */
-  recomputeForMenuItem(db: AppDb, tenantId: number, menuItemId: string): void {
-    const computed = computeForMenuItem(db, tenantId, menuItemId);
-    writeRow(db, tenantId, computed);
+  async recomputeForMenuItem(db: AppDb, tenantId: number, menuItemId: string): Promise<void> {
+    const computed = await computeForMenuItem(db, tenantId, menuItemId);
+    await writeRow(db, tenantId, computed);
   },
 };
 
-function writeRow(db: AppDb, tenantId: number, computed: AvailabilityRow): void {
-  menuItemAvailabilityRepository.upsert(db, {
+async function writeRow(db: AppDb, tenantId: number, computed: AvailabilityRow): Promise<void> {
+  await menuItemAvailabilityRepository.upsert(db, {
     id: newId(),
     tenantId,
     menuItemId: computed.menuItemId,
@@ -89,12 +86,12 @@ function writeRow(db: AppDb, tenantId: number, computed: AvailabilityRow): void 
  * min. Prepared children are read at their own stock — we do NOT explode into
  * raw constituents here.
  */
-function computeForMenuItem(
+async function computeForMenuItem(
   db: AppDb,
   tenantId: number,
   menuItemId: string,
-): AvailabilityRow {
-  const recipe = recipeRepository.findActiveVersion(db, {
+): Promise<AvailabilityRow> {
+  const recipe = await recipeRepository.findActiveVersion(db, {
     tenantId,
     parentId: menuItemId,
     parentType: 'menu_item',
@@ -102,7 +99,7 @@ function computeForMenuItem(
   if (!recipe) {
     return { menuItemId, maxServingsAvailable: 0, bottleneckIngredientId: null };
   }
-  const rows = recipeRepository.ingredientsForVersion(db, recipe.id);
+  const rows = await recipeRepository.ingredientsForVersion(db, recipe.id);
   if (rows.length === 0) {
     return { menuItemId, maxServingsAvailable: 0, bottleneckIngredientId: null };
   }
@@ -110,7 +107,7 @@ function computeForMenuItem(
   let min = Number.POSITIVE_INFINITY;
   let bottleneck: string | null = null;
   for (const row of rows) {
-    const child = ingredientRepository.findById(db, tenantId, row.childIngredientId);
+    const child = await ingredientRepository.findById(db, tenantId, row.childIngredientId);
     if (!child) {
       // Missing ingredient — treat as out of stock.
       min = 0;
@@ -155,27 +152,27 @@ function computeForMenuItem(
  * hit = a prepared ingredient whose recipe references one of these is used
  * by a menu.
  */
-function findAffectedMenuItems(
+async function findAffectedMenuItems(
   db: AppDb,
   tenantId: number,
   ingredientIds: string[],
-): Set<string> {
+): Promise<Set<string>> {
   const affected = new Set<string>();
   const ids = new Set(ingredientIds);
 
   // 1. Prepared ingredients whose active recipe references any of these.
-  const allActive = ingredientRepository.list(db, tenantId, { includeInactive: false });
+  const allActive = await ingredientRepository.list(db, tenantId, { includeInactive: false });
   const preparedDependents: string[] = [];
   for (const ing of allActive) {
     if (ing.type !== 'prepared') continue;
     if (ids.has(ing.id)) continue; // already in the trigger set
-    const recipe = recipeRepository.findActiveVersion(db, {
+    const recipe = await recipeRepository.findActiveVersion(db, {
       tenantId,
       parentId: ing.id,
       parentType: 'ingredient',
     });
     if (!recipe) continue;
-    const rows = recipeRepository.ingredientsForVersion(db, recipe.id);
+    const rows = await recipeRepository.ingredientsForVersion(db, recipe.id);
     if (rows.some((r) => ids.has(r.childIngredientId))) {
       preparedDependents.push(ing.id);
     }
@@ -186,17 +183,17 @@ function findAffectedMenuItems(
 
   // 2. Walk every active menu item's active recipe; mark affected if any row
   //    references any id in `lookup`.
-  const menuIds = menuItemRepository.listAllActive(db, tenantId).map((m) => m.id);
-  for (const menuId of menuIds) {
-    const recipe = recipeRepository.findActiveVersion(db, {
+  const menus = await menuItemRepository.listAllActive(db, tenantId);
+  for (const menu of menus) {
+    const recipe = await recipeRepository.findActiveVersion(db, {
       tenantId,
-      parentId: menuId,
+      parentId: menu.id,
       parentType: 'menu_item',
     });
     if (!recipe) continue;
-    const rows = recipeRepository.ingredientsForVersion(db, recipe.id);
+    const rows = await recipeRepository.ingredientsForVersion(db, recipe.id);
     if (rows.some((r) => lookup.has(r.childIngredientId))) {
-      affected.add(menuId);
+      affected.add(menu.id);
     }
   }
 

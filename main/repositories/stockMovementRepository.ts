@@ -21,11 +21,11 @@ export type ListMovementsFilter = {
 export type DateRange = { startMs: number; endMs: number };
 
 export const stockMovementRepository = {
-  list(
+  async list(
     db: AppDb,
     tenantId: number,
     filter: ListMovementsFilter = {},
-  ): StockMovementRow[] {
+  ): Promise<StockMovementRow[]> {
     const conditions: SQL[] = [eq(stockMovements.tenantId, tenantId)];
     if (filter.ingredientId)
       conditions.push(eq(stockMovements.ingredientId, filter.ingredientId));
@@ -37,25 +37,28 @@ export const stockMovementRepository = {
       .from(stockMovements)
       .where(and(...conditions))
       .orderBy(desc(stockMovements.occurredAt))
-      .limit(Math.max(1, Math.min(500, filter.limit ?? 50)))
-      .all();
+      .limit(Math.max(1, Math.min(500, filter.limit ?? 50)));
   },
 
-  insert(db: AppDb, row: StockMovementInsert): StockMovementRow {
-    return db.insert(stockMovements).values(row).returning().get();
+  async insert(db: AppDb, row: StockMovementInsert): Promise<StockMovementRow> {
+    const [inserted] = await db.insert(stockMovements).values(row).returning();
+    if (!inserted) throw new Error('stock movement insert returned no row');
+    return inserted;
   },
 
   /** Sum signed change_quantity per ingredient — used by reconciliation. */
-  sumByIngredient(db: AppDb, tenantId: number): Array<{ ingredientId: string; total: number }> {
-    const rows = db
+  async sumByIngredient(
+    db: AppDb,
+    tenantId: number,
+  ): Promise<Array<{ ingredientId: string; total: number }>> {
+    const rows = await db
       .select({
         ingredientId: stockMovements.ingredientId,
         total: sql<number>`SUM(${stockMovements.changeQuantity})`,
       })
       .from(stockMovements)
       .where(eq(stockMovements.tenantId, tenantId))
-      .groupBy(stockMovements.ingredientId)
-      .all();
+      .groupBy(stockMovements.ingredientId);
     return rows.map((r) => ({ ingredientId: r.ingredientId, total: r.total ?? 0 }));
   },
 
@@ -64,12 +67,12 @@ export const stockMovementRepository = {
    * DashboardService for COGS, wastage, spending. Optional reason filter
    * narrows to one or more reasons in a single query.
    */
-  listInRange(
+  async listInRange(
     db: AppDb,
     tenantId: number,
     range: DateRange,
     reasons?: StockMovementReason[],
-  ): StockMovementRow[] {
+  ): Promise<StockMovementRow[]> {
     const conditions: SQL[] = [
       eq(stockMovements.tenantId, tenantId),
       gte(stockMovements.occurredAt, range.startMs),
@@ -82,8 +85,7 @@ export const stockMovementRepository = {
       .select()
       .from(stockMovements)
       .where(and(...conditions))
-      .orderBy(asc(stockMovements.occurredAt))
-      .all();
+      .orderBy(asc(stockMovements.occurredAt));
   },
 
   /**
@@ -91,12 +93,12 @@ export const stockMovementRepository = {
    * lines). Used to value a service / repair from its immutable cost snapshots.
    * Hits the (reference_type, reference_id) index.
    */
-  listByReferenceIds(
+  async listByReferenceIds(
     db: AppDb,
     tenantId: number,
     referenceType: StockMovementReferenceType,
     referenceIds: string[],
-  ): StockMovementRow[] {
+  ): Promise<StockMovementRow[]> {
     if (referenceIds.length === 0) return [];
     return db
       .select()
@@ -107,19 +109,18 @@ export const stockMovementRepository = {
           eq(stockMovements.referenceType, referenceType),
           inArray(stockMovements.referenceId, referenceIds),
         ),
-      )
-      .all();
+      );
   },
 
   /**
    * Movements occurring at or after `sinceMs`, ordered ascending. Used by
    * the stock-value sparkline to walk forward from a snapshot point.
    */
-  listSince(
+  async listSince(
     db: AppDb,
     tenantId: number,
     sinceMs: number,
-  ): StockMovementRow[] {
+  ): Promise<StockMovementRow[]> {
     return db
       .select()
       .from(stockMovements)
@@ -129,8 +130,6 @@ export const stockMovementRepository = {
           gte(stockMovements.occurredAt, sinceMs),
         ),
       )
-      .orderBy(asc(stockMovements.occurredAt))
-      .all();
+      .orderBy(asc(stockMovements.occurredAt));
   },
-
 };

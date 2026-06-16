@@ -8,11 +8,11 @@ import { toCsv } from '@shared/utils/csv';
 import type { ExportReportInput, ExportReportResponse } from '@shared/schemas/report';
 
 export const ReportService = {
-  export(
+  async export(
     db: AppDb,
     tenantId: number,
     input: ExportReportInput,
-  ): ExportReportResponse {
+  ): Promise<ExportReportResponse> {
     switch (input.kind) {
       case 'movements':
         return exportMovements(db, tenantId, input);
@@ -22,13 +22,13 @@ export const ReportService = {
   },
 };
 
-function exportMovements(
+async function exportMovements(
   db: AppDb,
   tenantId: number,
   input: ExportReportInput,
-): ExportReportResponse {
-  const movements = stockMovementRepository.listInRange(db, tenantId, input.range);
-  const ingredients = ingredientRepository.list(db, tenantId, { includeInactive: true });
+): Promise<ExportReportResponse> {
+  const movements = await stockMovementRepository.listInRange(db, tenantId, input.range);
+  const ingredients = await ingredientRepository.list(db, tenantId, { includeInactive: true });
   const ingById = new Map(ingredients.map((i) => [i.id, i]));
 
   const header = [
@@ -63,16 +63,16 @@ function exportMovements(
   };
 }
 
-function exportSpending(
+async function exportSpending(
   db: AppDb,
   tenantId: number,
   input: ExportReportInput,
-): ExportReportResponse {
-  const invoices = invoiceRepository.listCommittedInRange(db, tenantId, input.range);
-  const lines = invoiceLineRepository.listForInvoices(db, invoices.map((i) => i.id));
-  const suppliers = supplierRepository.list(db, tenantId, { includeInactive: true });
+): Promise<ExportReportResponse> {
+  const invoices = await invoiceRepository.listCommittedInRange(db, tenantId, input.range);
+  const lines = await invoiceLineRepository.listForInvoices(db, invoices.map((i) => i.id));
+  const suppliers = await supplierRepository.list(db, tenantId, { includeInactive: true });
   const supplierById = new Map(suppliers.map((s) => [s.id, s]));
-  const ingredients = ingredientRepository.list(db, tenantId, { includeInactive: true });
+  const ingredients = await ingredientRepository.list(db, tenantId, { includeInactive: true });
   const ingredientById = new Map(ingredients.map((i) => [i.id, i]));
   const invoiceById = new Map(invoices.map((i) => [i.id, i]));
 

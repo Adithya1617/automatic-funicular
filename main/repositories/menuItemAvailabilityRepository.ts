@@ -7,11 +7,11 @@ import {
 } from '../db/schema';
 
 export const menuItemAvailabilityRepository = {
-  list(
+  async list(
     db: AppDb,
     tenantId: number,
     menuItemIds?: string[],
-  ): MenuItemAvailabilityRow[] {
+  ): Promise<MenuItemAvailabilityRow[]> {
     const conditions = [eq(menuItemAvailability.tenantId, tenantId)];
     if (menuItemIds && menuItemIds.length > 0) {
       conditions.push(inArray(menuItemAvailability.menuItemId, menuItemIds));
@@ -19,16 +19,15 @@ export const menuItemAvailabilityRepository = {
     return db
       .select()
       .from(menuItemAvailability)
-      .where(and(...conditions))
-      .all();
+      .where(and(...conditions));
   },
 
-  findByMenuItem(
+  async findByMenuItem(
     db: AppDb,
     tenantId: number,
     menuItemId: string,
-  ): MenuItemAvailabilityRow | undefined {
-    return db
+  ): Promise<MenuItemAvailabilityRow | undefined> {
+    const rows = await db
       .select()
       .from(menuItemAvailability)
       .where(
@@ -36,18 +35,18 @@ export const menuItemAvailabilityRepository = {
           eq(menuItemAvailability.tenantId, tenantId),
           eq(menuItemAvailability.menuItemId, menuItemId),
         ),
-      )
-      .get();
+      );
+    return rows[0];
   },
 
-  upsert(db: AppDb, row: MenuItemAvailabilityInsert): MenuItemAvailabilityRow {
-    const existing = menuItemAvailabilityRepository.findByMenuItem(
+  async upsert(db: AppDb, row: MenuItemAvailabilityInsert): Promise<MenuItemAvailabilityRow> {
+    const existing = await menuItemAvailabilityRepository.findByMenuItem(
       db,
       row.tenantId,
       row.menuItemId,
     );
     if (existing) {
-      return db
+      const [updated] = await db
         .update(menuItemAvailability)
         .set({
           maxServingsAvailable: row.maxServingsAvailable,
@@ -55,9 +54,12 @@ export const menuItemAvailabilityRepository = {
           lastComputedAt: row.lastComputedAt,
         })
         .where(eq(menuItemAvailability.id, existing.id))
-        .returning()
-        .get();
+        .returning();
+      if (!updated) throw new Error('availability update returned no row');
+      return updated;
     }
-    return db.insert(menuItemAvailability).values(row).returning().get();
+    const [inserted] = await db.insert(menuItemAvailability).values(row).returning();
+    if (!inserted) throw new Error('availability insert returned no row');
+    return inserted;
   },
 };

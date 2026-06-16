@@ -7,26 +7,31 @@ export type BikeTypeFilter = {
 };
 
 export const bikeTypeRepository = {
-  list(db: AppDb, tenantId: number, filter: BikeTypeFilter = {}): BikeTypeRow[] {
+  async list(
+    db: AppDb,
+    tenantId: number,
+    filter: BikeTypeFilter = {},
+  ): Promise<BikeTypeRow[]> {
     const conditions = [eq(bikeTypes.tenantId, tenantId)];
     if (!filter.includeInactive) conditions.push(eq(bikeTypes.isActive, true));
     return db
       .select()
       .from(bikeTypes)
       .where(and(...conditions))
-      .orderBy(asc(bikeTypes.displayOrder), asc(bikeTypes.name))
-      .all();
+      .orderBy(asc(bikeTypes.displayOrder), asc(bikeTypes.name));
   },
 
-  findById(db: AppDb, tenantId: number, id: string): BikeTypeRow | undefined {
-    return db
+  async findById(db: AppDb, tenantId: number, id: string): Promise<BikeTypeRow | undefined> {
+    const rows = await db
       .select()
       .from(bikeTypes)
-      .where(and(eq(bikeTypes.tenantId, tenantId), eq(bikeTypes.id, id)))
-      .get();
+      .where(and(eq(bikeTypes.tenantId, tenantId), eq(bikeTypes.id, id)));
+    return rows[0];
   },
 
-  insert(db: AppDb, row: BikeTypeInsert): BikeTypeRow {
-    return db.insert(bikeTypes).values(row).returning().get();
+  async insert(db: AppDb, row: BikeTypeInsert): Promise<BikeTypeRow> {
+    const [inserted] = await db.insert(bikeTypes).values(row).returning();
+    if (!inserted) throw new Error('bike type insert returned no row');
+    return inserted;
   },
 };

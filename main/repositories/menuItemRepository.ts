@@ -9,7 +9,7 @@ export type MenuItemFilter = {
 };
 
 export const menuItemRepository = {
-  list(db: AppDb, tenantId: number, filter: MenuItemFilter = {}): MenuItemRow[] {
+  async list(db: AppDb, tenantId: number, filter: MenuItemFilter = {}): Promise<MenuItemRow[]> {
     const conditions = [eq(menuItems.tenantId, tenantId)];
     if (!filter.includeInactive) conditions.push(eq(menuItems.isActive, true));
     if (filter.category) conditions.push(eq(menuItems.category, filter.category));
@@ -20,58 +20,61 @@ export const menuItemRepository = {
       .select()
       .from(menuItems)
       .where(and(...conditions))
-      .orderBy(asc(menuItems.displayOrder), asc(menuItems.name))
-      .all();
+      .orderBy(asc(menuItems.displayOrder), asc(menuItems.name));
   },
 
-  findById(db: AppDb, tenantId: number, id: string): MenuItemRow | undefined {
-    return db
+  async findById(db: AppDb, tenantId: number, id: string): Promise<MenuItemRow | undefined> {
+    const rows = await db
       .select()
       .from(menuItems)
-      .where(and(eq(menuItems.tenantId, tenantId), eq(menuItems.id, id)))
-      .get();
+      .where(and(eq(menuItems.tenantId, tenantId), eq(menuItems.id, id)));
+    return rows[0];
   },
 
-  findByName(db: AppDb, tenantId: number, name: string): MenuItemRow | undefined {
-    return db
+  async findByName(db: AppDb, tenantId: number, name: string): Promise<MenuItemRow | undefined> {
+    const rows = await db
       .select()
       .from(menuItems)
-      .where(and(eq(menuItems.tenantId, tenantId), eq(menuItems.name, name)))
-      .get();
+      .where(and(eq(menuItems.tenantId, tenantId), eq(menuItems.name, name)));
+    return rows[0];
   },
 
-  findByVariantGroup(db: AppDb, tenantId: number, groupId: string): MenuItemRow[] {
+  async findByVariantGroup(
+    db: AppDb,
+    tenantId: number,
+    groupId: string,
+  ): Promise<MenuItemRow[]> {
     return db
       .select()
       .from(menuItems)
       .where(and(eq(menuItems.tenantId, tenantId), eq(menuItems.variantGroupId, groupId)))
-      .orderBy(asc(menuItems.displayOrder), asc(menuItems.name))
-      .all();
+      .orderBy(asc(menuItems.displayOrder), asc(menuItems.name));
   },
 
-  insert(db: AppDb, row: MenuItemInsert): MenuItemRow {
-    return db.insert(menuItems).values(row).returning().get();
+  async insert(db: AppDb, row: MenuItemInsert): Promise<MenuItemRow> {
+    const [inserted] = await db.insert(menuItems).values(row).returning();
+    if (!inserted) throw new Error('menu item insert returned no row');
+    return inserted;
   },
 
-  update(
+  async update(
     db: AppDb,
     tenantId: number,
     id: string,
     patch: Partial<MenuItemInsert>,
-  ): MenuItemRow | undefined {
-    return db
+  ): Promise<MenuItemRow | undefined> {
+    const [updated] = await db
       .update(menuItems)
       .set(patch)
       .where(and(eq(menuItems.tenantId, tenantId), eq(menuItems.id, id)))
-      .returning()
-      .get();
+      .returning();
+    return updated;
   },
 
-  listAllActive(db: AppDb, tenantId: number): MenuItemRow[] {
+  async listAllActive(db: AppDb, tenantId: number): Promise<MenuItemRow[]> {
     return db
       .select()
       .from(menuItems)
-      .where(and(eq(menuItems.tenantId, tenantId), eq(menuItems.isActive, true)))
-      .all();
+      .where(and(eq(menuItems.tenantId, tenantId), eq(menuItems.isActive, true)));
   },
 };

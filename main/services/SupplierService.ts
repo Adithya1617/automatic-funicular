@@ -10,38 +10,39 @@ import type {
 import { ConflictError, NotFoundError } from '@shared/errors/DomainError';
 import { SYSTEM_USER_ID } from '@shared/constants/system';
 
-function toSupplier(row: ReturnType<typeof supplierRepository.findById>): Supplier {
+function toSupplier(
+  row: Awaited<ReturnType<typeof supplierRepository.findById>>,
+): Supplier {
   if (!row) throw new Error('toSupplier called with empty row');
   return row as unknown as Supplier;
 }
 
 export const SupplierService = {
-  list(db: AppDb, tenantId: number, filter: ListSuppliersInput): Supplier[] {
-    return supplierRepository
-      .list(db, tenantId, filter)
-      .map((row) => row as unknown as Supplier);
+  async list(db: AppDb, tenantId: number, filter: ListSuppliersInput): Promise<Supplier[]> {
+    const rows = await supplierRepository.list(db, tenantId, filter);
+    return rows.map((row) => row as unknown as Supplier);
   },
 
-  get(db: AppDb, tenantId: number, id: string): Supplier {
-    const row = supplierRepository.findById(db, tenantId, id);
+  async get(db: AppDb, tenantId: number, id: string): Promise<Supplier> {
+    const row = await supplierRepository.findById(db, tenantId, id);
     if (!row) throw new NotFoundError('Supplier', id);
     return toSupplier(row);
   },
 
-  create(
+  async create(
     db: AppDb,
     tenantId: number,
     input: CreateSupplierInput,
     actorId: string = SYSTEM_USER_ID,
-  ): Supplier {
-    const dup = supplierRepository.findByName(db, tenantId, input.name);
+  ): Promise<Supplier> {
+    const dup = await supplierRepository.findByName(db, tenantId, input.name);
     if (dup) {
       throw new ConflictError(`A supplier named "${input.name}" already exists`, {
         name: 'duplicate',
       });
     }
     const now = Date.now();
-    const row = supplierRepository.insert(db, {
+    const row = await supplierRepository.insert(db, {
       id: newId(),
       tenantId,
       name: input.name,
@@ -57,17 +58,17 @@ export const SupplierService = {
     return toSupplier(row);
   },
 
-  update(
+  async update(
     db: AppDb,
     tenantId: number,
     input: UpdateSupplierInput,
     actorId: string = SYSTEM_USER_ID,
-  ): Supplier {
-    const existing = supplierRepository.findById(db, tenantId, input.id);
+  ): Promise<Supplier> {
+    const existing = await supplierRepository.findById(db, tenantId, input.id);
     if (!existing) throw new NotFoundError('Supplier', input.id);
 
     if (input.name && input.name !== existing.name) {
-      const dup = supplierRepository.findByName(db, tenantId, input.name);
+      const dup = await supplierRepository.findByName(db, tenantId, input.name);
       if (dup && dup.id !== existing.id) {
         throw new ConflictError(`A supplier named "${input.name}" already exists`, {
           name: 'duplicate',
@@ -82,20 +83,20 @@ export const SupplierService = {
     if (input.notes !== undefined) patch['notes'] = input.notes;
     if (input.isActive !== undefined) patch['isActive'] = input.isActive;
 
-    const row = supplierRepository.update(db, tenantId, input.id, patch);
+    const row = await supplierRepository.update(db, tenantId, input.id, patch);
     if (!row) throw new NotFoundError('Supplier', input.id);
     return toSupplier(row);
   },
 
-  deactivate(
+  async deactivate(
     db: AppDb,
     tenantId: number,
     id: string,
     actorId: string = SYSTEM_USER_ID,
-  ): Supplier {
-    const existing = supplierRepository.findById(db, tenantId, id);
+  ): Promise<Supplier> {
+    const existing = await supplierRepository.findById(db, tenantId, id);
     if (!existing) throw new NotFoundError('Supplier', id);
-    const row = supplierRepository.update(db, tenantId, id, {
+    const row = await supplierRepository.update(db, tenantId, id, {
       isActive: false,
       updatedAt: Date.now(),
       updatedBy: actorId,

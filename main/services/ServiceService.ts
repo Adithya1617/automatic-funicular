@@ -30,7 +30,7 @@ import { SYSTEM_USER_ID } from '@shared/constants/system';
 import { toBase } from '@shared/utils/unitConverter';
 
 function toEvent(
-  row: ReturnType<typeof serviceEventRepository.findById>,
+  row: Awaited<ReturnType<typeof serviceEventRepository.findById>>,
 ): ServiceEvent {
   if (!row) throw new Error('toEvent called with empty row');
   return row as unknown as ServiceEvent;
@@ -41,16 +41,15 @@ function round2(n: number): number {
 }
 
 export const ServiceService = {
-  list(db: AppDb, tenantId: number, filter: ListServiceEventsInput): ServiceEvent[] {
-    return serviceEventRepository
-      .list(db, tenantId, filter)
-      .map((r) => r as unknown as ServiceEvent);
+  async list(db: AppDb, tenantId: number, filter: ListServiceEventsInput): Promise<ServiceEvent[]> {
+    const rows = await serviceEventRepository.list(db, tenantId, filter);
+    return rows.map((r) => r as unknown as ServiceEvent);
   },
 
-  get(db: AppDb, tenantId: number, id: string): ServiceEventWithLines {
-    const row = serviceEventRepository.findById(db, tenantId, id);
+  async get(db: AppDb, tenantId: number, id: string): Promise<ServiceEventWithLines> {
+    const row = await serviceEventRepository.findById(db, tenantId, id);
     if (!row) throw new NotFoundError('ServiceEvent', id);
-    const lines = serviceEventLineRepository.listForEvent(db, id);
+    const lines = await serviceEventLineRepository.listForEvent(db, id);
     return {
       ...(row as unknown as ServiceEvent),
       lines: lines as unknown as ServiceEventLine[],
@@ -64,19 +63,19 @@ export const ServiceService = {
    * (service_consumed minus any service_reversal, clamped at 0), so it reflects
    * what was really spent rather than today's average cost.
    */
-  listWithLines(
+  async listWithLines(
     db: AppDb,
     tenantId: number,
     filter: ListServiceEventsInput,
-  ): ServiceEventWithCost[] {
-    const events = serviceEventRepository.list(db, tenantId, filter);
-    const lineRows = serviceEventLineRepository.listForEvents(
+  ): Promise<ServiceEventWithCost[]> {
+    const events = await serviceEventRepository.list(db, tenantId, filter);
+    const lineRows = await serviceEventLineRepository.listForEvents(
       db,
       events.map((e) => e.id),
     );
 
     // Net snapshot cost per line id, from its consumption / reversal movements.
-    const movements = stockMovementRepository.listByReferenceIds(
+    const movements = await stockMovementRepository.listByReferenceIds(
       db,
       tenantId,
       'service_event_line',
@@ -121,16 +120,16 @@ export const ServiceService = {
    * service_event_lines so the operator can tweak quantities per-event before
    * completing.
    */
-  create(
+  async create(
     db: AppDb,
     tenantId: number,
     input: CreateServiceEventInput,
     actorId: string = SYSTEM_USER_ID,
-  ): ServiceEventWithLines {
-    const bike = bikeRepository.findById(db, tenantId, input.bikeId);
+  ): Promise<ServiceEventWithLines> {
+    const bike = await bikeRepository.findById(db, tenantId, input.bikeId);
     if (!bike) throw new NotFoundError('Bike', input.bikeId);
 
-    const template = serviceTemplateRepository.findById(
+    const template = await serviceTemplateRepository.findById(
       db,
       tenantId,
       input.serviceTemplateId,
@@ -143,7 +142,7 @@ export const ServiceService = {
       );
     }
 
-    const recipe = recipeRepository.findActiveVersion(db, {
+    const recipe = await recipeRepository.findActiveVersion(db, {
       tenantId,
       parentId: template.id,
       parentType: 'service_template',
@@ -154,16 +153,16 @@ export const ServiceService = {
       );
     }
 
-    const recipeRows = recipeRepository.ingredientsForVersion(db, recipe.id);
+    const recipeRows = await recipeRepository.ingredientsForVersion(db, recipe.id);
     if (recipeRows.length === 0) {
       throw new ValidationError(
         `Service template "${template.name}" has an active version but no parts — add at least one part row before starting a service`,
       );
     }
 
-    return db.transaction((tx) => {
+    return db.transaction(async (tx) => {
       const now = Date.now();
-      const event = serviceEventRepository.insert(tx, {
+      const event = await serviceEventRepository.insert(tx, {
         id: newId(),
         tenantId,
         bikeId: input.bikeId,
@@ -183,7 +182,7 @@ export const ServiceService = {
         updatedBy: actorId,
       });
 
-      const lines = serviceEventLineRepository.insertMany(
+      const lines = await serviceEventLineRepository.insertMany(
         tx,
         recipeRows.map((row, idx) => ({
           id: newId(),
@@ -214,13 +213,13 @@ export const ServiceService = {
    *     in the same transaction; if any line fails the whole thing rolls back.
    * `kind` defaults to 'service' when omitted so legacy callers keep working.
    */
-  createAdHoc(
+  async createAdHoc(
     db: AppDb,
     tenantId: number,
     input: CreateAdHocServiceEventInput,
     actorId: string = SYSTEM_USER_ID,
-  ): ServiceEventWithLines {
-    const bike = bikeRepository.findById(db, tenantId, input.bikeId);
+  ): Promise<ServiceEventWithLines> {
+    const bike = await bikeRepository.findById(db, tenantId, input.bikeId);
     if (!bike) throw new NotFoundError('Bike', input.bikeId);
 
     const kind = input.kind ?? 'service';
@@ -240,16 +239,16 @@ export const ServiceService = {
     // Validate every line up-front so we don't half-write an event then fail
     // on the third applyMovement call.
     for (const line of inputLines) {
-      const ing = ingredientRepository.findById(db, tenantId, line.ingredientId);
+      const ing = await ingredientRepository.findById(db, tenantId, line.ingredientId);
       if (!ing) throw new NotFoundError('Ingredient', line.ingredientId);
       toBase(line.quantity, line.unit, ing.baseUnit, {
         densityGPerMl: ing.densityGPerMl ?? undefined,
       });
     }
 
-    return db.transaction((tx) => {
+    return db.transaction(async (tx) => {
       const now = Date.now();
-      const event = serviceEventRepository.insert(tx, {
+      const event = await serviceEventRepository.insert(tx, {
         id: newId(),
         tenantId,
         bikeId: input.bikeId,
@@ -272,7 +271,7 @@ export const ServiceService = {
       const lines =
         inputLines.length === 0
           ? []
-          : serviceEventLineRepository.insertMany(
+          : await serviceEventLineRepository.insertMany(
               tx,
               inputLines.map((line, idx) => ({
                 id: newId(),
@@ -288,7 +287,7 @@ export const ServiceService = {
       // Stock only moves when the event is created already completed.
       if (status === 'completed') {
         for (const line of lines) {
-          InventoryService.applyMovement(
+          await InventoryService.applyMovement(
             tx,
             tenantId,
             {
@@ -319,13 +318,13 @@ export const ServiceService = {
    * just flips to completed with no movements. Moving a completed event back is
    * refused — cancel it instead. Cancelled events are terminal.
    */
-  setStatus(
+  async setStatus(
     db: AppDb,
     tenantId: number,
     input: SetServiceEventStatusInput,
     actorId: string = SYSTEM_USER_ID,
-  ): ServiceEventWithLines {
-    const existing = serviceEventRepository.findById(db, tenantId, input.id);
+  ): Promise<ServiceEventWithLines> {
+    const existing = await serviceEventRepository.findById(db, tenantId, input.id);
     if (!existing) throw new NotFoundError('ServiceEvent', input.id);
     if (existing.status === input.status) {
       return ServiceService.get(db, tenantId, input.id);
@@ -335,15 +334,15 @@ export const ServiceService = {
     }
 
     if (input.status === 'completed') {
-      const lines = serviceEventLineRepository.listForEvent(db, input.id);
+      const lines = await serviceEventLineRepository.listForEvent(db, input.id);
       if (existing.kind !== 'wash' && lines.length === 0) {
         throw new ValidationError(
           'Add at least one part before completing this event',
         );
       }
-      db.transaction((tx) => {
+      await db.transaction(async (tx) => {
         for (const line of lines) {
-          InventoryService.applyMovement(
+          await InventoryService.applyMovement(
             tx,
             tenantId,
             {
@@ -360,7 +359,7 @@ export const ServiceService = {
           );
         }
         const now = Date.now();
-        serviceEventRepository.update(tx, tenantId, input.id, {
+        await serviceEventRepository.update(tx, tenantId, input.id, {
           status: 'completed',
           completedAt: now,
           updatedAt: now,
@@ -375,7 +374,7 @@ export const ServiceService = {
         );
       }
       const now = Date.now();
-      serviceEventRepository.update(db, tenantId, input.id, {
+      await serviceEventRepository.update(db, tenantId, input.id, {
         status: input.status,
         completedAt: null,
         updatedAt: now,
@@ -391,13 +390,13 @@ export const ServiceService = {
    * operator tweaks quantities before completing (e.g. extra oil top-up).
    * Refuses completed / cancelled events.
    */
-  updateLines(
+  async updateLines(
     db: AppDb,
     tenantId: number,
     input: UpdateServiceEventLinesInput,
     actorId: string = SYSTEM_USER_ID,
-  ): ServiceEventWithLines {
-    const existing = serviceEventRepository.findById(db, tenantId, input.id);
+  ): Promise<ServiceEventWithLines> {
+    const existing = await serviceEventRepository.findById(db, tenantId, input.id);
     if (!existing) throw new NotFoundError('ServiceEvent', input.id);
     if (existing.status !== 'in_progress') {
       throw new ConflictError(
@@ -409,7 +408,7 @@ export const ServiceService = {
     // Catches typos and wrong-unit-for-this-part early so we don't half-replace
     // a line set and then fail.
     for (const line of input.lines) {
-      const ing = ingredientRepository.findById(db, tenantId, line.ingredientId);
+      const ing = await ingredientRepository.findById(db, tenantId, line.ingredientId);
       if (!ing) throw new NotFoundError('Ingredient', line.ingredientId);
       // Throws ValidationError if unit can't convert.
       toBase(line.quantity, line.unit, ing.baseUnit, {
@@ -417,8 +416,8 @@ export const ServiceService = {
       });
     }
 
-    return db.transaction((tx) => {
-      serviceEventLineRepository.replaceLines(
+    return db.transaction(async (tx) => {
+      await serviceEventLineRepository.replaceLines(
         tx,
         input.id,
         input.lines.map((line, idx) => ({
@@ -431,12 +430,12 @@ export const ServiceService = {
           displayOrder: line.displayOrder || idx,
         })),
       );
-      serviceEventRepository.update(tx, tenantId, input.id, {
+      await serviceEventRepository.update(tx, tenantId, input.id, {
         updatedAt: Date.now(),
         updatedBy: actorId,
       });
-      const fresh = serviceEventRepository.findById(tx, tenantId, input.id);
-      const lines = serviceEventLineRepository.listForEvent(tx, input.id);
+      const fresh = await serviceEventRepository.findById(tx, tenantId, input.id);
+      const lines = await serviceEventLineRepository.listForEvent(tx, input.id);
       return {
         ...(fresh as unknown as ServiceEvent),
         lines: lines as unknown as ServiceEventLine[],
@@ -452,13 +451,13 @@ export const ServiceService = {
    * If any line fails (e.g. insufficient stock), the whole completion rolls
    * back — the event stays in_progress.
    */
-  complete(
+  async complete(
     db: AppDb,
     tenantId: number,
     id: string,
     actorId: string = SYSTEM_USER_ID,
-  ): ServiceEventWithLines {
-    const existing = serviceEventRepository.findById(db, tenantId, id);
+  ): Promise<ServiceEventWithLines> {
+    const existing = await serviceEventRepository.findById(db, tenantId, id);
     if (!existing) throw new NotFoundError('ServiceEvent', id);
     if (existing.status === 'completed') {
       return ServiceService.get(db, tenantId, id);
@@ -467,16 +466,16 @@ export const ServiceService = {
       throw new ConflictError('Cannot complete a cancelled service event');
     }
 
-    const lines = serviceEventLineRepository.listForEvent(db, id);
+    const lines = await serviceEventLineRepository.listForEvent(db, id);
     if (lines.length === 0) {
       throw new ValidationError(
         'Service event has no parts to consume — edit the line list before completing',
       );
     }
 
-    db.transaction((tx) => {
+    await db.transaction(async (tx) => {
       for (const line of lines) {
-        InventoryService.applyMovement(
+        await InventoryService.applyMovement(
           tx,
           tenantId,
           {
@@ -493,7 +492,7 @@ export const ServiceService = {
         );
       }
       const now = Date.now();
-      serviceEventRepository.update(tx, tenantId, id, {
+      await serviceEventRepository.update(tx, tenantId, id, {
         status: 'completed',
         completedAt: now,
         updatedAt: now,
@@ -512,13 +511,13 @@ export const ServiceService = {
    *                  true  → wastage movements (stock NOT restored, double-deducts)
    *   cancelled   → idempotent; returns the existing record.
    */
-  cancel(
+  async cancel(
     db: AppDb,
     tenantId: number,
     input: CancelServiceEventInput,
     actorId: string = SYSTEM_USER_ID,
-  ): ServiceEventWithLines {
-    const existing = serviceEventRepository.findById(db, tenantId, input.id);
+  ): Promise<ServiceEventWithLines> {
+    const existing = await serviceEventRepository.findById(db, tenantId, input.id);
     if (!existing) throw new NotFoundError('ServiceEvent', input.id);
     if (existing.status === 'cancelled') {
       return ServiceService.get(db, tenantId, input.id);
@@ -530,7 +529,7 @@ export const ServiceService = {
       );
     }
 
-    const lines = serviceEventLineRepository.listForEvent(db, input.id);
+    const lines = await serviceEventLineRepository.listForEvent(db, input.id);
     const reason: 'service_reversal' | 'wastage' | null =
       existing.status === 'completed'
         ? input.partsUsed
@@ -538,14 +537,14 @@ export const ServiceService = {
           : 'service_reversal'
         : null;
 
-    db.transaction((tx) => {
+    await db.transaction(async (tx) => {
       if (reason && lines.length > 0) {
         for (const line of lines) {
           // service_reversal restores stock (direction +1); wastage continues
           // to deduct (direction -1) — the original consumption stays put and
           // this wastage records the loss for cost reporting.
           const direction = reason === 'service_reversal' ? 1 : -1;
-          InventoryService.applyMovement(
+          await InventoryService.applyMovement(
             tx,
             tenantId,
             {
@@ -564,7 +563,7 @@ export const ServiceService = {
       }
 
       const now = Date.now();
-      serviceEventRepository.update(tx, tenantId, input.id, {
+      await serviceEventRepository.update(tx, tenantId, input.id, {
         status: 'cancelled',
         cancelledAt: now,
         cancelledPartsUsed:

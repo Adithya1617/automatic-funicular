@@ -13,7 +13,7 @@ export type InvoiceFilter = {
 };
 
 export const invoiceRepository = {
-  list(db: AppDb, tenantId: number, filter: InvoiceFilter = {}): InvoiceRow[] {
+  async list(db: AppDb, tenantId: number, filter: InvoiceFilter = {}): Promise<InvoiceRow[]> {
     const conditions: SQL[] = [eq(invoices.tenantId, tenantId)];
     if (filter.status) conditions.push(eq(invoices.status, filter.status));
     if (filter.supplierId) conditions.push(eq(invoices.supplierId, filter.supplierId));
@@ -25,25 +25,24 @@ export const invoiceRepository = {
       .from(invoices)
       .where(and(...conditions))
       .orderBy(desc(invoices.invoiceDate))
-      .limit(Math.max(1, Math.min(500, filter.limit ?? 200)))
-      .all();
+      .limit(Math.max(1, Math.min(500, filter.limit ?? 200)));
   },
 
-  findById(db: AppDb, tenantId: number, id: string): InvoiceRow | undefined {
-    return db
+  async findById(db: AppDb, tenantId: number, id: string): Promise<InvoiceRow | undefined> {
+    const rows = await db
       .select()
       .from(invoices)
-      .where(and(eq(invoices.tenantId, tenantId), eq(invoices.id, id)))
-      .get();
+      .where(and(eq(invoices.tenantId, tenantId), eq(invoices.id, id)));
+    return rows[0];
   },
 
-  findByNumber(
+  async findByNumber(
     db: AppDb,
     tenantId: number,
     supplierId: string,
     invoiceNumber: string,
-  ): InvoiceRow | undefined {
-    return db
+  ): Promise<InvoiceRow | undefined> {
+    const rows = await db
       .select()
       .from(invoices)
       .where(
@@ -52,37 +51,39 @@ export const invoiceRepository = {
           eq(invoices.supplierId, supplierId),
           eq(invoices.invoiceNumber, invoiceNumber),
         ),
-      )
-      .get();
+      );
+    return rows[0];
   },
 
-  insert(db: AppDb, row: InvoiceInsert): InvoiceRow {
-    return db.insert(invoices).values(row).returning().get();
+  async insert(db: AppDb, row: InvoiceInsert): Promise<InvoiceRow> {
+    const [inserted] = await db.insert(invoices).values(row).returning();
+    if (!inserted) throw new Error('invoice insert returned no row');
+    return inserted;
   },
 
-  update(
+  async update(
     db: AppDb,
     tenantId: number,
     id: string,
     patch: Partial<InvoiceInsert>,
-  ): InvoiceRow | undefined {
-    return db
+  ): Promise<InvoiceRow | undefined> {
+    const [updated] = await db
       .update(invoices)
       .set(patch)
       .where(and(eq(invoices.tenantId, tenantId), eq(invoices.id, id)))
-      .returning()
-      .get();
+      .returning();
+    return updated;
   },
 
   /**
    * Committed invoices whose `committed_at` falls inside [start, end). Drives
    * the spending tile and supplier breakdown.
    */
-  listCommittedInRange(
+  async listCommittedInRange(
     db: AppDb,
     tenantId: number,
     range: InvoiceDateRange,
-  ): InvoiceRow[] {
+  ): Promise<InvoiceRow[]> {
     return db
       .select()
       .from(invoices)
@@ -94,7 +95,6 @@ export const invoiceRepository = {
           lt(invoices.committedAt, range.endMs),
         ),
       )
-      .orderBy(asc(invoices.committedAt))
-      .all();
+      .orderBy(asc(invoices.committedAt));
   },
 };
