@@ -3,11 +3,13 @@ import type {
   CancelServiceEventInput,
   CreateAdHocServiceEventInput,
   CreateServiceEventInput,
+  DeleteServiceEventInput,
   ListServiceEventsInput,
   ServiceEvent,
   ServiceEventKind,
   ServiceEventWithLines,
   SetServiceEventStatusInput,
+  UpdateServiceEventInput,
   UpdateServiceEventLinesInput,
 } from '@shared/schemas/serviceEvent';
 import { unwrap } from '@renderer/lib/ipc';
@@ -114,6 +116,45 @@ export function useUpdateServiceEventLines() {
     onSuccess: (updated: ServiceEventWithLines) => {
       qc.invalidateQueries({ queryKey: ['serviceEvents'] });
       qc.setQueryData(itemKey(updated.id), updated);
+    },
+  });
+}
+
+/**
+ * Full edit of an event (including a completed one). The service reconciles
+ * stock when the parts change, so refresh part counts, movements, and the
+ * dashboard alongside the event lists.
+ */
+export function useUpdateServiceEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateServiceEventInput) =>
+      unwrap(window.hyprride.serviceEvent.update(input)),
+    onSuccess: (updated: ServiceEventWithLines) => {
+      qc.invalidateQueries({ queryKey: ['serviceEvents'] });
+      qc.invalidateQueries({ queryKey: ['ingredients'] });
+      qc.invalidateQueries({ queryKey: ['stockMovements'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.setQueryData(itemKey(updated.id), updated);
+    },
+  });
+}
+
+/**
+ * Delete an event. Deleting a completed one restores its parts to stock, so
+ * refresh part counts, movements, and the dashboard.
+ */
+export function useDeleteServiceEvent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: DeleteServiceEventInput) =>
+      unwrap(window.hyprride.serviceEvent.remove(input)),
+    onSuccess: (_res, input) => {
+      qc.invalidateQueries({ queryKey: ['serviceEvents'] });
+      qc.invalidateQueries({ queryKey: ['ingredients'] });
+      qc.invalidateQueries({ queryKey: ['stockMovements'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.removeQueries({ queryKey: itemKey(input.id) });
     },
   });
 }

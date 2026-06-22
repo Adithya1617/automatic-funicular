@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import type { ServiceEventLine, ServiceEventLineInput } from '@shared/schemas/serviceEvent';
 import type { Ingredient } from '@shared/schemas/ingredient';
 import { Button } from '@renderer/components/ui/button';
@@ -37,12 +37,19 @@ import {
   useCancelServiceEvent,
   useCompleteServiceEvent,
   useServiceEvent,
+  useUpdateServiceEvent,
   useUpdateServiceEventLines,
 } from '@renderer/hooks/ipc/useServiceEvents';
 import { unitsCompatibleWithBase } from '@shared/constants/unitConversions';
 import { formatINR } from '@shared/utils/currency';
-import { formatStock } from '@renderer/lib/format';
+import {
+  dateInputToMs,
+  formatStock,
+  msToDateInput,
+  todayDateInput,
+} from '@renderer/lib/format';
 import { ServiceStatusBadge } from '@renderer/features/maintenance/ServiceStatusBadge';
+import { DeleteEventButton } from '@renderer/features/maintenance/DeleteEventButton';
 
 const KIND_LABELS: Record<'service' | 'repair' | 'wash', string> = {
   service: 'Service (oil change)',
@@ -92,6 +99,7 @@ export function ServiceEventEditorPage() {
   const { data: template } = useServiceTemplate(event?.serviceTemplateId);
 
   const update = useUpdateServiceEventLines();
+  const edit = useUpdateServiceEvent();
   const complete = useCompleteServiceEvent();
   const cancel = useCancelServiceEvent();
 
@@ -99,9 +107,20 @@ export function ServiceEventEditorPage() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [cancelPartsUsed, setCancelPartsUsed] = useState<boolean>(false);
+  // Edit mode for an already-completed event (fix a mistake). Toggled on by the
+  // "Edit" button; unlocks the part rows + the scalar fields below.
+  const [editing, setEditing] = useState(false);
+  const [odoDraft, setOdoDraft] = useState('');
+  const [notesDraft, setNotesDraft] = useState('');
+  const [dateDraft, setDateDraft] = useState(todayDateInput());
 
   useEffect(() => {
-    if (event) setDraft(linesToDraft(event.lines));
+    if (!event) return;
+    setDraft(linesToDraft(event.lines));
+    setOdoDraft(event.odometerKm != null ? String(event.odometerKm) : '');
+    setNotesDraft(event.notes ?? '');
+    setDateDraft(msToDateInput(event.completedAt ?? event.startedAt));
+    setEditing(false);
   }, [event?.id, event?.lines]);
 
   const bike = useMemo(
@@ -122,6 +141,10 @@ export function ServiceEventEditorPage() {
   const isOpen = event.status === 'in_progress' || event.status === 'requested';
   const isCompleted = event.status === 'completed';
   const isCancelled = event.status === 'cancelled';
+  // Part rows are editable while the event is open, or when a completed event
+  // has been put into edit mode.
+  const canEditLines = isOpen || (isCompleted && editing);
+  const needsParts = event.kind !== 'wash';
 
   const kindLabel = event.serviceTemplateId
     ? template?.name ?? 'Template service'
@@ -150,6 +173,44 @@ export function ServiceEventEditorPage() {
       await complete.mutateAsync(id!);
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Could not complete service');
+    }
+  }
+
+  async function onSaveCompleted() {
+    setServerError(null);
+    if (!allValid) {
+      setServerError('Fix the part rows before saving');
+      return;
+    }
+    if (needsParts && draft.length === 0) {
+      setServerError('Add at least one part, or delete the event instead');
+      return;
+    }
+    const odo = odoDraft.trim() === '' ? null : Number.parseFloat(odoDraft);
+    const odoFinal = odo != null && Number.isFinite(odo) && odo >= 0 ? odo : null;
+    const trimmedNotes = notesDraft.trim();
+    try {
+      await edit.mutateAsync({
+        id: id!,
+        lines: draftToInputs(draft),
+        odometerKm: odoFinal,
+        notes: trimmedNotes === '' ? null : trimmedNotes,
+        occurredAt: dateInputToMs(dateDraft) ?? undefined,
+      });
+      setEditing(false);
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : 'Could not save changes');
+    }
+  }
+
+  function discardEdit() {
+    setServerError(null);
+    setEditing(false);
+    if (event) {
+      setDraft(linesToDraft(event.lines));
+      setOdoDraft(event.odometerKm != null ? String(event.odometerKm) : '');
+      setNotesDraft(event.notes ?? '');
+      setDateDraft(msToDateInput(event.completedAt ?? event.startedAt));
     }
   }
 
@@ -263,46 +324,124 @@ export function ServiceEventEditorPage() {
               </Button>
             </>
           ) : isCompleted ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="md"
-              onClick={() => setCancelDialogOpen(true)}
-              className="text-text-danger"
-            >
-              Cancel & adjust
-            </Button>
+            editing ? (
+              <>
+                <Button type="button" variant="ghost" size="md" onClick={discardEdit}>
+                  Discard
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="md"
+                  onClick={onSaveCompleted}
+                  disabled={edit.isPending || !allValid}
+                >
+                  Save changes
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="md"
+                  onClick={() => {
+                    setServerError(null);
+                    setEditing(true);
+                  }}
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </Button>
+                <DeleteEventButton
+                  eventId={event.id}
+                  kind={event.kind}
+                  completed
+                  label="Delete"
+                  onDeleted={() => navigate('/services')}
+                />
+              </>
+            )
+          ) : isCancelled ? (
+            <DeleteEventButton
+              eventId={event.id}
+              kind={event.kind}
+              completed={false}
+              label="Delete"
+              onDeleted={() => navigate('/services')}
+            />
           ) : null}
         </div>
       </div>
 
       <section className="rounded-lg border border-border-tertiary bg-background-primary p-4">
         <h2 className="mb-3 text-[13px] font-medium text-text-primary">Details</h2>
-        <div className="grid grid-cols-4 gap-3 text-[12px]">
-          <Detail label="Bike" value={bike?.bikeNumber ?? '—'} />
-          <Detail label="Type" value={kindLabel} />
-          <Detail
-            label="Odometer"
-            value={event.odometerKm != null ? `${event.odometerKm.toLocaleString('en-IN')} km` : '—'}
-          />
-          <Detail
-            label="Theoretical cost"
-            value={totalCost > 0 ? formatINR(totalCost) : '—'}
-          />
-        </div>
-        {event.notes ? (
-          <div className="mt-3 rounded-md bg-background-secondary p-2 text-[12px] text-text-secondary">
-            {event.notes}
-          </div>
-        ) : null}
+        {isCompleted && editing ? (
+          <>
+            <div className="grid grid-cols-4 gap-3 text-[12px]">
+              <Detail label="Bike" value={bike?.bikeNumber ?? '—'} />
+              <Detail label="Type" value={kindLabel} />
+              <div className="grid gap-1">
+                <Label htmlFor="edit-date">Date</Label>
+                <Input
+                  id="edit-date"
+                  type="date"
+                  max={todayDateInput()}
+                  value={dateDraft}
+                  onChange={(e) => setDateDraft(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-1">
+                <Label htmlFor="edit-odo">Odometer (km)</Label>
+                <Input
+                  id="edit-odo"
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={odoDraft}
+                  onChange={(e) => setOdoDraft(e.target.value)}
+                  placeholder="optional"
+                />
+              </div>
+            </div>
+            <div className="mt-3 grid gap-1">
+              <Label htmlFor="edit-notes">Notes</Label>
+              <Input
+                id="edit-notes"
+                value={notesDraft}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                placeholder="optional"
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="grid grid-cols-4 gap-3 text-[12px]">
+              <Detail label="Bike" value={bike?.bikeNumber ?? '—'} />
+              <Detail label="Type" value={kindLabel} />
+              <Detail
+                label="Odometer"
+                value={event.odometerKm != null ? `${event.odometerKm.toLocaleString('en-IN')} km` : '—'}
+              />
+              <Detail
+                label="Theoretical cost"
+                value={totalCost > 0 ? formatINR(totalCost) : '—'}
+              />
+            </div>
+            {event.notes ? (
+              <div className="mt-3 rounded-md bg-background-secondary p-2 text-[12px] text-text-secondary">
+                {event.notes}
+              </div>
+            ) : null}
+          </>
+        )}
       </section>
 
       <section className="rounded-lg border border-border-tertiary bg-background-primary p-4">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-[13px] font-medium text-text-primary">
-            Parts {isOpen ? '· editable until you complete' : ''}
+            Parts {canEditLines ? '· editable' : ''}
           </h2>
-          {isOpen ? (
+          {canEditLines && needsParts ? (
             <Button type="button" variant="ghost" size="sm" onClick={addRow}>
               + Add row
             </Button>
@@ -316,13 +455,13 @@ export function ServiceEventEditorPage() {
               <TableHead className="w-[120px]">Quantity</TableHead>
               <TableHead className="w-[100px]">Unit</TableHead>
               <TableHead className="text-right">Stock</TableHead>
-              {isOpen ? <TableHead className="w-[40px]" /> : null}
+              {canEditLines ? <TableHead className="w-[40px]" /> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
             {draft.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isOpen ? 5 : 4} className="text-center text-text-tertiary">
+                <TableCell colSpan={canEditLines ? 5 : 4} className="text-center text-text-tertiary">
                   No parts on this service yet.
                 </TableCell>
               </TableRow>
@@ -333,7 +472,7 @@ export function ServiceEventEditorPage() {
                 return (
                   <TableRow key={row.key}>
                     <TableCell>
-                      {isOpen ? (
+                      {canEditLines ? (
                         <Select
                           value={row.ingredientId}
                           onValueChange={(v) => patchRow(row.key, { ingredientId: v })}
@@ -354,7 +493,7 @@ export function ServiceEventEditorPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {isOpen ? (
+                      {canEditLines ? (
                         <Input
                           type="number"
                           min={0}
@@ -369,7 +508,7 @@ export function ServiceEventEditorPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {isOpen && compatibleUnits.length > 0 ? (
+                      {canEditLines && compatibleUnits.length > 0 ? (
                         <Select
                           value={row.unit}
                           onValueChange={(v) => patchRow(row.key, { unit: v })}
@@ -392,7 +531,7 @@ export function ServiceEventEditorPage() {
                     <TableCell className="text-right tabular-nums text-text-tertiary">
                       {ing ? formatStock(ing.stockQuantity, ing.baseUnit) : '—'}
                     </TableCell>
-                    {isOpen ? (
+                    {canEditLines ? (
                       <TableCell>
                         <Button
                           type="button"

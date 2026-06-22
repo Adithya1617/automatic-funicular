@@ -47,12 +47,14 @@ import type {
   CompleteServiceEventInput,
   CreateAdHocServiceEventInput,
   CreateServiceEventInput,
+  DeleteServiceEventInput,
   GetServiceEventInput,
   ListServiceEventsInput,
   ServiceEvent,
   ServiceEventWithCost,
   ServiceEventWithLines,
   SetServiceEventStatusInput,
+  UpdateServiceEventInput,
   UpdateServiceEventLinesInput,
 } from './schemas/serviceEvent';
 import type { ListStockMovementsInput, StockMovement } from './schemas/stockMovement';
@@ -187,9 +189,11 @@ export type HyprrideBridge = {
     create: Invoke<CreateServiceEventInput, ServiceEventWithLines>;
     createAdHoc: Invoke<CreateAdHocServiceEventInput, ServiceEventWithLines>;
     updateLines: Invoke<UpdateServiceEventLinesInput, ServiceEventWithLines>;
+    update: Invoke<UpdateServiceEventInput, ServiceEventWithLines>;
     complete: Invoke<CompleteServiceEventInput, ServiceEventWithLines>;
     setStatus: Invoke<SetServiceEventStatusInput, ServiceEventWithLines>;
     cancel: Invoke<CancelServiceEventInput, ServiceEventWithLines>;
+    remove: Invoke<DeleteServiceEventInput, { id: string }>;
   };
   stockMovement: {
     list: Invoke<ListStockMovementsInput, StockMovement[]>;

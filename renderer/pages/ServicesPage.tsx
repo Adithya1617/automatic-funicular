@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { History, Plus } from 'lucide-react';
+import { History, Pencil, Plus } from 'lucide-react';
 import { Button } from '@renderer/components/ui/button';
 import {
   Table,
@@ -16,13 +16,14 @@ import {
 } from '@renderer/hooks/ipc/useServiceEvents';
 import { useBikes } from '@renderer/hooks/ipc/useBikes';
 import { useIngredients } from '@renderer/hooks/ipc/useIngredients';
-import { formatRelativeTime } from '@renderer/lib/format';
+import { formatDate } from '@renderer/lib/format';
 import { serviceOilLines } from '@renderer/lib/parts';
 import { formatINR } from '@shared/utils/currency';
 import type { SettableServiceEventStatus } from '@shared/schemas/serviceEvent';
 import { ServiceDialog } from '@renderer/features/services/ServiceDialog';
 import { BikeHistoryDialog } from '@renderer/features/maintenance/BikeHistoryDialog';
 import { StatusSelect } from '@renderer/features/maintenance/StatusSelect';
+import { DeleteEventButton } from '@renderer/features/maintenance/DeleteEventButton';
 
 export function ServicesPage() {
   const navigate = useNavigate();
@@ -104,12 +105,13 @@ export function ServicesPage() {
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Oil cost</TableHead>
                 <TableHead className="text-right">Odometer</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {events.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-text-tertiary">
+                  <TableCell colSpan={6} className="text-center text-text-tertiary">
                     No services yet — click <span className="font-medium">+ Request service</span> to add one.
                   </TableCell>
                 </TableRow>
@@ -120,11 +122,7 @@ export function ServicesPage() {
                     0,
                   );
                   return (
-                    <TableRow
-                      key={e.id}
-                      onClick={() => navigate(`/services/${e.id}/edit`)}
-                      className="cursor-pointer"
-                    >
+                    <TableRow key={e.id}>
                       <TableCell>
                         <span className="font-medium text-text-primary">
                           {bikeById.get(e.bikeId)?.bikeNumber ?? e.bikeId.slice(0, 8)}
@@ -132,7 +130,7 @@ export function ServicesPage() {
                       </TableCell>
                       <TableCell>
                         <span className="text-text-tertiary">
-                          {formatRelativeTime(e.completedAt ?? e.startedAt)}
+                          {formatDate(e.completedAt ?? e.startedAt)}
                         </span>
                       </TableCell>
                       <TableCell onClick={(ev) => ev.stopPropagation()}>
@@ -147,6 +145,24 @@ export function ServicesPage() {
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-text-secondary">
                         {e.odometerKm != null ? `${e.odometerKm.toLocaleString('en-IN')} km` : '—'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/services/${e.id}/edit`)}
+                            title="Edit"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <DeleteEventButton
+                            eventId={e.id}
+                            kind="service"
+                            completed={e.status === 'completed'}
+                          />
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

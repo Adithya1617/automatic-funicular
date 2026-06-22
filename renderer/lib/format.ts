@@ -60,3 +60,55 @@ const dateTimeLongFormatter = new Intl.DateTimeFormat('en-GB', {
 export function formatDateTimeLong(when: number): string {
   return dateTimeLongFormatter.format(when);
 }
+
+const dateOnlyFormatter = new Intl.DateTimeFormat('en-GB', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+});
+
+/** "16 Jun 2026" — calendar date only, for service / repair / wash records. */
+export function formatDate(when: number): string {
+  return dateOnlyFormatter.format(when);
+}
+
+/** Today as a `yyyy-MM-dd` string for <input type="date"> defaults / max. */
+export function todayDateInput(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Convert an <input type="date"> value (`yyyy-MM-dd`) into a Unix-ms timestamp
+ * at local noon (noon avoids any timezone day-shift when it's formatted back).
+ * Returns `null` only for an empty / malformed value. Use this when editing,
+ * where the chosen date should always be applied verbatim.
+ */
+export function dateInputToMs(value: string): number | null {
+  if (!value) return null;
+  const [y, m, d] = value.split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d, 12, 0, 0, 0).getTime();
+}
+
+/** Inverse of {@link dateInputToMs}: a `yyyy-MM-dd` string for prefilling. */
+export function msToDateInput(ms: number): string {
+  const d = new Date(ms);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Like {@link dateInputToMs} but returns `null` for an empty value or when the
+ * date is today, so creation callers send `null` and let the service stamp the
+ * exact current time instead of a noon-rounded one.
+ */
+export function eventDateToMs(value: string): number | null {
+  if (!value || value === todayDateInput()) return null;
+  return dateInputToMs(value);
+}

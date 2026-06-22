@@ -25,7 +25,7 @@ import { StatusPicker } from '@renderer/features/maintenance/StatusPicker';
 import { DEFAULT_SERVICE_OIL_ML } from '@shared/constants/system';
 import type { SettableServiceEventStatus } from '@shared/schemas/serviceEvent';
 import { formatBikeTypeLabel } from '@shared/utils/bikeType';
-import { formatStock } from '@renderer/lib/format';
+import { eventDateToMs, formatStock, todayDateInput } from '@renderer/lib/format';
 
 type Props = {
   open: boolean;
@@ -48,6 +48,7 @@ export function ServiceDialog({ open, onOpenChange, initialBikeId }: Props) {
 
   const [bikeId, setBikeId] = useState('');
   const [quantity, setQuantity] = useState(String(DEFAULT_SERVICE_OIL_ML));
+  const [eventDate, setEventDate] = useState(todayDateInput());
   const [odometer, setOdometer] = useState('');
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState<SettableServiceEventStatus>('requested');
@@ -57,6 +58,7 @@ export function ServiceDialog({ open, onOpenChange, initialBikeId }: Props) {
     if (open) {
       setBikeId(initialBikeId ?? '');
       setQuantity(String(DEFAULT_SERVICE_OIL_ML));
+      setEventDate(todayDateInput());
       setOdometer('');
       setNotes('');
       setStatus('requested');
@@ -102,6 +104,7 @@ export function ServiceDialog({ open, onOpenChange, initialBikeId }: Props) {
         bikeId,
         kind: 'service',
         status,
+        occurredAt: eventDateToMs(eventDate),
         lines: [
           {
             ingredientId: engineOil.id,
@@ -131,26 +134,40 @@ export function ServiceDialog({ open, onOpenChange, initialBikeId }: Props) {
         </DialogHeader>
 
         <div className="grid gap-3">
+          <div className="grid gap-1">
+            <Label>Bike</Label>
+            <Select value={bikeId} onValueChange={setBikeId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pick a bike…" />
+              </SelectTrigger>
+              <SelectContent>
+                {bikes.map((b) => {
+                  const t = bikeTypeById.get(b.bikeTypeId);
+                  return (
+                    <SelectItem key={b.id} value={b.id}>
+                      #{b.bikeNumber}
+                      {t ? ` · ${formatBikeTypeLabel(t)}` : ''}
+                      {b.licensePlate ? ` · ${b.licensePlate}` : ''}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1">
-              <Label>Bike</Label>
-              <Select value={bikeId} onValueChange={setBikeId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pick a bike…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bikes.map((b) => {
-                    const t = bikeTypeById.get(b.bikeTypeId);
-                    return (
-                      <SelectItem key={b.id} value={b.id}>
-                        #{b.bikeNumber}
-                        {t ? ` · ${formatBikeTypeLabel(t)}` : ''}
-                        {b.licensePlate ? ` · ${b.licensePlate}` : ''}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="svc-date">Date</Label>
+              <Input
+                id="svc-date"
+                type="date"
+                max={todayDateInput()}
+                value={eventDate}
+                onChange={(e) => setEventDate(e.target.value)}
+              />
+              <span className="text-[11px] text-text-tertiary">
+                Pick a past date to log an old service.
+              </span>
             </div>
             <div className="grid gap-1">
               <Label htmlFor="svc-odo">Odometer (km)</Label>

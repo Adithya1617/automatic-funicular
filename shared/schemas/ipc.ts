@@ -59,9 +59,11 @@ export const IPC = {
     create: 'serviceEvent:create',
     createAdHoc: 'serviceEvent:createAdHoc',
     updateLines: 'serviceEvent:updateLines',
+    update: 'serviceEvent:update',
     complete: 'serviceEvent:complete',
     setStatus: 'serviceEvent:setStatus',
     cancel: 'serviceEvent:cancel',
+    remove: 'serviceEvent:remove',
   },
   stockMovement: {
     list: 'stockMovement:list',

@@ -81,9 +81,11 @@ import {
   completeServiceEventInputSchema,
   createAdHocServiceEventInputSchema,
   createServiceEventInputSchema,
+  deleteServiceEventInputSchema,
   getServiceEventInputSchema,
   listServiceEventsInputSchema,
   setServiceEventStatusInputSchema,
+  updateServiceEventInputSchema,
   updateServiceEventLinesInputSchema,
 } from '@shared/schemas/serviceEvent';
 import { listStockMovementsInputSchema } from '@shared/schemas/stockMovement';
@@ -179,9 +181,11 @@ export const routes: Record<string, RouteHandler> = {
   'serviceEvent/create': makeHandler(createServiceEventInputSchema, (i) => ServiceService.create(db(), TID, i, actor())),
   'serviceEvent/createAdHoc': makeHandler(createAdHocServiceEventInputSchema, (i) => ServiceService.createAdHoc(db(), TID, i, actor())),
   'serviceEvent/updateLines': makeHandler(updateServiceEventLinesInputSchema, (i) => ServiceService.updateLines(db(), TID, i, actor())),
+  'serviceEvent/update': makeHandler(updateServiceEventInputSchema, (i) => ServiceService.update(db(), TID, i, actor())),
   'serviceEvent/complete': makeHandler(completeServiceEventInputSchema, (i) => ServiceService.complete(db(), TID, i.id, actor())),
   'serviceEvent/setStatus': makeHandler(setServiceEventStatusInputSchema, (i) => ServiceService.setStatus(db(), TID, i, actor())),
   'serviceEvent/cancel': makeHandler(cancelServiceEventInputSchema, (i) => ServiceService.cancel(db(), TID, i, actor())),
+  'serviceEvent/remove': makeHandler(deleteServiceEventInputSchema, (i) => ServiceService.remove(db(), TID, i.id, actor())),
 
   // ---- Stock movements ----
   'stockMovement/list': makeHandler(listStockMovementsInputSchema, async (i) => {

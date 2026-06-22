@@ -32,6 +32,7 @@ import { useCreateAdHocServiceEvent } from '@renderer/hooks/ipc/useServiceEvents
 import { StatusPicker } from '@renderer/features/maintenance/StatusPicker';
 import type { SettableServiceEventStatus } from '@shared/schemas/serviceEvent';
 import { formatBikeTypeLabel } from '@shared/utils/bikeType';
+import { eventDateToMs, todayDateInput } from '@renderer/lib/format';
 
 type Props = {
   open: boolean;
@@ -61,6 +62,7 @@ export function RepairDialog({ open, onOpenChange, initialBikeId }: Props) {
 
   const [bikeId, setBikeId] = useState('');
   const [selections, setSelections] = useState<Record<string, PartSelection>>({});
+  const [eventDate, setEventDate] = useState(todayDateInput());
   const [odometer, setOdometer] = useState('');
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState<SettableServiceEventStatus>('requested');
@@ -70,6 +72,7 @@ export function RepairDialog({ open, onOpenChange, initialBikeId }: Props) {
     if (open) {
       setBikeId(initialBikeId ?? '');
       setSelections({});
+      setEventDate(todayDateInput());
       setOdometer('');
       setNotes('');
       setStatus('requested');
@@ -137,6 +140,7 @@ export function RepairDialog({ open, onOpenChange, initialBikeId }: Props) {
         bikeId,
         kind: 'repair',
         status,
+        occurredAt: eventDateToMs(eventDate),
         lines,
         odometerKm: odoFinal,
         notes: trimmedNotes === '' ? null : trimmedNotes,
@@ -160,26 +164,40 @@ export function RepairDialog({ open, onOpenChange, initialBikeId }: Props) {
         </DialogHeader>
 
         <div className="grid gap-3">
+          <div className="grid gap-1">
+            <Label>Bike</Label>
+            <Select value={bikeId} onValueChange={setBikeId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pick a bike…" />
+              </SelectTrigger>
+              <SelectContent>
+                {bikes.map((b) => {
+                  const t = bikeTypeById.get(b.bikeTypeId);
+                  return (
+                    <SelectItem key={b.id} value={b.id}>
+                      #{b.bikeNumber}
+                      {t ? ` · ${formatBikeTypeLabel(t)}` : ''}
+                      {b.licensePlate ? ` · ${b.licensePlate}` : ''}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1">
-              <Label>Bike</Label>
-              <Select value={bikeId} onValueChange={setBikeId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pick a bike…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bikes.map((b) => {
-                    const t = bikeTypeById.get(b.bikeTypeId);
-                    return (
-                      <SelectItem key={b.id} value={b.id}>
-                        #{b.bikeNumber}
-                        {t ? ` · ${formatBikeTypeLabel(t)}` : ''}
-                        {b.licensePlate ? ` · ${b.licensePlate}` : ''}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="rep-date">Date</Label>
+              <Input
+                id="rep-date"
+                type="date"
+                max={todayDateInput()}
+                value={eventDate}
+                onChange={(e) => setEventDate(e.target.value)}
+              />
+              <span className="text-[11px] text-text-tertiary">
+                Pick a past date to log an old repair.
+              </span>
             </div>
             <div className="grid gap-1">
               <Label htmlFor="rep-odo">Odometer (km)</Label>

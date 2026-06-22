@@ -23,6 +23,7 @@ import { useCreateAdHocServiceEvent } from '@renderer/hooks/ipc/useServiceEvents
 import { StatusPicker } from '@renderer/features/maintenance/StatusPicker';
 import type { SettableServiceEventStatus } from '@shared/schemas/serviceEvent';
 import { formatBikeTypeLabel } from '@shared/utils/bikeType';
+import { eventDateToMs, todayDateInput } from '@renderer/lib/format';
 
 type Props = {
   open: boolean;
@@ -42,6 +43,7 @@ export function WashDialog({ open, onOpenChange, initialBikeId }: Props) {
   const create = useCreateAdHocServiceEvent();
 
   const [bikeId, setBikeId] = useState('');
+  const [eventDate, setEventDate] = useState(todayDateInput());
   const [odometer, setOdometer] = useState('');
   const [notes, setNotes] = useState('');
   const [status, setStatus] = useState<SettableServiceEventStatus>('requested');
@@ -50,6 +52,7 @@ export function WashDialog({ open, onOpenChange, initialBikeId }: Props) {
   useEffect(() => {
     if (open) {
       setBikeId(initialBikeId ?? '');
+      setEventDate(todayDateInput());
       setOdometer('');
       setNotes('');
       setStatus('requested');
@@ -76,6 +79,7 @@ export function WashDialog({ open, onOpenChange, initialBikeId }: Props) {
         bikeId,
         kind: 'wash',
         status,
+        occurredAt: eventDateToMs(eventDate),
         lines: [],
         odometerKm: odoFinal,
         notes: trimmedNotes === '' ? null : trimmedNotes,
@@ -98,26 +102,40 @@ export function WashDialog({ open, onOpenChange, initialBikeId }: Props) {
         </DialogHeader>
 
         <div className="grid gap-3">
+          <div className="grid gap-1">
+            <Label>Bike</Label>
+            <Select value={bikeId} onValueChange={setBikeId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pick a bike…" />
+              </SelectTrigger>
+              <SelectContent>
+                {bikes.map((b) => {
+                  const t = bikeTypeById.get(b.bikeTypeId);
+                  return (
+                    <SelectItem key={b.id} value={b.id}>
+                      #{b.bikeNumber}
+                      {t ? ` · ${formatBikeTypeLabel(t)}` : ''}
+                      {b.licensePlate ? ` · ${b.licensePlate}` : ''}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="grid gap-1">
-              <Label>Bike</Label>
-              <Select value={bikeId} onValueChange={setBikeId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pick a bike…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {bikes.map((b) => {
-                    const t = bikeTypeById.get(b.bikeTypeId);
-                    return (
-                      <SelectItem key={b.id} value={b.id}>
-                        #{b.bikeNumber}
-                        {t ? ` · ${formatBikeTypeLabel(t)}` : ''}
-                        {b.licensePlate ? ` · ${b.licensePlate}` : ''}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="wash-date">Date</Label>
+              <Input
+                id="wash-date"
+                type="date"
+                max={todayDateInput()}
+                value={eventDate}
+                onChange={(e) => setEventDate(e.target.value)}
+              />
+              <span className="text-[11px] text-text-tertiary">
+                Pick a past date to log an old wash.
+              </span>
             </div>
             <div className="grid gap-1">
               <Label htmlFor="wash-odo">Odometer (km)</Label>

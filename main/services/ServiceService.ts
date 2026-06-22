@@ -15,10 +15,12 @@ import type {
   ListServiceEventsInput,
   ServiceEvent,
   ServiceEventLine,
+  ServiceEventLineInput,
   ServiceEventLineWithCost,
   ServiceEventWithCost,
   ServiceEventWithLines,
   SetServiceEventStatusInput,
+  UpdateServiceEventInput,
   UpdateServiceEventLinesInput,
 } from '@shared/schemas/serviceEvent';
 import {
@@ -38,6 +40,33 @@ function toEvent(
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/** Stock-relevant identity of a line: which part, how much, in what unit. */
+function lineKey(l: { ingredientId: string; quantity: number; unit: string }): string {
+  return `${l.ingredientId}|${l.quantity}|${l.unit}`;
+}
+
+/**
+ * True when two line sets are the same multiset of (part, quantity, unit) —
+ * used by `update` to decide whether stock actually needs re-reconciling. If
+ * the parts are untouched (only odometer/notes/date changed) we leave the
+ * existing lines and their consumption movements in place.
+ */
+function sameLineSet(
+  a: ReadonlyArray<{ ingredientId: string; quantity: number; unit: string }>,
+  b: ReadonlyArray<{ ingredientId: string; quantity: number; unit: string }>,
+): boolean {
+  if (a.length !== b.length) return false;
+  const counts = new Map<string, number>();
+  for (const l of a) counts.set(lineKey(l), (counts.get(lineKey(l)) ?? 0) + 1);
+  for (const l of b) {
+    const k = lineKey(l);
+    const c = counts.get(k);
+    if (!c) return false;
+    counts.set(k, c - 1);
+  }
+  return true;
 }
 
 export const ServiceService = {
@@ -248,6 +277,10 @@ export const ServiceService = {
 
     return db.transaction(async (tx) => {
       const now = Date.now();
+      // Domain date of the maintenance — backdated when the operator logs a
+      // past record, else now. Audit columns (created/updated) always reflect
+      // when the row was actually entered.
+      const occurredAt = input.occurredAt ?? now;
       const event = await serviceEventRepository.insert(tx, {
         id: newId(),
         tenantId,
@@ -256,8 +289,8 @@ export const ServiceService = {
         serviceTemplateId: null,
         serviceTemplateVersionId: null,
         status,
-        startedAt: now,
-        completedAt: status === 'completed' ? now : null,
+        startedAt: occurredAt,
+        completedAt: status === 'completed' ? occurredAt : null,
         cancelledAt: null,
         cancelledPartsUsed: null,
         odometerKm: input.odometerKm ?? null,
@@ -574,5 +607,188 @@ export const ServiceService = {
     });
 
     return ServiceService.get(db, tenantId, input.id);
+  },
+
+  /**
+   * Full edit of an existing event — including a `completed` one, so staff can
+   * correct a mistake (wrong quantity, wrong part, wrong bike/date/odometer).
+   * Stock stays correct: if the parts changed (or the completed-ness changed)
+   * the old consumption is reversed and the new line set re-consumed in one tx,
+   * so inventory always reflects the saved lines. When only scalar fields move
+   * (odometer / notes / date) the lines + their movements are left untouched so
+   * the ledger and per-event cost don't churn. Cancelled events are terminal.
+   */
+  async update(
+    db: AppDb,
+    tenantId: number,
+    input: UpdateServiceEventInput,
+    actorId: string = SYSTEM_USER_ID,
+  ): Promise<ServiceEventWithLines> {
+    const existing = await serviceEventRepository.findById(db, tenantId, input.id);
+    if (!existing) throw new NotFoundError('ServiceEvent', input.id);
+    if (existing.status === 'cancelled') {
+      throw new ConflictError('A cancelled event is terminal — it cannot be edited');
+    }
+
+    if (input.bikeId) {
+      const bike = await bikeRepository.findById(db, tenantId, input.bikeId);
+      if (!bike) throw new NotFoundError('Bike', input.bikeId);
+    }
+
+    const kind = existing.kind;
+    const inputLines: ServiceEventLineInput[] = input.lines ?? [];
+    if (kind === 'wash') {
+      if (inputLines.length > 0) {
+        throw new ValidationError('A wash event cannot consume parts');
+      }
+    } else if (inputLines.length === 0) {
+      throw new ValidationError(`Add at least one part for this ${kind}`);
+    }
+
+    // Validate every line up-front (part exists + unit converts) so we never
+    // half-apply a reconciliation then fail.
+    for (const line of inputLines) {
+      const ing = await ingredientRepository.findById(db, tenantId, line.ingredientId);
+      if (!ing) throw new NotFoundError('Ingredient', line.ingredientId);
+      toBase(line.quantity, line.unit, ing.baseUnit, {
+        densityGPerMl: ing.densityGPerMl ?? undefined,
+      });
+    }
+
+    const newStatus = input.status ?? existing.status;
+    const wasDeducted = existing.status === 'completed';
+    const willDeduct = newStatus === 'completed';
+
+    const existingLines = await serviceEventLineRepository.listForEvent(db, input.id);
+    const stockRelevant =
+      !sameLineSet(existingLines, inputLines) || wasDeducted !== willDeduct;
+
+    return db.transaction(async (tx) => {
+      if (stockRelevant) {
+        // 1) Undo the old deduction (restore the parts that were consumed).
+        if (wasDeducted) {
+          for (const line of existingLines) {
+            await InventoryService.applyMovement(
+              tx,
+              tenantId,
+              {
+                ingredientId: line.ingredientId,
+                quantity: line.quantity,
+                unit: line.unit,
+                reason: 'service_reversal',
+                referenceType: 'service_event_line',
+                referenceId: line.id,
+                direction: 1,
+              },
+              actorId,
+              { skipAvailabilityRecompute: true },
+            );
+          }
+        }
+
+        // 2) Swap in the new line set.
+        const newLines = await serviceEventLineRepository.replaceLines(
+          tx,
+          input.id,
+          inputLines.map((line, idx) => ({
+            id: newId(),
+            serviceEventId: input.id,
+            ingredientId: line.ingredientId,
+            quantity: line.quantity,
+            unit: line.unit,
+            notes: line.notes ?? null,
+            displayOrder: line.displayOrder || idx,
+          })),
+        );
+
+        // 3) Re-deduct against the new lines when the event is (still) completed.
+        if (willDeduct) {
+          for (const line of newLines) {
+            await InventoryService.applyMovement(
+              tx,
+              tenantId,
+              {
+                ingredientId: line.ingredientId,
+                quantity: line.quantity,
+                unit: line.unit,
+                reason: 'service_consumed',
+                referenceType: 'service_event_line',
+                referenceId: line.id,
+                direction: -1,
+              },
+              actorId,
+              { skipAvailabilityRecompute: true },
+            );
+          }
+        }
+      }
+
+      const now = Date.now();
+      const newStartedAt = input.occurredAt ?? existing.startedAt;
+      const newCompletedAt = willDeduct
+        ? input.occurredAt ?? existing.completedAt ?? existing.startedAt
+        : null;
+      await serviceEventRepository.update(tx, tenantId, input.id, {
+        ...(input.bikeId ? { bikeId: input.bikeId } : {}),
+        status: newStatus,
+        startedAt: newStartedAt,
+        completedAt: newCompletedAt,
+        ...(input.odometerKm !== undefined ? { odometerKm: input.odometerKm } : {}),
+        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        updatedAt: now,
+        updatedBy: actorId,
+      });
+
+      const fresh = await serviceEventRepository.findById(tx, tenantId, input.id);
+      const lines = await serviceEventLineRepository.listForEvent(tx, input.id);
+      return {
+        ...(fresh as unknown as ServiceEvent),
+        lines: lines as unknown as ServiceEventLine[],
+      };
+    });
+  },
+
+  /**
+   * Delete an event. When it was `completed`, every line's parts are first put
+   * back into inventory via a `service_reversal` movement (append-only — the
+   * original consumption rows stay), then the event + its lines are removed.
+   * requested / in_progress events never deducted stock, so they're just
+   * removed; cancelled events already settled their stock on cancel.
+   */
+  async remove(
+    db: AppDb,
+    tenantId: number,
+    id: string,
+    actorId: string = SYSTEM_USER_ID,
+  ): Promise<{ id: string }> {
+    const existing = await serviceEventRepository.findById(db, tenantId, id);
+    if (!existing) throw new NotFoundError('ServiceEvent', id);
+    const lines = await serviceEventLineRepository.listForEvent(db, id);
+
+    await db.transaction(async (tx) => {
+      if (existing.status === 'completed') {
+        for (const line of lines) {
+          await InventoryService.applyMovement(
+            tx,
+            tenantId,
+            {
+              ingredientId: line.ingredientId,
+              quantity: line.quantity,
+              unit: line.unit,
+              reason: 'service_reversal',
+              referenceType: 'service_event_line',
+              referenceId: line.id,
+              direction: 1,
+            },
+            actorId,
+            { skipAvailabilityRecompute: true },
+          );
+        }
+      }
+      await serviceEventLineRepository.deleteForEvent(tx, id);
+      await serviceEventRepository.delete(tx, tenantId, id);
+    });
+
+    return { id };
   },
 };

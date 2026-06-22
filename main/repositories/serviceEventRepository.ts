@@ -70,6 +70,12 @@ export const serviceEventRepository = {
     return updated;
   },
 
+  async delete(db: AppDb, tenantId: number, id: string): Promise<void> {
+    await db
+      .delete(serviceEvents)
+      .where(and(eq(serviceEvents.tenantId, tenantId), eq(serviceEvents.id, id)));
+  },
+
   /**
    * Bike + range query used by the cost-per-bike dashboard tile (lands in H6).
    * `bikeId` is optional — when omitted, returns every event in range.

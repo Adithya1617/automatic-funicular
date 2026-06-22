@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { History, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { History, Pencil, Plus } from 'lucide-react';
 import { Button } from '@renderer/components/ui/button';
 import {
   Table,
@@ -14,13 +15,15 @@ import {
   useSetServiceEventStatus,
 } from '@renderer/hooks/ipc/useServiceEvents';
 import { useBikes } from '@renderer/hooks/ipc/useBikes';
-import { formatRelativeTime } from '@renderer/lib/format';
+import { formatDate } from '@renderer/lib/format';
 import type { SettableServiceEventStatus } from '@shared/schemas/serviceEvent';
 import { WashDialog } from '@renderer/features/wash/WashDialog';
 import { BikeHistoryDialog } from '@renderer/features/maintenance/BikeHistoryDialog';
 import { StatusSelect } from '@renderer/features/maintenance/StatusSelect';
+import { DeleteEventButton } from '@renderer/features/maintenance/DeleteEventButton';
 
 export function WashPage() {
+  const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
@@ -97,12 +100,13 @@ export function WashPage() {
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Odometer</TableHead>
                 <TableHead>Notes</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {events.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-text-tertiary">
+                  <TableCell colSpan={6} className="text-center text-text-tertiary">
                     No washes yet — click <span className="font-medium">+ Request wash</span> to add one.
                   </TableCell>
                 </TableRow>
@@ -116,7 +120,7 @@ export function WashPage() {
                     </TableCell>
                     <TableCell>
                       <span className="text-text-tertiary">
-                        {formatRelativeTime(e.completedAt ?? e.startedAt)}
+                        {formatDate(e.completedAt ?? e.startedAt)}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -131,6 +135,24 @@ export function WashPage() {
                     </TableCell>
                     <TableCell>
                       <span className="text-text-secondary">{e.notes ?? '—'}</span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigate(`/services/${e.id}/edit`)}
+                          title="Edit"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <DeleteEventButton
+                          eventId={e.id}
+                          kind="wash"
+                          completed={e.status === 'completed'}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))

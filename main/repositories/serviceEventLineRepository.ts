@@ -35,6 +35,13 @@ export const serviceEventLineRepository = {
     return db.insert(serviceEventLines).values(rows).returning();
   },
 
+  /** Delete every line for an event — used when an event is removed. */
+  async deleteForEvent(db: AppDb, serviceEventId: string): Promise<void> {
+    await db
+      .delete(serviceEventLines)
+      .where(eq(serviceEventLines.serviceEventId, serviceEventId));
+  },
+
   /** Replace all lines for an event — used by updateLines while in_progress. */
   async replaceLines(
     db: AppDb,

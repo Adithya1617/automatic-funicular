@@ -119,6 +119,12 @@ export const createAdHocServiceEventInputSchema = z.object({
   // 'requested' / 'in_progress' record the (planned) parts without touching
   // stock until the event is later marked completed.
   status: z.enum(SETTABLE_SERVICE_EVENT_STATUSES).optional(),
+  // When the maintenance actually happened (Unix ms). Lets the operator
+  // backdate a past service / repair / wash record. Drives startedAt (and
+  // completedAt when created completed), so it feeds list order, the
+  // maintenance countdown, and the dashboard date ranges. Null → the service
+  // stamps the current time.
+  occurredAt: z.number().int().positive().nullable().default(null),
   lines: z
     .array(
       z.object({
@@ -168,6 +174,35 @@ export const cancelServiceEventInputSchema = z.object({
   partsUsed: z.boolean().optional(),
 });
 export type CancelServiceEventInput = z.infer<typeof cancelServiceEventInputSchema>;
+
+/**
+ * Full edit of an existing event (service / repair / wash) at any non-terminal
+ * status — including a `completed` one, so staff can fix a mistake. Stock is
+ * reconciled in `ServiceService.update`: if the event was completed its old
+ * consumption is reversed and the new line set re-consumed, so inventory always
+ * matches the saved parts. `wash` carries zero lines. Omitted scalar fields are
+ * left unchanged; `occurredAt` (Unix ms) backdates the event when supplied.
+ */
+export const updateServiceEventInputSchema = z.object({
+  id: idSchema,
+  bikeId: idSchema.optional(),
+  status: z.enum(SETTABLE_SERVICE_EVENT_STATUSES).optional(),
+  lines: z.array(serviceEventLineInputSchema).default([]),
+  odometerKm: z.number().nonnegative().nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  occurredAt: z.number().int().positive().nullable().optional(),
+});
+export type UpdateServiceEventInput = z.infer<typeof updateServiceEventInputSchema>;
+
+/**
+ * Delete an event. `ServiceService.remove` restores stock first when the event
+ * was `completed` (a `service_reversal` per line adds the parts back to
+ * inventory) and then removes the event + its lines. The append-only stock
+ * ledger keeps both the original consumption and the reversal, so reconciliation
+ * still balances.
+ */
+export const deleteServiceEventInputSchema = z.object({ id: idSchema });
+export type DeleteServiceEventInput = z.infer<typeof deleteServiceEventInputSchema>;
 
 export const listServiceEventsInputSchema = z.object({
   status: z.enum(SERVICE_EVENT_STATUSES).optional(),
